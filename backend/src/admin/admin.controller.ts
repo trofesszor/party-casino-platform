@@ -58,9 +58,9 @@ export class AdminController {
   }
 
   @Post('side-quests')
-  addSideQuest(@Body() body: { title: string; description?: string }, @Headers('authorization') authorization?: string) {
+  addSideQuest(@Body() body: { title: string; description?: string; photoEnabled?: boolean }, @Headers('authorization') authorization?: string) {
     this.admin.assertToken(this.token(authorization));
-    return this.players.addSideQuestToPool(body.title, body.description ?? '');
+    return this.players.addSideQuestToPool(body.title, body.description ?? '', body.photoEnabled === true);
   }
 
   @Post('side-quests/:id/photo-enabled')
