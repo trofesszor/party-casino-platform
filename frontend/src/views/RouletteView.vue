@@ -14,6 +14,7 @@ const selectedType = ref<RouletteBetType>('NUMBER');
 const selectedNumbers = ref<number[]>([]);
 const selectedValue = ref('');
 const chip = ref(1);
+const tokenBalance = ref(0);
 const error = ref('');
 const busy = ref(false);
 const now = ref(Date.now());
@@ -93,6 +94,7 @@ async function submitBet() {
  busy.value = true; error.value = '';
  try {
    state.value = await api.placeRouletteBet(playerId, selectedType.value, value, chip.value);
+   tokenBalance.value = (await api.getPlayerBalance(playerId)).tokenBalance;
    selectedNumbers.value = [];
    selectedValue.value = '';
  } catch (e: any) { error.value = e.message; }
@@ -104,7 +106,7 @@ function labelBet(bet: { betType: RouletteBetType; betValue: string }) {
  return names[bet.betType] + ': ' + (values[bet.betValue] ?? bet.betValue.split(',').join(' / '));
 }
 function onChanged(payload: RouletteState) { state.value = payload; }
-onMounted(() => { refresh().catch(e => error.value = e.message); socket.on('roulette:changed', onChanged); clock = setInterval(() => { now.value = Date.now(); }, 250); });
+onMounted(() => { refresh().catch(e => error.value = e.message); if (playerId > 0) api.getPlayerBalance(playerId).then(b => tokenBalance.value = b.tokenBalance).catch(e => error.value = e.message); socket.on('roulette:changed', onChanged); clock = setInterval(() => { now.value = Date.now(); }, 250); });
 onUnmounted(() => { socket.off('roulette:changed', onChanged); if (clock) clearInterval(clock); });
 </script>
 
@@ -112,7 +114,7 @@ onUnmounted(() => { socket.off('roulette:changed', onChanged); if (clock) clearI
  <main class="roulette-page">
   <header class="roulette-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><span class="live-indicator">● {{ isDisplay ? 'TV KIJELZŐ' : 'KÖZÖS RULETTASZTAL' }}</span></header>
   <section v-if="state?.currentRound" class="roulette-content">
-   <p class="eyebrow">EURÓPAI RULETT · 0–36</p><h1>Rulettasztal</h1>
+   <p class="eyebrow">EURÓPAI RULETT · 0–36</p><h1>Rulettasztal</h1><p v-if="!isDisplay" class="roulette-token-balance">Egyenleg: <strong>{{ tokenBalance }} CR</strong></p>
    <div class="roulette-round panel"><span class="eyebrow">KÖR #{{ state.currentRound.roundNumber }}</span><h2>{{ state.currentRound.status === 'BETTING' ? secondsLeft + ' mp' : 'Eredmény' }}</h2><p class="muted">{{ state.currentRound.status === 'BETTING' ? 'Helyezd el a zsetonjaidat az asztalon.' : 'A következő kör automatikusan indul.' }}</p></div>
    <RouletteWheel :result-number="state.currentRound.resultNumber" :previous-result-number="state.history[0]?.resultNumber ?? null" :spinning="state.currentRound.status === 'COMPLETED'" :round-number="state.currentRound.roundNumber" />
 
