@@ -151,20 +151,49 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
       <nav><a href="/leaderboard">Ranglista</a><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
     </header>
 
-    <section class="hero">
-      <p class="eyebrow">A TE HELYI KASZINÓD</p>
-      <h1>Válassz <span>játékot.</span></h1>
-      <p class="muted">Egy platform, állandó játékasztalok.</p>
+    <section class="hero dashboard-hero">
+      <div><p class="eyebrow">A TE HELYI KASZINÓD</p><h1>Játékra <span>fel.</span></h1><p class="muted">Játssz, versenyezz, gyűjts tokeneket.</p></div>
+      <a class="hero-leaderboard" href="/leaderboard">Ranglista megtekintése <span>↗</span></a>
     </section>
 
-    <section class="welcome panel">
+    <section class="welcome panel dashboard-welcome">
       <div>
-        <p class="eyebrow">JÁTÉKOS</p>
+        <p class="eyebrow">JÁTÉKOS · PARTY CASINO</p>
         <h2>Szia, {{ player.name }}!</h2>
-        <p class="muted">Válassz az állandó játékok közül.</p>
-        <p class="player-token-balance">Tokenegyenleg: <strong>{{ tokenBalance }} CR</strong></p>
+        <p class="muted">A játékasztalok készen állnak. Melyikkel kezded?</p>
       </div>
+      <div class="welcome-status"><span class="online-dot"></span><span>Csatlakozva</span></div>
     </section>
+
+    <div class="game-grid">
+      <button class="game-card panel" @click="router.push('/roulette')">
+        <span class="game-icon">🎡</span>
+        <h3>Rulettasztal</h3>
+        <p class="muted">Közös asztal, automatikus körök. Mindenki ugyanarra az eredményre játszik.</p>
+        <span class="game-link">Játék megnyitása →</span>
+      </button>
+
+      <button class="game-card panel" @click="router.push('/slots')">
+        <span class="game-icon">🎰</span>
+        <h3>Slot machine</h3>
+        <p class="muted">Egyéni pörgetések. Minden játékos külön játszik.</p>
+        <span class="game-link">Játék megnyitása →</span>
+      </button>
+
+      <button class="game-card panel" @click="router.push('/lucky-wheel')">
+        <span class="game-icon">🎡</span>
+        <h3>Szerencsekerék</h3>
+        <p class="muted">Közös party kihívások. Egy játékos pörget, mindenki ugyanazt látja.</p>
+        <span class="game-link">Kerék megnyitása →</span>
+      </button>
+
+      <article class="game-card panel coming-soon">
+        <span class="game-icon">🛍️</span>
+        <h3>Shop</h3>
+        <p class="muted">A későbbiekben itt válthatod be a játék során szerzett jutalmakat.</p>
+        <span class="game-link">Hamarosan</span>
+      </article>
+    </div>
 
     <section class="duels-panel panel">
       <div class="duels-heading"><div><p class="eyebrow">PLAYER CHALLENGES</p><h2>Párbajok</h2><p class="muted">Hívd ki egy játékost, mérjétek össze a tudásotokat, majd közösen erősítsétek meg az eredményt.</p></div><span class="duel-live-count">{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }} AKTÍV</span></div>
@@ -233,42 +262,12 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
       </div>
     </section>
 
-    <section class="section-heading">
-      <div>
-        <p class="eyebrow">JÁTÉKTEREM</p>
-        <h2>Válassz játékot</h2>
-      </div>
+    <section class="section-heading game-section-heading">
+      <div><p class="eyebrow">JÁTÉKTEREM</p><h2>Válassz játékot</h2></div>
+      <span class="section-hint">3 elérhető játék</span>
     </section>
 
-    <div class="game-grid">
-      <button class="game-card panel" @click="router.push('/roulette')">
-        <span class="game-icon">🎡</span>
-        <h3>Rulettasztal</h3>
-        <p class="muted">Közös asztal, automatikus körök. Mindenki ugyanarra az eredményre játszik.</p>
-        <span class="game-link">Játék megnyitása →</span>
-      </button>
 
-      <button class="game-card panel" @click="router.push('/slots')">
-        <span class="game-icon">🎰</span>
-        <h3>Slot machine</h3>
-        <p class="muted">Egyéni pörgetések. Minden játékos külön játszik.</p>
-        <span class="game-link">Játék megnyitása →</span>
-      </button>
-
-      <button class="game-card panel" @click="router.push('/lucky-wheel')">
-        <span class="game-icon">🎡</span>
-        <h3>Szerencsekerék</h3>
-        <p class="muted">Közös party kihívások. Egy játékos pörget, mindenki ugyanazt látja.</p>
-        <span class="game-link">Kerék megnyitása →</span>
-      </button>
-
-      <article class="game-card panel coming-soon">
-        <span class="game-icon">🛍️</span>
-        <h3>Shop</h3>
-        <p class="muted">A későbbiekben itt válthatod be a játék során szerzett jutalmakat.</p>
-        <span class="game-link">Hamarosan</span>
-      </article>
-    </div>
 
     <footer>PARTY CASINO <span>•</span> Helyi hálózaton futó party platform</footer>
   </main>
