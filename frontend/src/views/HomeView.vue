@@ -330,7 +330,7 @@ onUnmounted(() => { window.removeEventListener('message',handleSnappinMessage); 
       <p v-if="sideQuestError" class="error">{{ sideQuestError }}</p>
       <div v-if="sideQuests.some(q => q.status !== 'ACTIVE')" class="side-quest-completed">
         <h3>Teljesített küldetések</h3>
-        <div v-for="quest in sideQuests.filter(q => q.status !== 'ACTIVE')" :key="quest.id"><span>{{ quest.title }}</span><small>{{ quest.status === 'SKIPPED' ? '↷ Kihagyva' : `✓ Jóváhagyta: ${quest.approvedByName || 'ismeretlen'}` }}</small></div>
+        <div v-for="quest in sideQuests.filter(q => q.status !== 'ACTIVE')" :key="quest.id"><span>{{ quest.title }}</span><small>{{ quest.status === 'SKIPPED' ? '↷ Kihagyva' : quest.completionMethod === 'PHOTO' ? '✓ Fotóval teljesítve · Snappin' : `✓ Jóváhagyta: ${quest.approvedByName || 'ismeretlen'}` }}</small></div>
       </div>
     </section>
 
