@@ -1,4 +1,4 @@
-export interface Player { id: number; name: string; joinedAt: string }
+export interface Player { id: number; name: string; joinedAt: string; tokenBalance: number }
 export type RouletteBetType = 'NUMBER' | 'SPLIT' | 'STREET' | 'CORNER' | 'SIX_LINE' | 'DOZEN' | 'COLUMN' | 'COLOR' | 'ODD_EVEN' | 'LOW_HIGH';
 export interface RouletteBet { id: number; playerId: number; playerName: string; betType: RouletteBetType; betValue: string; amount: number }
 export interface RouletteRound { id: number; roundNumber: number; status: 'BETTING' | 'COMPLETED'; resultNumber: number | null; bettingEndsAt: string; createdAt: string; completedAt: string | null }
