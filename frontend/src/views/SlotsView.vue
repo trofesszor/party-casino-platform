@@ -5,9 +5,10 @@ import { api } from '../services/api';
 const playerId = Number(localStorage.getItem('party-player-id'));
 const reels = ref(['🍒', '7️⃣', '💎']);
 const reelStrips = ref<string[][]>(reels.value.map(symbol => Array(13).fill(symbol)));
-const reelOffsets = ref([6, 6, 6]);
+const reelOffsets = ref([0, 0, 0]);
+const reelCellHeights = ref([104, 104, 104]);
 const reelAnimating = ref(false);
-const reelDurations = [2300, 3150, 4000];
+const reelDurations = [3300, 4100, 4900];
 const reelSymbols = ['🍒','🍋','🍇','🍉','🔔','💎','7️⃣','⭐','🪙'];
 const randomSymbol = () => reelSymbols[Math.floor(Math.random() * reelSymbols.length)];
 const busy = ref(false);
@@ -37,18 +38,26 @@ async function spin() {
     // Build a real vertical symbol strip for each reel. The server-selected
     // result is placed at the end of each strip and the reel scrolls to it.
     reelStrips.value = response.reels.map((winningSymbol) => [
-      ...Array.from({ length: 22 }, randomSymbol),
+      ...Array.from({ length: 69 }, randomSymbol),
       winningSymbol,
     ]);
     reelOffsets.value = [0, 0, 0];
     await nextTick();
 
-    // Let the browser paint the starting position before applying the target.
+    // Measure the visible reel window. Transform percentages are relative to
+    // the strip's own box, not its overflowing contents, so use exact pixels.
+    const windows = Array.from(document.querySelectorAll<HTMLElement>('.slot-reel-window'));
+    reelCellHeights.value = windows.map(window => window.getBoundingClientRect().height);
+    reelOffsets.value = [0, 0, 0];
+    reelAnimating.value = false;
+    await nextTick();
+
+    // Paint the reset position, then travel through 70+ symbols per reel.
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     reelAnimating.value = true;
     await nextTick();
     reelOffsets.value = reelStrips.value.map(strip => strip.length - 1);
-    await sleep(reelDurations[2] + 180);
+    await sleep(reelDurations[2] + 220);
 
     reels.value = response.reels;
     winMultiplier.value = response.multiplier;
@@ -90,7 +99,7 @@ async function spin() {
           <div class="slot-reel-labels"><span>1</span><span>2</span><span>3</span></div>
           <div class="slot-reels" :class="{ spinning: busy }">
             <div v-for="(strip,index) in reelStrips" :key="index" class="slot-reel-window" :class="{ 'reel-stopped': !busy && spinCount > 0 }">
-              <div class="slot-reel-strip" :style="{ transform: `translate3d(0, -${(reelOffsets[index] / strip.length) * 100}%, 0)`, transitionDuration: reelAnimating ? `${reelDurations[index]}ms` : '0ms' }">
+              <div class="slot-reel-strip" :style="{ transform: `translate3d(0, -${reelOffsets[index] * reelCellHeights[index]}px, 0)`, transitionDuration: reelAnimating ? `${reelDurations[index]}ms` : '0ms' }">
                 <div v-for="(symbol, symbolIndex) in strip" :key="symbolIndex" class="slot-reel-symbol">{{ symbol }}</div>
               </div>
               <div class="slot-reel-reflection"></div>
