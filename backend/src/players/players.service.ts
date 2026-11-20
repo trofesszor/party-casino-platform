@@ -163,7 +163,17 @@ export class PlayersService {
         const reward=updated.rewardAmount;
         sqlite.prepare('UPDATE players SET token_balance=token_balance+? WHERE id=?').run(reward,winnerId);
         const balance=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(winnerId) as {balance:number};
-        sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?, ?, ?, 'DUEL_WIN', ?)").run(winnerId,reward,balance.balance,'Párbaj győzelem');
+        const opponentName = winnerId===updated.challengerId ? updated.opponentName : updated.challengerName;
+        const duelTypeLabels: Record<string, string> = {
+          SZKANDER: 'Szkander',
+          ROCK_PAPER_SCISSORS: 'Kő-papír-olló · best of 3',
+          PLANK: 'Plank',
+          PUSH_UPS: 'Fekvő',
+          DICE: 'Kockadobás',
+        };
+        const duelTypeLabel = duelTypeLabels[updated.duelType ?? ''] ?? updated.duelType ?? 'Ismeretlen';
+        const description = `Párbaj győzelem · Ellenfél: ${opponentName} · Típus: ${duelTypeLabel}`;
+        sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?, ?, ?, 'DUEL_WIN', ?)").run(winnerId,reward,balance.balance,description);
         sqlite.prepare("UPDATE duels SET status='COMPLETED',winner_id=?,loser_id=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(winnerId,loserId,duelId);
       }
       sqlite.exec('COMMIT');
