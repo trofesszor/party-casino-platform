@@ -6,7 +6,7 @@ export class SlotsController {
   constructor(private readonly slots: SlotsService) {}
 
   @Post('spin')
-  spin(@Body() body: { playerId: number }) {
-    return this.slots.spin(Number(body.playerId));
+  spin(@Body() body: { playerId: number; betAmount: number }) {
+    return this.slots.spin(Number(body.playerId), Number(body.betAmount));
   }
 }
