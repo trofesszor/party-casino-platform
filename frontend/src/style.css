@@ -364,3 +364,44 @@
 .admin-empty{padding:30px;text-align:center}
 .admin-footnote{font-size:11px;color:#7e808a;margin-top:14px}
 @media(max-width:600px){.admin-page{padding:0 14px 35px}.admin-content{margin:30px auto}.admin-login{margin-top:10vh;padding:22px}.admin-heading{align-items:flex-start}.admin-stat-grid{gap:8px}.admin-stat{padding:15px}.admin-stat strong{font-size:28px}.admin-players{padding:15px}.admin-table th,.admin-table td{padding:11px 9px}}
+
+
+/* Shared lucky wheel */
+.lucky-wheel-page{min-height:100vh;padding:0 max(16px,4vw) 38px;background:radial-gradient(ellipse at 50% 12%,#28372b 0%,#101114 58%);color:#f3f3f5}
+.lucky-wheel-content{width:min(820px,100%);margin:42px auto;text-align:center}
+.lucky-wheel-content h1{font:600 clamp(38px,7vw,64px) 'Space Grotesk';margin:0}
+.lucky-wheel-content h1 span{color:var(--accent)}
+.wheel-subtitle{margin:8px 0 24px}
+.wheel-stage{position:relative;display:flex;flex-direction:column;align-items:center;padding:30px 18px 24px;overflow:hidden;background:linear-gradient(145deg,#1a201d,#121513);border:1px solid #d6b76b44}
+.wheel-frame{width:min( min(72vw,520px),100%);aspect-ratio:1;position:relative;filter:drop-shadow(0 16px 24px #0009)}
+.lucky-wheel-svg{width:100%;height:100%;transform-origin:50% 50%;transition-property:transform;transition-timing-function:cubic-bezier(.08,.72,.12,1);will-change:transform}
+.lucky-wheel-svg text{fill:#fff8e6;font:700 12px 'Space Grotesk';paint-order:stroke;stroke:#17171799;stroke-width:2px;stroke-linejoin:round}
+.wheel-pointer{position:absolute;z-index:3;top:20px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-top:40px solid #f4d17e;filter:drop-shadow(0 3px 4px #000)}
+.wheel-status{display:flex;flex-direction:column;gap:6px;margin:18px 0 12px;min-height:58px;justify-content:center}
+.wheel-status span{font-size:10px;letter-spacing:.2em;color:#d7bd7a}
+.wheel-status strong{font:600 clamp(20px,4vw,30px) 'Space Grotesk';color:#fff}
+.wheel-spin-button{min-width:min(340px,100%);min-height:54px;font-weight:800;letter-spacing:.08em}
+.wheel-spin-button:disabled{opacity:.55;cursor:not-allowed}
+.wheel-tv-hint{color:#b9b7ad;font-size:12px}
+.wheel-segment-list{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin:18px auto}
+.wheel-segment-list span{border:1px solid #ffffff20;background:#ffffff09;border-radius:99px;padding:7px 12px;font-size:11px;color:#d7d5cc}
+.lucky-wheel-content footer{margin-top:32px;color:#777c77;font-size:9px;letter-spacing:.16em}
+.admin-wheel-editor{padding:24px;margin-top:24px}
+.admin-wheel-editor .admin-section-heading{align-items:flex-start}
+.admin-wheel-row{display:grid;grid-template-columns:28px minmax(130px,1fr) auto 38px 38px auto;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #ffffff12}
+.admin-wheel-index{color:#a5a5a5;font-size:12px}
+.admin-wheel-row input:not([type=checkbox]){min-width:0}
+.admin-wheel-row label{display:flex;align-items:center;gap:5px;color:#aaa;font-size:11px;white-space:nowrap}
+.admin-wheel-row button{padding:7px 9px}
+.admin-wheel-row .danger{color:#f19b91}
+@media(max-width:600px){
+ .lucky-wheel-content{margin:28px auto}
+ .wheel-stage{padding:24px 10px 20px}
+ .wheel-frame{width:min(82vw,440px)}
+ .wheel-pointer{top:14px}
+ .lucky-wheel-svg text{font-size:10px}
+ .admin-wheel-editor{padding:16px}
+ .admin-wheel-row{grid-template-columns:20px minmax(0,1fr) 32px 32px;gap:6px}
+ .admin-wheel-row label{grid-column:2}
+ .admin-wheel-row .danger{grid-column:4;grid-row:1}
+}
