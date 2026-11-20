@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { api } from '../services/api';
 import { socket } from '../services/socket';
@@ -13,6 +13,7 @@ const busy = ref(false);
 const error = ref('');
 const rotation = ref(0);
 const transitionMs = ref(7000);
+let animatedSpinId: string | null = null;
 const now = ref(Date.now());
 let clock: ReturnType<typeof setInterval>|undefined;
 const colors = ['#b78b39','#263a30','#8d3b42','#293b55','#72523b','#354b45','#755a82','#9a7135','#3c4652','#914d39','#466a61','#62523b'];
@@ -29,32 +30,59 @@ const slices = computed(() => {
     const large = 360/count > 180 ? 1 : 0;
     const path = `M 200 200 L ${sx} ${sy} A 178 178 0 ${large} 1 ${ex} ${ey} Z`;
     const [tx,ty] = point((start+end)/2,112);
-    return { ...segment, path, tx, ty, color: colors[index%colors.length], angle:(start+end)/2 };
+    const words = segment.label.trim().split(/\\s+/);
+    const lines: string[] = [];
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (candidate.length > 13 && line) { lines.push(line); line = word; }
+      else line = candidate;
+    }
+    if (line) lines.push(line);
+    return { ...segment, path, tx, ty, color: colors[index%colors.length], angle:(start+end)/2, lines: lines.slice(0,3) };
   });
 });
-function rotationForWinner() {
-  const s=state.value; if(!s?.winner || !s.segments.length) return;
-  const index=s.segments.findIndex(item=>item.id===s.winner?.id);
-  if(index<0)return;
-  const center=-90+(index+.5)*360/s.segments.length;
-  const target=(((-90-center)%360)+360)%360;
-  const remainingMs=Math.max(0,(s.endsAt??Date.now())-Date.now());
-  transitionMs.value=s.status==='SPINNING'?remainingMs:0;
-  rotation.value=2160+target;
+function targetRotation(s: WheelState) {
+  if (!s.winner || !s.segments.length) return null;
+  const index = s.segments.findIndex(item => item.id === s.winner?.id);
+  if (index < 0) return null;
+  const center = -90 + (index + .5) * 360 / s.segments.length;
+  return (((-90 - center) % 360) + 360) % 360;
 }
-async function refresh(){ state.value=await api.getLuckyWheel(); rotationForWinner(); }
+async function animateSpin(s: WheelState) {
+  if (s.status !== 'SPINNING' || !s.spinId || animatedSpinId === s.spinId) return;
+  const target = targetRotation(s);
+  if (target === null) return;
+  animatedSpinId = s.spinId;
+  const current = rotation.value;
+  const currentModulo = ((current % 360) + 360) % 360;
+  const delta = (target - currentModulo + 360) % 360;
+  transitionMs.value = Math.max(250, (s.endsAt ?? Date.now()) - Date.now());
+  await nextTick();
+  // Force the browser to commit the starting transform before applying the long spin.
+  const wheel = document.querySelector('.lucky-wheel-svg');
+  if (wheel) void (wheel as SVGElement).getBoundingClientRect();
+  rotation.value = current + 360 * 10 + delta;
+}
+function showWinner(s: WheelState) {
+  const target = targetRotation(s);
+  if (target === null) return;
+  transitionMs.value = 0;
+  rotation.value = Math.floor(rotation.value / 360) * 360 + target;
+}
+async function refresh(){ state.value=await api.getLuckyWheel(); if (state.value.status === 'SPINNING') await animateSpin(state.value); else showWinner(state.value); }
 async function spin(){
   if(busy.value||isSpinning.value)return;
   busy.value=true;error.value='';
-  try{state.value=await api.spinLuckyWheel();rotationForWinner();}
+  try{const next=await api.spinLuckyWheel();state.value=next;await animateSpin(next);}
   catch(e:any){error.value=e.message;}
   finally{busy.value=false;}
 }
 function onChanged(next:WheelState){
   const newSpin=next.status==='SPINNING'&&next.spinId!==state.value?.spinId;
   state.value=next;
-  if(newSpin){rotation.value=0;requestAnimationFrame(()=>rotationForWinner());}
-  else if(next.status!=='SPINNING')rotationForWinner();
+  if(newSpin) void animateSpin(next);
+  else if(next.status!=='SPINNING')showWinner(next);
 }
 onMounted(()=>{refresh().catch(e=>error.value=e.message);socket.on('lucky-wheel:changed',onChanged);clock=setInterval(()=>now.value=Date.now(),100);});
 onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInterval(clock);});
@@ -73,7 +101,7 @@ onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInter
       <circle cx="200" cy="200" r="190" fill="#171a19" stroke="#d7b66c" stroke-width="8"/>
       <g v-for="slice in slices" :key="slice.id">
        <path :d="slice.path" :fill="slice.color" stroke="#f4d99a" stroke-width="2"/>
-       <text :x="slice.tx" :y="slice.ty" text-anchor="middle" dominant-baseline="middle" :transform="`rotate(${slice.angle+90} ${slice.tx} ${slice.ty})`">{{ slice.label }}</text>
+       <text :x="slice.tx" :y="slice.ty" text-anchor="middle" dominant-baseline="middle" :transform="`rotate(${slice.angle+90} ${slice.tx} ${slice.ty})`"><tspan v-for="(line,lineIndex) in slice.lines" :key="lineIndex" :x="slice.tx" :dy="lineIndex===0?`${-(slice.lines.length-1)*0.58}em`:'1.16em'">{{ line }}</tspan></text>
       </g>
       <circle cx="200" cy="200" r="36" fill="#d5ad5e" stroke="#fff0bd" stroke-width="5"/>
       <circle cx="200" cy="200" r="10" fill="#30251a"/>
