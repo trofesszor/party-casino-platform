@@ -4,6 +4,7 @@ import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
 
 const SPIN_DURATION_MS = 7000;
+const SPIN_COST = 5;
 
 @Injectable()
 export class LuckyWheelService implements OnModuleInit {
@@ -23,14 +24,15 @@ export class LuckyWheelService implements OnModuleInit {
     const segments = this.database.sqlite.prepare(
       'SELECT id, label, position, enabled FROM lucky_wheel_segments WHERE enabled = 1 ORDER BY position, id',
     ).all();
-    return { ...state, segments, durationMs: SPIN_DURATION_MS };
+    return { ...state, segments, durationMs: SPIN_DURATION_MS, spinCost: SPIN_COST };
   }
 
   getAllSegments() {
     return this.database.sqlite.prepare('SELECT id, label, position, enabled FROM lucky_wheel_segments ORDER BY position, id').all();
   }
 
-  spin() {
+  spin(playerId: number) {
+    if (!Number.isInteger(playerId) || playerId <= 0) throw new BadRequestException('Előbb lépj be a játékosneveddel.');
     const sqlite = this.database.sqlite;
     sqlite.exec('BEGIN IMMEDIATE');
     let spinId = '';
@@ -40,9 +42,15 @@ export class LuckyWheelService implements OnModuleInit {
     try {
       const state = sqlite.prepare("SELECT status FROM lucky_wheel_state WHERE id = 1").get() as { status: string };
       if (state.status === 'SPINNING') throw new BadRequestException('A szerencsekerék már forog. Várd meg az eredményt!');
+      const player = sqlite.prepare('SELECT id FROM players WHERE id = ?').get(playerId);
+      if (!player) throw new BadRequestException('A játékos nem található. Lépj be újra.');
       const segments = sqlite.prepare('SELECT id, label, position FROM lucky_wheel_segments WHERE enabled = 1 ORDER BY position, id').all() as any[];
       if (segments.length < 2) throw new BadRequestException('Legalább két aktív mező szükséges a kerékhez.');
       winningSegment = segments[randomInt(segments.length)];
+      const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(SPIN_COST, playerId, SPIN_COST);
+      if (Number(debit.changes) !== 1) throw new BadRequestException(`A kerék megpörgetéséhez ${SPIN_COST} CR szükséges.`);
+      const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
+      sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'LUCKY_WHEEL_SPIN', 'Szerencsekerék pörgetés')").run(playerId, -SPIN_COST, balance.tokenBalance);
       spinId = randomUUID();
       sqlite.prepare("UPDATE lucky_wheel_state SET status = 'SPINNING', spin_id = ?, winning_segment_id = ?, started_at = ?, ends_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1")
         .run(spinId, winningSegment.id, startedAt, endsAt);
@@ -56,7 +64,8 @@ export class LuckyWheelService implements OnModuleInit {
     this.events.publish('lucky-wheel:changed', started);
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.finishSpin(spinId), SPIN_DURATION_MS);
-    return started;
+    const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
+    return { ...started, tokenBalance: balance.tokenBalance };
   }
 
   saveSegments(input: Array<{ id?: number; label: string; enabled?: boolean }>) {
