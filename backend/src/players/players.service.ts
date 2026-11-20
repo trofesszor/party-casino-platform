@@ -372,8 +372,7 @@ export class PlayersService {
 
   buyShopItem(playerId: number, itemKeyInput: string) {
     const itemKey=String(itemKeyInput ?? '').trim().toUpperCase();
-    const sqlite=this.database.sqlite;
-    sqlite.exec('BEGIN IMMEDIATE');
+    const sqlite=this.database.sqlite; sqlite.exec('BEGIN IMMEDIATE');
     try {
       const player=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(playerId) as {balance:number}|undefined;
       if (!player) throw new BadRequestException('A játékos nem található.');
@@ -381,17 +380,41 @@ export class PlayersService {
       if (!item) throw new BadRequestException('Ez a termék jelenleg nem elérhető.');
       if (player.balance < item.price) throw new BadRequestException('Nincs elég CR az egyenlegeden.');
       sqlite.prepare('UPDATE players SET token_balance=token_balance-? WHERE id=?').run(item.price,playerId);
-      sqlite.prepare(`INSERT INTO player_inventory (player_id,item_key,quantity) VALUES (?,?,1)
-        ON CONFLICT(player_id,item_key) DO UPDATE SET quantity=quantity+1,updated_at=CURRENT_TIMESTAMP`).run(playerId,item.itemKey);
       const balance=player.balance-item.price;
-      sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?,?,?,'SHOP_PURCHASE',?)").run(playerId,-item.price,balance,`Shop vásárlás · ${item.name}`);
+      sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?,?,?,'SHOP_PURCHASE',?)").run(playerId,-item.price,balance,'Shop vásárlás · '+item.name);
+      if(itemKey==='SCRATCH_TICKET'){
+        const roll=randomInt(0,10000),prize=roll<6000?0:roll<8500?10:roll<9500?25:roll<9900?50:100;
+        const result=sqlite.prepare('INSERT INTO scratch_tickets (player_id,prize_amount) VALUES (?,?)').run(playerId,prize);
+        sqlite.exec('COMMIT'); return {success:true,itemKey:item.itemKey,ticketId:Number(result.lastInsertRowid),tokenBalance:balance};
+      }
+      sqlite.prepare('INSERT INTO player_inventory (player_id,item_key,quantity) VALUES (?,?,1) ON CONFLICT(player_id,item_key) DO UPDATE SET quantity=quantity+1,updated_at=CURRENT_TIMESTAMP').run(playerId,item.itemKey);
       sqlite.exec('COMMIT');
       return {success:true,itemKey:item.itemKey,quantity:sqlite.prepare('SELECT quantity FROM player_inventory WHERE player_id=? AND item_key=?').get(playerId,item.itemKey).quantity,tokenBalance:balance};
-    } catch(error) {
-      sqlite.exec('ROLLBACK');
-      throw error;
-    }
+    } catch(error) { sqlite.exec('ROLLBACK'); throw error; }
   }
+
+  getScratchTickets(playerId:number) {
+    if(!this.database.sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId)) throw new BadRequestException('A játékos nem található.');
+    return this.database.sqlite.prepare('SELECT id,status,prize_amount AS prizeAmount,created_at AS createdAt,revealed_at AS revealedAt FROM scratch_tickets WHERE player_id=? ORDER BY id DESC LIMIT 20').all(playerId);
+  }
+
+  revealScratchTicket(playerId:number,ticketId:number) {
+    if(!Number.isSafeInteger(ticketId)||ticketId<=0) throw new BadRequestException('Érvénytelen sorsjegy.');
+    const sqlite=this.database.sqlite; sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const ticket=sqlite.prepare('SELECT id,status,prize_amount AS prizeAmount FROM scratch_tickets WHERE id=? AND player_id=?').get(ticketId,playerId) as {id:number;status:string;prizeAmount:number}|undefined;
+      if(!ticket) throw new BadRequestException('A sorsjegy nem található.');
+      if(ticket.status==='REVEALED'){sqlite.exec('COMMIT');return {success:true,ticketId,prizeAmount:ticket.prizeAmount,alreadyRevealed:true};}
+      sqlite.prepare("UPDATE scratch_tickets SET status='REVEALED',revealed_at=CURRENT_TIMESTAMP WHERE id=? AND status='UNSCRATCHED'").run(ticketId);
+      if(ticket.prizeAmount>0){
+        sqlite.prepare('UPDATE players SET token_balance=token_balance+? WHERE id=?').run(ticket.prizeAmount,playerId);
+        const balance=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(playerId) as {balance:number};
+        sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?,?,?,'SCRATCH_WIN',?)").run(playerId,ticket.prizeAmount,balance.balance,'Kapart sorsjegy nyeremény · +'+ticket.prizeAmount+' CR');
+      }
+      sqlite.exec('COMMIT'); return {success:true,ticketId,prizeAmount:ticket.prizeAmount,alreadyRevealed:false};
+    } catch(error){sqlite.exec('ROLLBACK');throw error;}
+  }
+
 
   useShopItem(playerId: number, itemKeyInput: string, questId: number) {
     const itemKey=String(itemKeyInput ?? '').trim().toUpperCase();
