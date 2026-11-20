@@ -19,7 +19,6 @@ Casino environment variables:
 SNAPPIN_API_URL=https://<snappin-host>
 SNAPPIN_API_KEY=<server-to-server-key>
 SNAPPIN_EVENT_ID=<existing-snappin-event-id>
-SNAPPIN_WEBHOOK_SECRET=<shared-hmac-secret>
 ```
 
 ## 2. Associate the casino with an existing Snappin event
@@ -130,51 +129,33 @@ Requirements:
 
 The casino stores only the Snappin photo ID and verification metadata; Snappin remains the source of truth for the photo binary.
 
-## 6. Webhook notification
+## 6. Polling-based completion verification (initial implementation)
 
-When the photo is fully uploaded, Snappin sends:
+The initial deployment must use polling, not webhooks. The casino currently runs on localhost, while Snappin is publicly hosted over HTTPS. A webhook from Snappin cannot reach the casino's `localhost`: that address would refer to the Snappin server itself.
 
-`POST <casino-public-base-url>/api/integrations/snappin/webhook`
+The casino backend initiates outbound HTTPS requests to Snappin, which works from localhost and does not require a tunnel, public casino URL or inbound firewall rule.
 
-Headers:
+- [ ] After creating a guest session, the casino frontend opens the returned `cameraUrl` in a new browser tab.
+- [ ] The casino frontend polls its own casino-backend status endpoint every 2–3 seconds while the player completes the upload.
+- [ ] The casino backend calls Snappin's `GET /api/integrations/sessions/:sessionId` endpoint using the server-side integration key.
+- [ ] The casino backend validates that the returned `eventId` and `externalReference` match the stored casino session before accepting the result.
+- [ ] The casino marks the matching active photo quest completed only when Snappin reports `UPLOADED` and provides a stable photo ID.
+- [ ] Stop polling when the quest is completed, the session expires/is cancelled, or a terminal error occurs.
+- [ ] Use a sensible overall timeout and backoff for temporary network errors; do not mark a quest complete based only on the browser redirect or a client-side message.
+- [ ] Make status checks idempotent so repeated polls cannot complete or reward the same quest more than once.
 
-- `Content-Type: application/json`
-- `X-Snappin-Timestamp: <unix-seconds>`
-- `X-Snappin-Signature: sha256=<hex-hmac>`
+### Optional future webhook support
 
-Body:
+Webhooks are not required for the localhost phase. Once the casino is deployed at a publicly reachable HTTPS URL, webhook notifications may be added to reduce polling latency and network requests.
 
-```json
-{
-  "event": "photo.uploaded",
-  "sessionId": "session-uuid",
-  "eventId": "snappin-event-id",
-  "externalReference": "party-casino:quest:123:player:45:unique-id",
-  "photoId": "photo-uuid",
-  "uploadedAt": "2026-11-20T23:25:00.000Z"
-}
-```
+If implemented later:
 
-Signature algorithm:
-
-```text
-HMAC-SHA256(
-  SNAPPIN_WEBHOOK_SECRET,
-  "<timestamp>.<exact-raw-request-body>"
-)
-```
-
-Requirements:
-
-- [ ] Configure a callback URL and webhook secret for the casino integration.
-- [ ] Sign the exact UTF-8 request body bytes; do not reserialize JSON before signing.
-- [ ] Retry non-2xx responses with exponential backoff (for example: 5s, 30s, 2m, 10m, 30m).
-- [ ] Include a stable event/delivery ID if possible, and retain delivery attempts for diagnostics.
-- [ ] Treat duplicate deliveries as normal; the casino receiver is idempotent.
-- [ ] Never send the integration API key or guest camera token in the webhook.
-- [ ] Provide a way to test/resend a webhook from the Snappin admin interface or integration logs.
-
-The casino verifies the HMAC and then calls the session-status endpoint before completing a quest. Polling the status endpoint is also supported as a fallback if a webhook is delayed or lost.
+- [ ] Configure a callback URL and a separate webhook signing secret.
+- [ ] Sign the exact UTF-8 request body bytes with HMAC-SHA256 and include a timestamp to prevent replay.
+- [ ] Retry non-2xx responses with exponential backoff and include a stable delivery ID.
+- [ ] Treat duplicate deliveries as normal and keep the receiver idempotent.
+- [ ] Never include the integration API key or guest camera token in the webhook.
+- [ ] Treat the webhook only as a notification; the casino must still fetch the session status from Snappin and validate the event/reference before completing the quest.
 
 ## 7. Operational and privacy requirements
 
@@ -190,11 +171,11 @@ The casino verifies the HMAC and then calls the session-status endpoint before c
 2. Casino backend creates a Snappin guest session for the configured event.
 3. Player opens the returned camera URL in a new browser tab without logging into Snappin.
 4. Player takes and uploads a photo.
-5. Snappin persists the photo, changes the session status to `UPLOADED`, and sends the signed webhook.
-6. Casino validates the webhook and independently reads the session status from Snappin.
-7. Casino marks only the matching active quest as completed and stores the photo ID.
-8. Duplicate webhook deliveries do not complete or reward the quest twice.
-9. A different event, expired session, invalid signature or mismatched external reference cannot complete the quest.
+5. Snappin persists the photo and changes the session status to `UPLOADED`.
+6. Casino polls its backend status endpoint; the casino backend reads the status from Snappin over outbound HTTPS.
+7. Casino validates the event ID and external reference, then marks only the matching active quest as completed and stores the photo ID.
+8. Repeated status checks do not complete or reward the quest more than once.
+9. A different event, expired session or mismatched external reference cannot complete the quest.
 10. A non-photo quest continues to use the existing three-digit PIN flow.
 
 ## Contract note
