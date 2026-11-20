@@ -230,6 +230,16 @@ export const DATABASE = Symbol('DATABASE');
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('scratch_25_percent','10')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('scratch_50_percent','4')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('scratch_100_percent','1')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_number','35')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_split','17')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_street','11')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_corner','8')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_six_line','5')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_dozen','2')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_column','2')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_color','1')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_odd_even','1')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_low_high','1')").run();
 
       const tokenPhotoDefaults: Array<[string,string]> = [['enabled','1'],['balance_threshold','50'],['reward_amount','10'],['cooldown_minutes','60'],['daily_limit','2']];
       const insertTokenPhotoSetting=sqlite.prepare('INSERT OR IGNORE INTO token_photo_settings (setting_key,setting_value) VALUES (?,?)');
