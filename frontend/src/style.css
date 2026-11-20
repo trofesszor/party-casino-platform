@@ -756,3 +756,24 @@ button.game-card{width:100%}
 @media(max-width:520px){.scratch-modal{padding:22px 15px}.scratch-modal-heading h2{font-size:29px}.scratch-prize-area,.scratch-surface{height:170px}.scratch-surface{top:38px}.scratch-card{padding:12px}.scratch-overlay{padding:10px}}
 
 .token-photo-reward{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:0 0 24px;padding:24px 26px;border:1px solid #d5ad5438;background:linear-gradient(120deg,#242016,#171719 65%)}.token-photo-reward h2{margin:5px 0 8px}.token-photo-reward-action{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:220px}.token-photo-message{flex-basis:100%;margin:0;color:#e8c76d}.token-photo-admin-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.token-photo-admin-settings label{display:flex;flex-direction:column;gap:7px;color:#b8b8c0;font-size:13px}.token-photo-admin-settings input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #34343d;border-radius:8px;background:#111216;color:#f4f4f5}.token-photo-admin-settings .admin-photo-quest-option{grid-column:1/-1;flex-direction:row;align-items:center}.token-photo-admin-settings .admin-photo-quest-option input{width:auto}@media(max-width:650px){.token-photo-reward{align-items:stretch;flex-direction:column;padding:20px}.token-photo-reward-action{align-items:stretch;min-width:0}.token-photo-admin-settings{grid-template-columns:1fr}}
+
+/* Shareable casino session statistics */
+.admin-statistics-editor{overflow:hidden}
+.stats-mode-row{display:flex;gap:9px;margin:18px 0}
+.stats-mode-row .active{border-color:var(--accent);color:var(--accent);background:#b9f36a12}
+.casino-stats-preview{max-width:850px;margin:18px auto;padding:26px;border:1px solid #ffffff20;border-radius:18px;background:radial-gradient(ellipse at 90% 0%,#45245f 0%,#20172d 38%,#111216 82%);box-shadow:0 18px 55px #0005}
+.casino-stats-cover{display:flex;flex-direction:column;gap:12px;padding:16px 8px 25px;border-bottom:1px solid #ffffff20}
+.casino-stats-cover>span{font:800 10px 'Space Grotesk';letter-spacing:.2em;color:#d8a9ff}
+.casino-stats-cover>strong{font:800 clamp(35px,7vw,58px)/.98 'Space Grotesk';letter-spacing:-.06em;color:#fff}
+.casino-stats-cover>small{font-size:11px;color:#b7a9c5}
+.casino-stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}
+.casino-stats-grid article{display:flex;flex-direction:column;gap:8px;min-height:90px;padding:14px;border:1px solid #ffffff16;border-radius:11px;background:#ffffff09}
+.casino-stats-grid small,.casino-stats-highlights small{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#b7a9c5}
+.casino-stats-grid strong{font:700 27px 'Space Grotesk';color:#fff}
+.casino-stats-highlights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.casino-stats-highlights>div{display:flex;flex-direction:column;gap:6px;padding:15px;border-radius:11px;background:#b88ae515;border:1px solid #b88ae52b}
+.casino-stats-highlights strong{font:700 19px 'Space Grotesk';color:#fff;overflow-wrap:anywhere}
+.casino-stats-highlights span{font-size:11px;color:#d3b5ee}
+.casino-stats-footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:17px;padding-top:15px;border-top:1px solid #ffffff20;color:#c5b7d0;font-size:10px}
+.stats-export-button{display:block;margin:18px auto 0}
+@media(max-width:650px){.casino-stats-preview{padding:15px;border-radius:13px}.casino-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.casino-stats-grid article{min-height:75px;padding:11px}.casino-stats-grid strong{font-size:23px}.casino-stats-highlights{grid-template-columns:1fr 1fr}.casino-stats-highlights>div{padding:11px}.casino-stats-highlights strong{font-size:15px}.casino-stats-footer{font-size:9px}}
