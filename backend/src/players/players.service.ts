@@ -52,7 +52,7 @@ export class PlayersService {
           WHERE assigned.player_id = ? AND assigned.pool_quest_id = side_quest_pool.id AND assigned.status <> 'SKIPPED'
         )
         ORDER BY RANDOM() LIMIT 1
-      `).get(playerId) as { id: number; title: string; description: string } | undefined;
+      `).get(playerId) as { id: number; title: string; description: string; photoEnabled:number } | undefined;
       if (!quest) throw new BadRequestException('Nincs több kiosztható side quest a poolban.');
       const result = sqlite.prepare("INSERT INTO player_side_quests (player_id, pool_quest_id, title, description, photo_enabled) VALUES (?, ?, ?, ?, ?)").run(playerId, quest.id, quest.title, quest.description, quest.photoEnabled);
       sqlite.exec('COMMIT');
@@ -152,7 +152,7 @@ export class PlayersService {
     const player=sqlite.prepare('SELECT name FROM players WHERE id=?').get(playerId) as {name:string}|undefined;
     const response=await fetch(baseUrl+'/v1/events/'+encodeURIComponent(eventId)+'/sessions',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      headers:{'Content-Type':'application/json','x-api-key':apiKey},
       body:JSON.stringify({guestExternalId:'party-casino-player-'+playerId,guestName:player?.name??'Party Casino player'})
     });
     const payload:any=await response.json().catch(()=>({}));
@@ -182,11 +182,10 @@ export class PlayersService {
     const apiKey=String(process.env.SNAPPIN_API_KEY??'').trim();
     const eventId=String(process.env.SNAPPIN_EVENT_ID??'').trim();
     if(!baseUrl||!apiKey||!eventId) throw new BadRequestException('A Snappin integráció nincs konfigurálva.');
-    const verifyResponse=await fetch(baseUrl+'/v1/events/'+encodeURIComponent(eventId)+'/sessions/'+encodeURIComponent(sessionId),{headers:{Authorization:'Bearer '+apiKey}});
+    const verifyResponse=await fetch(baseUrl+'/v1/events/'+encodeURIComponent(eventId)+'/sessions/'+encodeURIComponent(sessionId),{headers:{'x-api-key':apiKey}});
     const verify:any=await verifyResponse.json().catch(()=>({}));
     if(!verifyResponse.ok) throw new BadRequestException(verify.message||'Nem sikerült ellenőrizni a Snappin munkamenetet.');
-    const expectedExternalId='party-casino-player-'+playerId;
-    if(String(verify.guestExternalId??'')!==expectedExternalId) throw new BadRequestException('A Snappin munkamenet nem ehhez a játékoshoz tartozik.');
+    if(verify.eventId && String(verify.eventId)!==eventId) throw new BadRequestException('A Snappin munkamenet nem a konfigurált eseményhez tartozik.');
     const photoId=String(verify.photoId??verify.photo?.id??verify.photos?.[0]?.id??'');
     const status=String(verify.status??'').toUpperCase();
     const uploaded=!!photoId&&(['COMPLETED','UPLOADED','READY'].includes(status)||!!verify.completedAt||verify.completed===true);
