@@ -188,3 +188,20 @@
   .outside-group:first-child{grid-column:auto}
   .roulette-wheel-stage{width:78vw}
 }
+
+
+/* One-tap roulette inside bets: markers sit on the actual table boundaries. */
+.roulette-number-grid-shell{position:relative;min-width:0}
+.roulette-number-grid-shell .roulette-number-grid{height:100%;margin:0}
+.roulette-number-grid-shell .roulette-number-grid button:disabled{opacity:1;cursor:default}
+.roulette-bet-spot{position:absolute;z-index:4;transform:translate(-50%,-50%);width:25px;height:25px;padding:0;border:2px solid #f5e8bf;border-radius:50%;background:#d5b15f;color:#1a160d;font-size:13px;font-weight:900;line-height:1;box-shadow:0 2px 7px #000b;touch-action:manipulation}
+.roulette-bet-spot.active{background:var(--accent);border-color:#fff;box-shadow:0 0 0 4px #b9f36a55,0 2px 7px #000b}
+.roulette-bet-spot:active{transform:translate(-50%,-50%) scale(.92)}
+@media(max-width:760px){
+ .roulette-number-grid-shell{min-width:381px;height:116px}
+ .roulette-bet-spot{width:27px;height:27px;font-size:14px}
+}
+@media(min-width:761px){
+ .roulette-number-grid-shell{height:143px}
+ .roulette-bet-spot{width:23px;height:23px}
+}
