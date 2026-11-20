@@ -104,3 +104,31 @@
   .roulette-wheel-stage.has-landed .roulette-ball-track{transform:rotate(0deg) scale(.785)}
   .wheel-pocket{transform:rotate(var(--pocket-angle)) translateY(-28.8vw)}
 }
+
+
+/* Roulette betting-table layout */
+.bet-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.bet-heading h2{margin-bottom:0}
+.chip-picker{display:flex;gap:7px}
+.chip-picker button{width:42px;height:42px;border-radius:50%;border:2px dashed #c8c8c8;background:#25262d;color:#fff;font-weight:800}
+.chip-picker button.active{background:var(--accent);border-color:#fff;color:#171812;box-shadow:0 0 0 3px #b9f36a35}
+.roulette-bet-types{display:flex;gap:7px;flex-wrap:wrap;margin:20px 0 10px}
+.roulette-bet-types button,.outside-group button{border:1px solid #45464e;background:#25262d;color:#ddd;border-radius:7px;padding:9px 12px;font-size:11px}
+.roulette-bet-types button.active,.outside-group button.active{border-color:var(--accent);color:var(--accent);background:#b9f36a13}
+.bet-instruction{color:#a9aab2;font-size:12px;margin:8px 0 14px}
+.roulette-layout{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:14px}
+.roulette-number-board{display:grid;grid-template-columns:48px minmax(0,1fr);gap:7px;min-width:0}
+.roulette-zero{background:#27824c;color:#fff;border:1px solid #ffffff35;border-radius:5px;font-weight:800;font-size:18px}
+.roulette-number-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.roulette-number-grid button{min-height:43px;border:1px solid #ffffff30;border-radius:5px;color:#fff;font-weight:800}
+.roulette-number-grid button.red{background:#a92730}
+.roulette-number-grid button.black{background:#17181d}
+.roulette-number-grid button.selected,.roulette-zero.selected{outline:3px solid var(--accent);outline-offset:1px;filter:brightness(1.3)}
+.roulette-outside{display:flex;flex-direction:column;gap:12px}
+.outside-group{display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start}
+.outside-group strong{width:100%;font-size:10px;color:#a7a8b0;letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+.outside-group button{padding:8px;font-size:10px}
+.bet-confirm{display:flex;justify-content:space-between;align-items:center;gap:14px;padding-top:17px;margin-top:17px;border-top:1px solid var(--line)}
+.bet-confirm>div{display:flex;flex-direction:column;gap:4px;font-size:12px}
+.bet-confirm strong{color:#fff}
+@media(max-width:680px){.roulette-layout{grid-template-columns:1fr}.roulette-number-board{grid-template-columns:40px minmax(0,1fr)}.roulette-number-grid button{min-height:39px}.roulette-outside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.outside-group:first-child{grid-column:1/-1}.bet-confirm{align-items:stretch;flex-direction:column}.bet-confirm .primary{width:100%}}
