@@ -7,6 +7,7 @@ import { identifyPlayer } from '../services/socket';
 
 const router = useRouter();
 const player = ref<Player | null>(null);
+const tokenBalance = ref(0);
 const name = ref('');
 const error = ref('');
 const busy = ref(false);
@@ -17,6 +18,7 @@ if (savedPlayerId > 0 && savedPlayerName) {
   player.value = { id: savedPlayerId, name: savedPlayerName, joinedAt: '' };
   name.value = savedPlayerName;
   identifyPlayer(savedPlayerId);
+  api.getPlayerBalance(savedPlayerId).then(balance => tokenBalance.value = balance.tokenBalance).catch(() => {});
 }
 
 
@@ -30,6 +32,7 @@ async function enter() {
   try {
     player.value = await api.joinPlayer(trimmedName);
     name.value = player.value.name;
+    tokenBalance.value = player.value.tokenBalance ?? 0;
     localStorage.setItem('party-player-name', player.value.name);
     localStorage.setItem('party-player-id', String(player.value.id));
     identifyPlayer(player.value.id);
@@ -44,6 +47,7 @@ function logout() {
   localStorage.removeItem('party-player-id');
   localStorage.removeItem('party-player-name');
   player.value = null;
+  tokenBalance.value = 0;
   name.value = '';
   error.value = '';
 }
@@ -86,6 +90,7 @@ function logout() {
         <p class="eyebrow">JÁTÉKOS</p>
         <h2>Szia, {{ player.name }}!</h2>
         <p class="muted">Válassz az állandó játékok közül.</p>
+        <p class="player-token-balance">Tokenegyenleg: <strong>{{ tokenBalance }} CR</strong></p>
       </div>
     </section>
 
