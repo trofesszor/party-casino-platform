@@ -18,9 +18,9 @@ const visibleResult = computed(() => props.resultNumber ?? props.previousResultN
 const winningIndex = computed(() => visibleResult.value === null ? 0 : wheelOrder.indexOf(visibleResult.value));
 const pocketStep = 360 / wheelOrder.length;
 const wheelStyle = computed(() => ({
-  // Wheel makes six full turns and finishes with the winning pocket under the pointer.
-  '--wheel-stop': `${2160 - winningIndex.value * pocketStep}deg`,
-  // Retain the exact same final orientation after the CSS animation is removed.
+  // Six full turns, then settle at the winning pocket. The resting transform
+  // is the exact same angle modulo 360 degrees, preventing a post-spin snap.
+  '--wheel-stop': `${-winningIndex.value * pocketStep - 2160}deg`,
   '--wheel-rest': `${-winningIndex.value * pocketStep}deg`,
 }));
 const pockets = computed(() => wheelOrder.map((number,index) => ({
