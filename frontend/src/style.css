@@ -305,3 +305,11 @@
 .slot-reel-window.reel-stopped .slot-reel-symbol:first-child{animation:none}
 .slot-reels.spinning .slot-reel-strip .slot-reel-symbol{animation:none!important}
 @media(prefers-reduced-motion:reduce){.slot-reel-strip{transition-duration:.01ms!important}}
+
+
+/* Real long-travel reel strips. Each cell is exactly one visible reel height;
+   JS measures the window and translates the strip by a pixel-accurate distance. */
+.slot-reel-strip{height:max-content;flex:0 0 auto;transition-property:transform;transition-timing-function:cubic-bezier(.12,.72,.12,1)}
+.slot-reel-strip .slot-reel-symbol{height:var(--slot-reel-cell-height,104px);flex:0 0 var(--slot-reel-cell-height,104px)}
+.slot-reel-window{--slot-reel-cell-height:clamp(104px,23vw,145px)}
+@media(max-width:480px){.slot-reel-window{--slot-reel-cell-height:104px}}
