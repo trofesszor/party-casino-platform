@@ -20,6 +20,8 @@ const sideQuestSaving = ref(false);
 type AdminShopItem = { itemKey:string; name:string; description:string; price:number; enabled:number };
 const shopItems = ref<AdminShopItem[]>([]);
 const shopSavingKey = ref('');
+const gameSettings=ref({wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:100,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1});
+const gameSettingsSaving=ref(false);
 const tokenPhotoSettings=ref({enabled:true,balanceThreshold:50,rewardAmount:10,cooldownMinutes:60,dailyLimit:2});
 const tokenPhotoSaving=ref(false);
 const defaultPlayerTokens=ref(100);
@@ -86,6 +88,7 @@ async function loadPlayers() {
     wheelSegments.value = wheel.map(segment => ({ label: segment.label, enabled: !!segment.enabled }));
     sideQuestPool.value = await api.adminSideQuestPool(token.value);
     shopItems.value = await api.adminShopItems(token.value);
+    gameSettings.value = await api.adminGetGameSettings(token.value);
     tokenPhotoSettings.value = await api.adminGetTokenPhotoSettings(token.value);
     defaultPlayerTokens.value = (await api.adminGetDefaultPlayerTokens(token.value)).defaultTokens;
     await loadCasinoStatistics();
@@ -150,6 +153,22 @@ async function toggleShopItem(item: AdminShopItem) {
   } finally {
     shopSavingKey.value = '';
   }
+}
+
+async function saveCasinoGameSettings(){
+  const s=gameSettings.value;
+  const odds=s.scratchLossPercent+s.scratch10Percent+s.scratch25Percent+s.scratch50Percent+s.scratch100Percent;
+  if(odds!==100){actionError.value='A kaparós sorsjegy esélyeinek összege pontosan 100% legyen.';return;}
+  gameSettingsSaving.value=true;actionError.value='';
+  try{gameSettings.value=await api.adminSaveGameSettings(token.value,s);}
+  catch(e:any){actionError.value=e.message||'A játékszabályok mentése nem sikerült.';}
+  finally{gameSettingsSaving.value=false;}
+}
+async function saveShopItem(item:AdminShopItem){
+  shopSavingKey.value=item.itemKey;actionError.value='';
+  try{const updated=await api.adminUpdateShopItem(token.value,item);Object.assign(item,updated);}
+  catch(e:any){actionError.value=e.message||'A shop termék mentése nem sikerült.';}
+  finally{shopSavingKey.value='';}
 }
 
 async function saveDefaultPlayerTokens(){
@@ -318,17 +337,43 @@ onMounted(loadPlayers);
         <button class="primary" :disabled="wheelSaving||wheelSegments.length<2" @click="saveWheel">{{wheelSaving?'Mentés…':'Kerék mentése'}}</button>
       </section>
       <section class="panel admin-wheel-editor admin-shop-editor">
-        <div class="admin-section-heading"><div><p class="eyebrow">STORE MANAGEMENT</p><h2>Shop termékek</h2><p class="muted">Az inaktív termékek nem jelennek meg a játékosok shopjában, és nem vásárolhatók meg. A már megvásárolt tárgyak a játékosok készletében maradnak.</p></div></div>
-        <div v-if="!shopItems.length" class="admin-empty muted">Nincs konfigurált shop termék.</div>
-        <div v-for="item in shopItems" :key="item.itemKey" class="side-quest-admin-row">
-          <div>
-            <strong>{{ item.name }}</strong>
-            <p class="muted">{{ item.description }}</p>
-            <small>{{ item.price }} CR · {{ item.itemKey }}</small>
-            <span class="player-status" :class="{ online: !!item.enabled }">{{ item.enabled ? 'Aktív' : 'Inaktív' }}</span>
+        <div class="admin-section-heading"><div><p class="eyebrow">STORE MANAGEMENT</p><h2>Shop termékek</h2><p class="muted">Itt módosíthatod a termékek nevét, leírását, árát és elérhetőségét.</p></div></div>
+        <div v-for="item in shopItems" :key="item.itemKey" class="side-quest-admin-row shop-admin-edit-row">
+          <div class="shop-admin-edit-fields">
+            <strong>{{item.itemKey}}</strong>
+            <label>Megnevezés<input v-model="item.name" maxlength="80"></label>
+            <label>Leírás<textarea v-model="item.description" maxlength="300" rows="2"></textarea></label>
+            <label>Ár (CR)<input v-model.number="item.price" type="number" min="0" max="2000000" step="1"></label>
+            <span class="player-status" :class="{online:!!item.enabled}">{{item.enabled?'Aktív':'Inaktív'}}</span>
           </div>
-          <button class="ghost" :disabled="shopSavingKey === item.itemKey" @click="toggleShopItem(item)">{{ shopSavingKey === item.itemKey ? 'Mentés…' : item.enabled ? 'Inaktiválás' : 'Aktiválás' }}</button>
+          <div class="shop-admin-actions">
+            <button class="primary" :disabled="shopSavingKey===item.itemKey" @click="saveShopItem(item)">{{shopSavingKey===item.itemKey?'Mentés…':'Termék mentése'}}</button>
+            <button class="ghost" :disabled="shopSavingKey===item.itemKey" @click="toggleShopItem(item)">{{item.enabled?'Inaktiválás':'Aktiválás'}}</button>
+          </div>
         </div>
+      </section>
+      <section class="panel admin-wheel-editor admin-game-settings-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">GAME RULES</p><h2>Játékmenet beállításai</h2><p class="muted">A módosítások mentés után a backend által futtatott játékszabályokra érvényesek. A már folyamatban lévő körök és párbajok a korábban rögzített adatokkal zárulnak.</p></div></div>
+        <div class="game-settings-grid">
+          <label>Szerencsekerék ára (CR)<input v-model.number="gameSettings.wheelSpinCost" type="number" min="0" max="100000"></label>
+          <label>Szerencsekerék animáció (ms)<input v-model.number="gameSettings.wheelSpinDurationMs" type="number" min="1000" max="60000" step="500"></label>
+          <label>Rulett fogadási idő (mp)<input v-model.number="gameSettings.rouletteBettingSeconds" type="number" min="5" max="120"></label>
+          <label>Rulett eredményidő (mp)<input v-model.number="gameSettings.rouletteResultSeconds" type="number" min="1" max="30"></label>
+          <label>Maximális rulett tét (CR)<input v-model.number="gameSettings.rouletteMaxBet" type="number" min="1" max="1000000"></label>
+          <label>Párbaj győzelmi jutalom (CR)<input v-model.number="gameSettings.duelReward" type="number" min="0" max="1000000"></label>
+          <label>Max. aktív side quest / játékos<input v-model.number="gameSettings.maxActiveSideQuests" type="number" min="1" max="10"></label>
+          <label>PIN érvényesség (mp)<input v-model.number="gameSettings.questPinExpirySeconds" type="number" min="15" max="600"></label>
+        </div>
+        <div class="admin-subheading"><strong>Kaparós sorsjegy nyerési esélyek</strong><span class="muted">Az összegnek pontosan 100%-nak kell lennie.</span></div>
+        <div class="game-settings-grid scratch-odds-grid">
+          <label>Nem nyer (%)<input v-model.number="gameSettings.scratchLossPercent" type="number" min="0" max="100"></label>
+          <label>10 CR (%)<input v-model.number="gameSettings.scratch10Percent" type="number" min="0" max="100"></label>
+          <label>25 CR (%)<input v-model.number="gameSettings.scratch25Percent" type="number" min="0" max="100"></label>
+          <label>50 CR (%)<input v-model.number="gameSettings.scratch50Percent" type="number" min="0" max="100"></label>
+          <label>100 CR (%)<input v-model.number="gameSettings.scratch100Percent" type="number" min="0" max="100"></label>
+        </div>
+        <p class="muted">Jelenlegi összesített esély: {{gameSettings.scratchLossPercent+gameSettings.scratch10Percent+gameSettings.scratch25Percent+gameSettings.scratch50Percent+gameSettings.scratch100Percent}}%</p>
+        <button class="primary" :disabled="gameSettingsSaving" @click="saveCasinoGameSettings">{{gameSettingsSaving?'Mentés…':'Játékszabályok mentése'}}</button>
       </section>
       <section class="panel admin-wheel-editor admin-default-tokens-editor">
         <div class="admin-section-heading"><div><p class="eyebrow">PLAYER ECONOMY</p><h2>Kezdő tokenegyenleg</h2><p class="muted">Ennyi tokent kap minden újonnan regisztráló játékos. A módosítás csak a később csatlakozó játékosokra érvényes, a meglévő egyenlegeket nem változtatja meg.</p></div></div>
