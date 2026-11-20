@@ -333,3 +333,34 @@
  .slot-bet-options button{min-width:0;min-height:47px;font-size:13px}
 }
 
+
+/* Separate password-protected admin area */
+.admin-page{min-height:100vh;padding:0 max(20px,5vw) 50px;background:radial-gradient(ellipse at 50% 0%,#29321f 0%,#101114 58%);color:#f3f3f5}
+.admin-topbar{height:78px;border-bottom:1px solid #ffffff18;display:flex;align-items:center;justify-content:space-between}
+.admin-label{font-size:10px;letter-spacing:.18em;color:#b9f36a}
+.admin-login{width:min(420px,100%);margin:12vh auto 0;padding:30px}
+.admin-login h1,.admin-heading h1{font:600 clamp(34px,6vw,48px) 'Space Grotesk';margin:0 0 10px}
+.admin-login h1 span,.admin-heading h1 span{color:var(--accent)}
+.admin-login form{display:flex;flex-direction:column;gap:12px;margin-top:24px}
+.admin-login .primary{min-height:46px}
+.admin-back{display:inline-block;margin-top:22px;color:#aeb0b8;font-size:12px;text-decoration:none}
+.admin-content{width:min(1100px,100%);margin:48px auto}
+.admin-heading,.admin-section-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.admin-heading .muted{margin:0}
+.admin-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:28px 0}
+.admin-stat{padding:22px;display:flex;flex-direction:column;gap:10px}
+.admin-stat span{font-size:10px;letter-spacing:.14em;color:#a6a7b0}
+.admin-stat strong{font:600 34px 'Space Grotesk';color:var(--accent)}
+.admin-players{padding:24px}
+.admin-section-heading{margin-bottom:20px}
+.admin-section-heading h2{font:600 22px 'Space Grotesk';margin:0}
+.admin-table-wrap{overflow-x:auto}
+.admin-table{width:100%;border-collapse:collapse;text-align:left;white-space:nowrap}
+.admin-table th{padding:12px 14px;color:#9c9da6;font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+.admin-table td{padding:14px;border-bottom:1px solid #ffffff10;color:#bfc0c7;font-size:12px}
+.admin-table .player-name{font-weight:700;color:#fff}
+.player-status{display:inline-block;padding:5px 8px;border-radius:5px;background:#ffffff12;color:#aaa;font-size:10px}
+.player-status.online{background:#b9f36a18;color:var(--accent)}
+.admin-empty{padding:30px;text-align:center}
+.admin-footnote{font-size:11px;color:#7e808a;margin-top:14px}
+@media(max-width:600px){.admin-page{padding:0 14px 35px}.admin-content{margin:30px auto}.admin-login{margin-top:10vh;padding:22px}.admin-heading{align-items:flex-start}.admin-stat-grid{gap:8px}.admin-stat{padding:15px}.admin-stat strong{font-size:28px}.admin-players{padding:15px}.admin-table th,.admin-table td{padding:11px 9px}}
