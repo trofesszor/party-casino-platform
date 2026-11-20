@@ -68,7 +68,7 @@ async function submitBet() {
 function labelBet(bet: { betType: RouletteBetType; betValue: string }) {
  const names: Record<string,string> = { NUMBER:'Szám', SPLIT:'Split', STREET:'Street', CORNER:'Corner', SIX_LINE:'Six line', DOZEN:'Tucat', COLUMN:'Oszlop', COLOR:'Szín', ODD_EVEN:'Páros/páratlan', LOW_HIGH:'Kis/nagy' };
  const values: Record<string,string> = { red:'Piros', black:'Fekete', odd:'Páratlan', even:'Páros', low:'1–18', high:'19–36' };
- return names[bet.betType] + ': ' + (values[bet.betValue] ?? bet.betValue.replaceAll(',', ' / '));
+ return names[bet.betType] + ': ' + (values[bet.betValue] ?? bet.betValue.split(',').join(' / '));
 }
 function onChanged(payload: RouletteState) { state.value = payload; }
 onMounted(() => { refresh().catch(e => error.value = e.message); socket.on('roulette:changed', onChanged); clock = setInterval(() => { now.value = Date.now(); }, 250); });
