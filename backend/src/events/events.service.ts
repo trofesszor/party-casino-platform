@@ -36,6 +36,21 @@ export class EventsService {
     if (event.maxPlayers && event.participantCount >= event.maxPlayers && !event.participants.some((p: any) => p.id === playerId)) throw new BadRequestException('Az esemény megtelt.');
     this.database.sqlite.prepare('INSERT OR IGNORE INTO event_participants (event_id, player_id) VALUES (?, ?)').run(eventId, playerId);
     const updated = this.getOne(eventId);
+
+    if (status === 'RUNNING' && updated.eventType === 'ROULETTE') {
+      const existingRound = this.database.sqlite.prepare(
+        "SELECT id FROM roulette_rounds WHERE event_id = ? AND status = 'OPEN'",
+      ).get(eventId);
+      if (!existingRound) {
+        const nextRound = this.database.sqlite.prepare(
+          'SELECT COALESCE(MAX(round_number), 0) + 1 AS roundNumber FROM roulette_rounds WHERE event_id = ?',
+        ).get(eventId) as { roundNumber: number };
+        this.database.sqlite.prepare(
+          "INSERT INTO roulette_rounds (event_id, round_number) VALUES (?, ?)",
+        ).run(eventId, nextRound.roundNumber);
+      }
+    }
+
     this.gateway.publish('events:changed', this.list());
     return updated;
   }
