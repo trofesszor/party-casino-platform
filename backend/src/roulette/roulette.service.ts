@@ -4,8 +4,6 @@ import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
 
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
-const BETTING_SECONDS = 20;
-const RESULT_SECONDS = 5;
 const BET_TYPES = new Set(['NUMBER', 'SPLIT', 'STREET', 'CORNER', 'SIX_LINE', 'DOZEN', 'COLUMN', 'COLOR', 'ODD_EVEN', 'LOW_HIGH']);
 
 @Injectable()
@@ -13,16 +11,21 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
   private timer: NodeJS.Timeout | null = null;
 
   constructor(@Inject(DATABASE) private readonly database: any, private readonly gateway: EventsGateway) {}
+  private setting(key:string,fallback:number){const row=this.database.sqlite.prepare('SELECT setting_value AS value FROM casino_settings WHERE setting_key=?').get(key) as {value:string}|undefined;return Number(row?.value??fallback);}
+  private get bettingSeconds(){return this.setting('roulette_betting_seconds',20);}
+  private get resultSeconds(){return this.setting('roulette_result_seconds',5);}
+  private get maxBet(){return this.setting('roulette_max_bet',100);}
+
 
   onModuleInit() {
     const current = this.latestRound();
     if (!current) { this.openNextRound(); return; }
     if (current.status === 'BETTING') {
-      const endsAt = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
+      const endsAt = new Date(Date.now() + this.bettingSeconds * 1000).toISOString();
       this.database.sqlite.prepare('UPDATE casino_roulette_rounds SET betting_ends_at = ? WHERE id = ?').run(endsAt, current.id);
-      this.schedule(BETTING_SECONDS * 1000, () => this.finishRound());
+      this.schedule(this.bettingSeconds * 1000, () => this.finishRound());
     } else {
-      this.schedule(RESULT_SECONDS * 1000, () => this.openNextRound());
+      this.schedule(this.resultSeconds * 1000, () => this.openNextRound());
     }
     this.publishState();
   }
@@ -31,7 +34,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
 
   getState() {
     const currentRound = this.latestRound();
-    if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: BETTING_SECONDS };
+    if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: this.bettingSeconds };
     const bets = this.database.sqlite.prepare(`
       SELECT b.id AS id, b.player_id AS playerId, p.name AS playerName,
         b.bet_type AS betType, b.bet_value AS betValue, b.amount AS amount
@@ -45,7 +48,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
       FROM casino_roulette_rounds WHERE status = 'COMPLETED' AND id < ?
       ORDER BY id DESC LIMIT 10
     `).all(currentRound.id);
-    return { currentRound, bets, winners, history, bettingSeconds: BETTING_SECONDS };
+    return { currentRound, bets, winners, history, bettingSeconds: this.bettingSeconds };
   }
 
   placeBet(playerId: number, input: { betType: string; betValue: string | number; amount?: number }) {
@@ -60,7 +63,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     const betValue = String(input?.betValue ?? '').toLowerCase();
     const amount = Number(input?.amount ?? 1);
     if (!BET_TYPES.has(betType)) throw new BadRequestException('Érvénytelen fogadástípus.');
-    if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new BadRequestException('A zseton értéke 1 és 100 között lehet.');
+    if (!Number.isInteger(amount) || amount < 1 || amount > this.maxBet) throw new BadRequestException('A tét értéke 1 és '+this.maxBet+' között lehet.');
     this.validateBet(betType, betValue);
 
     const sqlite = this.database.sqlite;
@@ -120,10 +123,10 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
 
   private openNextRound() {
     const next = this.database.sqlite.prepare('SELECT COALESCE(MAX(round_number), 0) + 1 AS n FROM casino_roulette_rounds').get() as { n: number };
-    const endsAt = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
+    const endsAt = new Date(Date.now() + this.bettingSeconds * 1000).toISOString();
     this.database.sqlite.prepare("INSERT INTO casino_roulette_rounds (round_number, status, betting_ends_at) VALUES (?, 'BETTING', ?)").run(next.n, endsAt);
     this.publishState();
-    this.schedule(BETTING_SECONDS * 1000, () => this.finishRound());
+    this.schedule(this.bettingSeconds * 1000, () => this.finishRound());
   }
 
   private finishRound() {
@@ -155,7 +158,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
     this.publishState();
-    this.schedule(RESULT_SECONDS * 1000, () => this.openNextRound());
+    this.schedule(this.resultSeconds * 1000, () => this.openNextRound());
   }
 
   private publishState() {
