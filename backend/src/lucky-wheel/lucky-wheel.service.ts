@@ -26,6 +26,10 @@ export class LuckyWheelService implements OnModuleInit {
     return { ...state, segments, durationMs: SPIN_DURATION_MS };
   }
 
+  getAllSegments() {
+    return this.database.sqlite.prepare('SELECT id, label, position, enabled FROM lucky_wheel_segments ORDER BY position, id').all();
+  }
+
   spin() {
     const sqlite = this.database.sqlite;
     sqlite.exec('BEGIN IMMEDIATE');
