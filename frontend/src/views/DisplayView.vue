@@ -6,12 +6,21 @@ import type { RouletteState } from '../types';
 const state = ref<RouletteState | null>(null);
 const players = ref<{id:number;name:string}[]>([]);
 async function refresh() {
-  const [roulette, allPlayers] = await Promise.all([api.getRouletteState(), api.getPlayers()]);
-  state.value = roulette; players.value = allPlayers;
+  const [roulette, onlinePlayers] = await Promise.all([api.getRouletteState(), api.getPlayers()]);
+  state.value = roulette;
+  players.value = onlinePlayers;
 }
 function onChanged(next: RouletteState) { state.value = next; }
-onMounted(() => { refresh().catch(() => undefined); socket.on('roulette:changed', onChanged); });
-onUnmounted(() => socket.off('roulette:changed', onChanged));
+function onPlayersChanged(next: {id:number;name:string}[]) { players.value = next; }
+onMounted(() => {
+  refresh().catch(() => undefined);
+  socket.on('roulette:changed', onChanged);
+  socket.on('players:online', onPlayersChanged);
+});
+onUnmounted(() => {
+  socket.off('roulette:changed', onChanged);
+  socket.off('players:online', onPlayersChanged);
+});
 </script>
 <template>
   <main class="display-page">
@@ -21,7 +30,8 @@ onUnmounted(() => socket.off('roulette:changed', onChanged));
       <p class="eyebrow">KÖZÖS RULETTASZTAL · {{ state.currentRound.status === 'BETTING' ? 'FOGADÁS' : 'EREDMÉNY' }}</p>
       <h2>{{ state.currentRound.status === 'BETTING' ? 'Tétek leadása folyamatban' : 'A kör eredménye' }}</h2>
       <div v-if="state.currentRound.status === 'COMPLETED'" class="roulette-result" :class="state.currentRound.resultNumber === 0 ? 'green' : [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(state.currentRound.resultNumber ?? -1) ? 'red' : 'black'">{{ state.currentRound.resultNumber }}</div>
-      <div class="tv-meta"><span>Játékosok: {{ players.length }}</span><span>Leadott tippek: {{ state.bets.length }}</span></div>
+      <div class="tv-meta"><span>Online játékosok: {{ players.length }}</span><span>Leadott tippek: {{ state.bets.length }}</span></div>
+      <div class="online-players"><span v-for="player in players" :key="player.id" class="online-player">{{ player.name }}</span><span v-if="!players.length" class="muted">Jelenleg nincs online játékos.</span></div>
       <div class="roulette-bet-row" v-for="bet in state.bets" :key="bet.playerId"><strong>{{ bet.playerName }}</strong><span>{{ bet.betType === 'NUMBER' ? bet.betValue : bet.betValue === 'red' ? 'Piros' : 'Fekete' }}</span><b v-if="state.currentRound.status === 'COMPLETED'">{{ state.winners.some(w => w.playerId === bet.playerId) ? 'NYERT' : '—' }}</b></div>
     </section>
     <div v-else class="display-empty"><h2>Hamarosan indul az első rulettkör</h2></div>
