@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, type Duel } from '../services/api';
 import type { Player } from '../types';
@@ -121,7 +121,6 @@ function logout() {
   error.value = '';
 }
 onMounted(() => { loadDuels(); });
-onUnmounted(() => {});
 </script>
 
 <template>
