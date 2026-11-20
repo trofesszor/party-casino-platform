@@ -64,14 +64,18 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     this.validateBet(betType, betValue);
 
     const sqlite = this.database.sqlite;
-    const place = sqlite.transaction(() => {
-      this.database.sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(amount, playerId, amount);
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(amount, playerId, amount);
+      if (Number(debit.changes) !== 1) throw new BadRequestException('Nincs elegendő token a fogadáshoz.');
       const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
-      if (balance.tokenBalance < 0) throw new BadRequestException('Nincs elegendő token a fogadáshoz.');
-      sqlite.prepare(\"INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'ROULETTE_BET', ?)\").run(playerId, -amount, balance.tokenBalance, 'Rulett tét: ' + betType + ' ' + betValue);
+      sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'ROULETTE_BET', ?)").run(playerId, -amount, balance.tokenBalance, 'Rulett tét: ' + betType + ' ' + betValue);
       sqlite.prepare('INSERT INTO casino_roulette_bets (round_id, player_id, bet_type, bet_value, amount) VALUES (?, ?, ?, ?, ?)').run(round.id, playerId, betType, betValue, amount);
-    });
-    place();
+      sqlite.exec('COMMIT');
+    } catch (error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
     return this.publishState();
   }
 
@@ -126,7 +130,30 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     const round = this.latestRound();
     if (!round || round.status !== 'BETTING') return;
     const result = randomInt(0, 37);
-    this.database.sqlite.prepare("UPDATE casino_roulette_rounds SET status = 'COMPLETED', result_number = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'BETTING'").run(result, round.id);
+    const sqlite = this.database.sqlite;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const updated = sqlite.prepare("UPDATE casino_roulette_rounds SET status = 'COMPLETED', result_number = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'BETTING'").run(result, round.id);
+      if (Number(updated.changes) === 1) {
+        const bets = sqlite.prepare('SELECT id, player_id AS playerId, bet_type AS betType, bet_value AS betValue, amount FROM casino_roulette_bets WHERE round_id = ?').all(round.id) as any[];
+        const savePayout = sqlite.prepare('UPDATE casino_roulette_bets SET payout_amount = ? WHERE id = ?');
+        const credit = sqlite.prepare('UPDATE players SET token_balance = token_balance + ? WHERE id = ?');
+        const balanceQuery = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?');
+        const ledger = sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'ROULETTE_WIN', ?)");
+        for (const bet of bets) {
+          if (!this.isWinner(bet, result)) continue;
+          const payout = Number(bet.amount) * (this.payoutOdds(bet.betType) + 1);
+          savePayout.run(payout, bet.id);
+          credit.run(payout, bet.playerId);
+          const balance = balanceQuery.get(bet.playerId) as { tokenBalance: number };
+          ledger.run(bet.playerId, payout, balance.tokenBalance, 'Rulett nyeremény: ' + bet.betType);
+        }
+      }
+      sqlite.exec('COMMIT');
+    } catch (error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
     this.publishState();
     this.schedule(RESULT_SECONDS * 1000, () => this.openNextRound());
   }
