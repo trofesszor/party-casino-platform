@@ -33,7 +33,7 @@ export class LuckyWheelService implements OnModuleInit {
   spin() {
     const sqlite = this.database.sqlite;
     sqlite.exec('BEGIN IMMEDIATE');
-    let spinId: string;
+    let spinId = '';
     let winningSegment: any;
     const startedAt = Date.now();
     const endsAt = startedAt + SPIN_DURATION_MS;
