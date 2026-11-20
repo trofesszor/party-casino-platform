@@ -16,6 +16,9 @@ export class PlayersController {
   @Get(':id/side-quests') getSideQuests(@Param('id') id: string) { return this.players.getSideQuests(Number(id)); }
   @Post(':id/side-quests') assignSideQuest(@Param('id') id: string) { return this.players.assignSideQuest(Number(id)); }
   @Post(':id/side-quests/:questId/complete') completeSideQuest(@Param('id') id: string, @Param('questId') questId: string) { return this.players.completeSideQuest(Number(id), Number(questId)); }
+  @Get(':id/shop') getShop(@Param('id') id: string) { return this.players.getShop(Number(id)); }
+  @Post(':id/shop/buy') buyShopItem(@Param('id') id: string, @Body() body:{itemKey:string}) { return this.players.buyShopItem(Number(id),body.itemKey); }
+  @Post(':id/shop/use') useShopItem(@Param('id') id: string, @Body() body:{itemKey:string;questId:number}) { return this.players.useShopItem(Number(id),body.itemKey,Number(body.questId)); }
   @Get(':id/balance') getBalance(@Param('id') id: string) { return this.players.getBalance(Number(id)); }
   @Get(':id/transactions') getTransactions(@Param('id') id: string) { return this.players.getTransactions(Number(id)); }
 }
