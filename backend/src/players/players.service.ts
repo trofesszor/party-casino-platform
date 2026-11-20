@@ -28,7 +28,7 @@ export class PlayersService {
     if (!player) throw new BadRequestException('A játékos nem található.');
     return this.database.sqlite.prepare(`
       SELECT q.id, q.title, q.description, q.status, q.assigned_at AS assignedAt,
-        q.completed_at AS completedAt, verifier.name AS approvedByName, v.verified_at AS approvedAt
+        q.completed_at AS completedAt, q.photo_enabled AS photoEnabled, q.completion_method AS completionMethod, q.photo_id AS photoId, verifier.name AS approvedByName, v.verified_at AS approvedAt
       FROM player_side_quests q
       LEFT JOIN side_quest_verification_requests v ON v.quest_id=q.id AND v.status='APPROVED'
       LEFT JOIN players verifier ON verifier.id=v.verified_by
@@ -46,7 +46,7 @@ export class PlayersService {
       const active = sqlite.prepare("SELECT COUNT(*) AS count FROM player_side_quests WHERE player_id = ? AND status = 'ACTIVE'").get(playerId) as { count: number };
       if (active.count >= 2) throw new BadRequestException('Már van 2 aktív side quested.');
       const quest = sqlite.prepare(`
-        SELECT id, title, description FROM side_quest_pool
+        SELECT id, title, description, photo_enabled AS photoEnabled FROM side_quest_pool
         WHERE enabled = 1 AND NOT EXISTS (
           SELECT 1 FROM player_side_quests assigned
           WHERE assigned.player_id = ? AND assigned.pool_quest_id = side_quest_pool.id AND assigned.status <> 'SKIPPED'
@@ -54,9 +54,9 @@ export class PlayersService {
         ORDER BY RANDOM() LIMIT 1
       `).get(playerId) as { id: number; title: string; description: string } | undefined;
       if (!quest) throw new BadRequestException('Nincs több kiosztható side quest a poolban.');
-      const result = sqlite.prepare("INSERT INTO player_side_quests (player_id, pool_quest_id, title, description) VALUES (?, ?, ?, ?)").run(playerId, quest.id, quest.title, quest.description);
+      const result = sqlite.prepare("undefined").run(playerId, quest.id, quest.title, quest.description, quest.photoEnabled);
       sqlite.exec('COMMIT');
-      return sqlite.prepare("SELECT id, title, description, status, assigned_at AS assignedAt, completed_at AS completedAt FROM player_side_quests WHERE id = ?").get(result.lastInsertRowid);
+      return sqlite.prepare("SELECT id, title, description, status, assigned_at AS assignedAt, completed_at AS completedAt, photo_enabled AS photoEnabled FROM player_side_quests WHERE id = ?").get(result.lastInsertRowid);
     } catch (error) {
       sqlite.exec('ROLLBACK');
       throw error;
@@ -67,7 +67,8 @@ export class PlayersService {
     const sqlite = this.database.sqlite;
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      const quest = sqlite.prepare("SELECT id FROM player_side_quests WHERE id=? AND player_id=? AND status='ACTIVE'").get(questId, playerId);
+      const quest = sqlite.prepare("SELECT id, photo_enabled AS photoEnabled FROM player_side_quests WHERE id=? AND player_id=? AND status='ACTIVE'").get(questId, playerId) as {id:number;photoEnabled:number}|undefined;
+      if (quest?.photoEnabled) throw new BadRequestException('Ehhez a küldetéshez fotófeltöltés szükséges, PIN-kód nem használható.');
       if (!quest) throw new BadRequestException('Az aktív side quest nem található.');
       sqlite.prepare("UPDATE side_quest_verification_requests SET status='EXPIRED' WHERE quest_id=? AND status='PENDING' AND datetime(expires_at)<=CURRENT_TIMESTAMP").run(questId);
       if (sqlite.prepare("SELECT id FROM side_quest_verification_requests WHERE quest_id=? AND status='PENDING'").get(questId)) throw new BadRequestException('Ehhez a küldetéshez már van aktív PIN-kód.');
@@ -138,17 +139,67 @@ export class PlayersService {
       return {success:true,status,questId:request.questId,questTitle:request.title,verifiedByName:verifier.name};
     } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
   }
-  getSideQuestPool() {
-    return this.database.sqlite.prepare('SELECT id, title, description, enabled, created_at AS createdAt FROM side_quest_pool ORDER BY id DESC').all();
+
+  async createSideQuestPhotoSession(playerId: number, questId: number) {
+    const quest = this.database.sqlite.prepare("SELECT id, photo_enabled AS photoEnabled, status FROM player_side_quests WHERE id=? AND player_id=?").get(questId,playerId) as {id:number;photoEnabled:number;status:string}|undefined;
+    if (!quest || quest.status!=='ACTIVE') throw new BadRequestException('Az aktív küldetés nem található.');
+    if (!quest.photoEnabled) throw new BadRequestException('Ehhez a küldetéshez PIN-kódos igazolás szükséges.');
+    const baseUrl = String(process.env.SNAPPIN_API_URL ?? '').trim().replace(/\/$/,'');
+    const apiKey = String(process.env.SNAPPIN_API_KEY ?? '').trim();
+    if (!baseUrl || !apiKey) throw new BadRequestException('A Snappin API nincs konfigurálva a backend .env fájlban.');
+    const eventId = String(process.env.SNAPPIN_EVENT_ID ?? '').trim();
+    const response = await fetch(baseUrl + '/api/v1/sessions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body:JSON.stringify({eventId:eventId||undefined,playerId:String(playerId),playerName:this.database.sqlite.prepare('SELECT name FROM players WHERE id=?').get(playerId).name,questId,title:'Side quest: '+this.database.sqlite.prepare('SELECT title FROM player_side_quests WHERE id=?').get(questId).title,metadata:{source:'party-casino',questId,playerId}})
+    });
+    const payload:any = await response.json().catch(()=>({}));
+    if (!response.ok) throw new BadRequestException(payload.message || 'A Snappin fotófeltöltési munkamenet nem indítható el.');
+    const sessionId = String(payload.sessionId ?? payload.id ?? '');
+    const uploadUrl = String(payload.uploadUrl ?? payload.url ?? '');
+    if (!sessionId || !uploadUrl) throw new BadRequestException('A Snappin API válasza hiányos (sessionId/uploadUrl).');
+    const expiresAt = new Date(Date.now()+10*60_000).toISOString();
+    this.database.sqlite.prepare("INSERT INTO side_quest_photo_sessions (session_id,quest_id,player_id,expires_at) VALUES (?,?,?,?)").run(sessionId,questId,playerId,expiresAt);
+    return {sessionId,uploadUrl,expiresAt,publicKey:payload.publicKey ?? null};
   }
 
-  addSideQuestToPool(titleInput: string, descriptionInput: string) {
+  async completeSideQuestWithPhoto(playerId:number, questId:number, sessionIdInput:string, photoIdInput:string) {
+    const sessionId=String(sessionIdInput??'').trim(), photoId=String(photoIdInput??'').trim();
+    if(!sessionId||!photoId||sessionId.length>200||photoId.length>300) throw new BadRequestException('Érvénytelen fotófeltöltési azonosító.');
+    const sqlite=this.database.sqlite;
+    const session=sqlite.prepare("SELECT * FROM side_quest_photo_sessions WHERE session_id=? AND quest_id=? AND player_id=? AND status='PENDING' AND datetime(expires_at)>CURRENT_TIMESTAMP").get(sessionId,questId,playerId);
+    if(!session) throw new BadRequestException('A fotófeltöltési munkamenet lejárt vagy nem található.');
+    const baseUrl=String(process.env.SNAPPIN_API_URL??'').trim().replace(/\/$/,'');
+    const apiKey=String(process.env.SNAPPIN_API_KEY??'').trim();
+    if(!baseUrl||!apiKey) throw new BadRequestException('A Snappin API nincs konfigurálva.');
+    const verifyResponse=await fetch(baseUrl+'/api/v1/sessions/'+encodeURIComponent(sessionId),{headers:{Authorization:'Bearer '+apiKey}});
+    const verify:any=await verifyResponse.json().catch(()=>({}));
+    if(!verifyResponse.ok) throw new BadRequestException(verify.message||'Nem sikerült ellenőrizni a Snappin fotót.');
+    const photos=Array.isArray(verify.photos)?verify.photos:[];
+    const photo=photos.find((item:any)=>String(item.id??item.photoId)===photoId);
+    if(!photo||!['UPLOADED','READY','COMPLETED'].includes(String(photo.status??verify.status??'').toUpperCase())) throw new BadRequestException('A Snappin nem igazolta vissza a feltöltött fotót.');
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const current=sqlite.prepare("SELECT status,photo_enabled FROM player_side_quests WHERE id=? AND player_id=?").get(questId,playerId) as {status:string;photo_enabled:number}|undefined;
+      if(!current||current.status!=='ACTIVE'||!current.photo_enabled) throw new BadRequestException('Ez a küldetés már nem teljesíthető fotóval.');
+      sqlite.prepare("UPDATE player_side_quest_photo_sessions SET status='COMPLETED',photo_id=?,completed_at=CURRENT_TIMESTAMP WHERE session_id=?").run(photoId,sessionId);
+      sqlite.prepare("UPDATE player_side_quests SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP,completion_method='PHOTO',photo_id=? WHERE id=?").run(photoId,questId);
+      sqlite.exec('COMMIT');
+      return {success:true,questId,photoId,completionMethod:'PHOTO'};
+    } catch(error){sqlite.exec('ROLLBACK');throw error;}
+  }
+
+  getSideQuestPool() {
+    return this.database.sqlite.prepare('SELECT id, title, description, enabled, photo_enabled AS photoEnabled, created_at AS createdAt FROM side_quest_pool ORDER BY id DESC').all();
+  }
+
+  addSideQuestToPool(titleInput: string, descriptionInput: string, photoEnabledInput = false) {
     const title = String(titleInput ?? '').trim();
     const description = String(descriptionInput ?? '').trim();
     if (!title || title.length > 120) throw new BadRequestException('A side quest címe 1–120 karakter legyen.');
     if (description.length > 500) throw new BadRequestException('A leírás legfeljebb 500 karakter lehet.');
-    const result = this.database.sqlite.prepare('INSERT INTO side_quest_pool (title, description) VALUES (?, ?)').run(title, description);
-    return this.database.sqlite.prepare('SELECT id, title, description, enabled FROM side_quest_pool WHERE id = ?').get(result.lastInsertRowid);
+    const result = this.database.sqlite.prepare('INSERT INTO side_quest_pool (title, description, photo_enabled) VALUES (?, ?, ?)').run(title, description, photoEnabledInput ? 1 : 0);
+    return this.database.sqlite.prepare('SELECT id, title, description, enabled, photo_enabled AS photoEnabled FROM side_quest_pool WHERE id = ?').get(result.lastInsertRowid);
   }
 
   deleteSideQuestFromPool(questId: number) {
