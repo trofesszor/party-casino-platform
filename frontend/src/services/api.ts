@@ -8,7 +8,7 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
 export const api = {
   adminLogin: (password: string) => request<{ token: string; expiresIn: number }>('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
   adminPlayers: (token: string) => request<(Player & { online: boolean })[]>('/api/admin/players', { headers: { Authorization: `Bearer ${token}` } }),
-  adminLogout: (token: string) => request<{ success: boolean }>('/api/admin/logout', { method: 'POST, headers: { Authorization: `Bearer ${token}` } }),
+  adminLogout: (token: string) => request<{ success: boolean }>('/api/admin/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
   joinPlayer: (name: string) => request<Player>('/api/players/join', { method: 'POST', body: JSON.stringify({ name }) }),
   getPlayers: () => request<Player[]>('/api/players'),
   getRouletteState: () => request<RouletteState>('/api/roulette'),
