@@ -35,43 +35,57 @@ export class SlotsService {
 
   spin(playerId: number, betAmount: number) {
     const allowedBets = [1, 5, 10, 25, 50];
-    if (!allowedBets.includes(betAmount)) {
-      throw new NotFoundException('Érvénytelen tét. Válassz az elérhető tétek közül.');
-    }
-    const player = this.database.sqlite.prepare('SELECT id, name FROM players WHERE id = ?').get(playerId) as { id: number; name: string } | undefined;
-    if (!player) throw new NotFoundException('A játékos nem található. Lépj be újra.');
-
-    const state = this.database.sqlite.prepare('SELECT free_spins AS freeSpins FROM slot_player_state WHERE player_id = ?').get(playerId) as { freeSpins: number } | undefined;
-    const freeSpinsBefore = state?.freeSpins ?? 0;
-    const usedFreeSpin = freeSpinsBefore > 0;
-    if (usedFreeSpin) {
-      this.database.sqlite.prepare('UPDATE slot_player_state SET free_spins = free_spins - 1 WHERE player_id = ?').run(playerId);
-    } else {
-      this.database.sqlite.prepare('INSERT INTO slot_player_state (player_id, free_spins) VALUES (?, 0) ON CONFLICT(player_id) DO NOTHING').run(playerId);
-    }
-
+    if (!allowedBets.includes(betAmount)) throw new NotFoundException('Érvénytelen tét. Válassz az elérhető tétek közül.');
+    const sqlite = this.database.sqlite;
     const reels = Array.from({ length: 3 }, () => this.drawSymbol());
     const evaluation = this.evaluate(reels);
     const freeSpinsAwarded = reels.every(symbol => symbol === BONUS) ? 5 : 0;
-    if (freeSpinsAwarded) {
-      this.database.sqlite.prepare('UPDATE slot_player_state SET free_spins = free_spins + ? WHERE player_id = ?').run(freeSpinsAwarded, playerId);
-    }
-    const remaining = this.database.sqlite.prepare('SELECT free_spins AS freeSpins FROM slot_player_state WHERE player_id = ?').get(playerId) as { freeSpins: number };
+    const payoutAmount = evaluation.multiplier * betAmount;
 
-    return {
-      playerId,
-      playerName: player.name,
-      reels,
-      isWin: evaluation.multiplier > 0,
-      multiplier: evaluation.multiplier,
-      betAmount,
-      payoutAmount: evaluation.multiplier * betAmount,
-      winLabel: evaluation.label,
-      freeSpinsAwarded,
-      freeSpins: remaining.freeSpins,
-      usedFreeSpin,
-      paytable: PAYTABLE,
-    };
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const player = sqlite.prepare('SELECT id, name, token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { id: number; name: string; tokenBalance: number } | undefined;
+      if (!player) throw new NotFoundException('A játékos nem található. Lépj be újra.');
+      sqlite.prepare('INSERT INTO slot_player_state (player_id, free_spins) VALUES (?, 0) ON CONFLICT(player_id) DO NOTHING').run(playerId);
+      const state = sqlite.prepare('SELECT free_spins AS freeSpins FROM slot_player_state WHERE player_id = ?').get(playerId) as { freeSpins: number };
+      const usedFreeSpin = state.freeSpins > 0;
+      if (usedFreeSpin) {
+        sqlite.prepare('UPDATE slot_player_state SET free_spins = free_spins - 1 WHERE player_id = ? AND free_spins > 0').run(playerId);
+      } else {
+        const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(betAmount, playerId, betAmount);
+        if (Number(debit.changes) !== 1) throw new NotFoundException('Nincs elegendő token a pörgetéshez.');
+        const afterDebit = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
+        sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'SLOT_BET', 'Slot gép pörgetés')").run(playerId, -betAmount, afterDebit.tokenBalance);
+      }
+
+      if (freeSpinsAwarded) sqlite.prepare('UPDATE slot_player_state SET free_spins = free_spins + ? WHERE player_id = ?').run(freeSpinsAwarded, playerId);
+      if (payoutAmount > 0) {
+        sqlite.prepare('UPDATE players SET token_balance = token_balance + ? WHERE id = ?').run(payoutAmount, playerId);
+        const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
+        sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'SLOT_WIN', ?)").run(playerId, payoutAmount, balance.tokenBalance, evaluation.label);
+      }
+      const remaining = sqlite.prepare('SELECT free_spins AS freeSpins FROM slot_player_state WHERE player_id = ?').get(playerId) as { freeSpins: number };
+      const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
+      sqlite.exec('COMMIT');
+      return {
+        playerId,
+        playerName: player.name,
+        reels,
+        isWin: evaluation.multiplier > 0,
+        multiplier: evaluation.multiplier,
+        betAmount,
+        payoutAmount,
+        tokenBalance: balance.tokenBalance,
+        winLabel: evaluation.label,
+        freeSpinsAwarded,
+        freeSpins: remaining.freeSpins,
+        usedFreeSpin,
+        paytable: PAYTABLE,
+      };
+    } catch (error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   private drawSymbol(): string {
