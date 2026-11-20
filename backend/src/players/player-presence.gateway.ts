@@ -14,7 +14,6 @@ export class PlayerPresenceGateway implements OnGatewayConnection, OnGatewayDisc
 
   handleDisconnect(client: Socket) {
     const playerId = Number(client.data.playerId);
-    if (playerIdInput === null || playerIdInput === undefined || playerIdInput === '') { const previousId = Number(client.data.playerId); if (previousId > 0) { this.removeSession(previousId, client.id); delete client.data.playerId; this.publishOnlinePlayers(); } return; }
     if (!Number.isInteger(playerId) || playerId <= 0) return;
     this.removeSession(playerId, client.id);
     this.publishOnlinePlayers();
@@ -22,6 +21,16 @@ export class PlayerPresenceGateway implements OnGatewayConnection, OnGatewayDisc
 
   @SubscribeMessage('player:identify')
   identify(@ConnectedSocket() client: Socket, @MessageBody() playerIdInput: unknown) {
+    if (playerIdInput === null || playerIdInput === undefined || playerIdInput === '') {
+      const previousId = Number(client.data.playerId);
+      if (previousId > 0) {
+        this.removeSession(previousId, client.id);
+        delete client.data.playerId;
+        this.publishOnlinePlayers();
+      }
+      return;
+    }
+
     const playerId = Number(playerIdInput);
     if (!Number.isInteger(playerId) || playerId <= 0) return;
     const player = this.database.sqlite.prepare('SELECT id, name FROM players WHERE id = ?').get(playerId) as { id: number; name: string } | undefined;
