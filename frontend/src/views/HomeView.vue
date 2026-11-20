@@ -20,7 +20,7 @@ if (savedPlayerId > 0 && savedPlayerName) {
 }
 
 
-async async function enter() {
+async function enter() {
   const trimmedName = name.value.trim();
   if (!trimmedName) return;
 
