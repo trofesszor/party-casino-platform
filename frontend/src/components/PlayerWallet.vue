@@ -52,10 +52,12 @@ onMounted(() => {
   refreshBalance();
   refreshTimer = setInterval(refreshBalance, 4000);
   window.addEventListener('storage', syncPlayer);
+  window.addEventListener('party-player-changed', refreshBalance);
 });
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer);
   window.removeEventListener('storage', syncPlayer);
+  window.removeEventListener('party-player-changed', refreshBalance);
 });
 </script>
 
