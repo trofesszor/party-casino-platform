@@ -71,13 +71,27 @@ export class PlayersService {
     }
   }
 
+  getDefaultPlayerTokens() {
+    const row=this.database.sqlite.prepare("SELECT setting_value AS value FROM casino_settings WHERE setting_key='default_player_tokens'").get() as {value:string}|undefined;
+    return {defaultTokens:Number(row?.value??100)};
+  }
+
+  setDefaultPlayerTokens(value:number) {
+    if(!Number.isSafeInteger(value)||value<0||value>2000000000) throw new BadRequestException('Az alapértelmezett tokenmennyiség 0 és 2 000 000 000 között lehet.');
+    this.database.sqlite.prepare("INSERT INTO casino_settings (setting_key,setting_value) VALUES ('default_player_tokens',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value").run(String(value));
+    return this.getDefaultPlayerTokens();
+  }
+
   join(nameInput: string) {
     const name = String(nameInput ?? '').trim().replace(/\s+/g, ' ');
     if (!name || name.length > 24) throw new BadRequestException('A név 1–24 karakter legyen.');
     const existing = this.database.sqlite.prepare('SELECT id, name, joined_at AS joinedAt, token_balance AS tokenBalance FROM players WHERE name = ?').get(name);
     if (existing) return existing;
-    const result = this.database.sqlite.prepare('INSERT INTO players (name) VALUES (?)').run(name);
-    return this.database.sqlite.prepare('SELECT id, name, joined_at AS joinedAt, token_balance AS tokenBalance FROM players WHERE id = ?').get(result.lastInsertRowid);
+    const {defaultTokens} = this.getDefaultPlayerTokens();
+    const result = this.database.sqlite.prepare('INSERT INTO players (name, token_balance) VALUES (?, ?)').run(name, defaultTokens);
+    const player=this.database.sqlite.prepare('SELECT id, name, joined_at AS joinedAt, token_balance AS tokenBalance FROM players WHERE id = ?').get(result.lastInsertRowid) as any;
+    if(defaultTokens>0) this.database.sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?, ?, ?, 'WELCOME_BONUS', 'Kezdő tokenegyenleg')").run(player.id,defaultTokens,defaultTokens);
+    return player;
   }
 
   findAll() {
