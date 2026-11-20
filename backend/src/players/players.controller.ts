@@ -8,4 +8,5 @@ export class PlayersController {
   @Post('join') join(@Body() body: { name: string }) { return this.players.join(body.name); }
   @Get() findAll() { return this.presence.getOnlinePlayers(); }
   @Get(':id/balance') getBalance(@Param('id') id: string) { return this.players.getBalance(Number(id)); }
+  @Get(':id/transactions') getTransactions(@Param('id') id: string) { return this.players.getTransactions(Number(id)); }
 }
