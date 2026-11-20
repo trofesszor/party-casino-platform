@@ -35,6 +35,26 @@ export class AdminController {
       online: onlineIds.has(player.id),
     }));
   }
+  @Get('side-quests')
+  getSideQuestPool(@Headers('authorization') authorization?: string) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.getSideQuestPool();
+  }
+
+  @Post('side-quests')
+  addSideQuest(@Body() body: { title: string; description?: string }, @Headers('authorization') authorization?: string) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.addSideQuestToPool(body.title, body.description ?? '');
+  }
+
+  @Post('side-quests/:id/delete')
+  deleteSideQuest(@Param('id') id: string, @Headers('authorization') authorization?: string) {
+    this.admin.assertToken(this.token(authorization));
+    const questId = Number(id);
+    if (!Number.isSafeInteger(questId) || questId <= 0) throw new BadRequestException('Érvénytelen side quest azonosító.');
+    return this.players.deleteSideQuestFromPool(questId);
+  }
+
   @Post('players/:id/balance')
   setPlayerBalance(
     @Param('id') id: string,
