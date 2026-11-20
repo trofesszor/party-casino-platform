@@ -18,7 +18,7 @@ let verificationPinPollTimer: ReturnType<typeof setInterval> | undefined;
 const photoSession = ref<{questId:number;title:string;sessionId:string;cameraUrl:string;expiresAt:string}|null>(null);
 let photoPollTimer: ReturnType<typeof setInterval> | undefined;
 const activeSideQuests = ref<SideQuest[]>([]);
-type TokenPhotoStatus={enabled:boolean;eligible:boolean;balance:number;balanceThreshold:number;rewardAmount:number;dailyLimit:number;dailyUsed:number;dailyRemaining:number;pending:boolean;sessionId:string|null;expiresAt:string|null;reason:string|null};
+type TokenPhotoStatus={enabled:boolean;eligible:boolean;balance:number;balanceThreshold:number;rewardAmount:number;cooldownMinutes:number;dailyLimit:number;dailyUsed:number;dailyRemaining:number;pending:boolean;sessionId:string|null;expiresAt:string|null;reason:string|null};
 const tokenPhotoStatus=ref<TokenPhotoStatus|null>(null);
 const tokenPhotoSession=ref<{sessionId:string;cameraUrl:string;expiresAt:string;rewardAmount:number}|null>(null);
 const tokenPhotoBusy=ref(false);
