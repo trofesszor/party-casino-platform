@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { socket } from '../services/socket';
 import { api } from '../services/api';
 import type { RouletteState } from '../types';
+import RouletteWheel from '../components/RouletteWheel.vue';
 const state = ref<RouletteState | null>(null);
 const players = ref<{id:number;name:string}[]>([]);
 async function refresh() {
@@ -29,6 +30,7 @@ onUnmounted(() => {
     <section v-if="state?.currentRound" class="tv-roulette panel">
       <p class="eyebrow">KÖZÖS RULETTASZTAL · {{ state.currentRound.status === 'BETTING' ? 'FOGADÁS' : 'EREDMÉNY' }}</p>
       <h2>{{ state.currentRound.status === 'BETTING' ? 'Tétek leadása folyamatban' : 'A kör eredménye' }}</h2>
+      <RouletteWheel :result-number="state.currentRound.resultNumber" :spinning="state.currentRound.status === 'COMPLETED'" :round-number="state.currentRound.roundNumber" />
       <div v-if="state.currentRound.status === 'COMPLETED'" class="roulette-result" :class="state.currentRound.resultNumber === 0 ? 'green' : [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(state.currentRound.resultNumber ?? -1) ? 'red' : 'black'">{{ state.currentRound.resultNumber }}</div>
       <div class="tv-meta"><span>Online játékosok: {{ players.length }}</span><span>Leadott tippek: {{ state.bets.length }}</span></div>
       <div class="online-players"><span v-for="player in players" :key="player.id" class="online-player">{{ player.name }}</span><span v-if="!players.length" class="muted">Jelenleg nincs online játékos.</span></div>
