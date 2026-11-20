@@ -694,3 +694,6 @@ button.game-card{width:100%}
 .quest-qr-modal>small{font-size:10px}
 .quest-qr-close{position:absolute;top:12px;right:12px;padding:7px 10px}
 .quest-qr-link{max-width:100%;overflow-wrap:anywhere;font-size:9px;text-decoration:underline}
+
+
+.quest-verification-pin{display:flex;align-items:center;justify-content:center;width:100%;padding:22px 12px;border:1px solid var(--accent);border-radius:16px;background:rgba(255,255,255,.045);font-size:clamp(3rem,15vw,5rem);font-weight:800;letter-spacing:.28em;font-variant-numeric:tabular-nums;text-indent:.28em}
