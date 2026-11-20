@@ -395,7 +395,7 @@ export class PlayersService {
 
   getScratchTickets(playerId:number) {
     if(!this.database.sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId)) throw new BadRequestException('A játékos nem található.');
-    return this.database.sqlite.prepare('SELECT id,status,prize_amount AS prizeAmount,created_at AS createdAt,revealed_at AS revealedAt FROM scratch_tickets WHERE player_id=? ORDER BY id DESC LIMIT 20').all(playerId);
+    return this.database.sqlite.prepare('SELECT id,status,CASE WHEN status='REVEALED' THEN prize_amount ELSE NULL END AS prizeAmount,created_at AS createdAt,revealed_at AS revealedAt FROM scratch_tickets WHERE player_id=? ORDER BY id DESC LIMIT 20').all(playerId);
   }
 
   revealScratchTicket(playerId:number,ticketId:number) {
