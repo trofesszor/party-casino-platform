@@ -50,7 +50,7 @@ export class LuckyWheelService implements OnModuleInit {
       const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(SPIN_COST, playerId, SPIN_COST);
       if (Number(debit.changes) !== 1) throw new BadRequestException(`A kerék megpörgetéséhez ${SPIN_COST} CR szükséges.`);
       const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
-      sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'LUCKY_WHEEL_SPIN', 'Szerencsekerék pörgetés')").run(playerId, -SPIN_COST, balance.tokenBalance);
+      sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'LUCKY_WHEEL_SPIN', ?)").run(playerId, -SPIN_COST, balance.tokenBalance, 'Szerencsekerék: ' + winningSegment.label);
       spinId = randomUUID();
       sqlite.prepare("UPDATE lucky_wheel_state SET status = 'SPINNING', spin_id = ?, winning_segment_id = ?, started_at = ?, ends_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1")
         .run(spinId, winningSegment.id, startedAt, endsAt);
