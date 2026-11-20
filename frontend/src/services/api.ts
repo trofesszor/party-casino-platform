@@ -6,8 +6,8 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   return data as T;
 };
 export const api = {
-  getLuckyWheel: () => request<{ status: 'IDLE' | 'SPINNING' | 'RESULT'; spinId: string | null; startedAt: number | null; endsAt: number | null; winner: { id: number; label: string; position: number } | null; segments: { id: number; label: string; position: number; enabled: number }[]; durationMs: number }>('/api/lucky-wheel'),
-  spinLuckyWheel: () => request<any>('/api/lucky-wheel/spin', { method: 'POST' }),
+  getLuckyWheel: () => request<{ status: 'IDLE' | 'SPINNING' | 'RESULT'; spinId: string | null; startedAt: number | null; endsAt: number | null; winner: { id: number; label: string; position: number } | null; segments: { id: number; label: string; position: number; enabled: number }[]; durationMs: number; spinCost: number }>('/api/lucky-wheel'),
+  spinLuckyWheel: (playerId: number) => request<any>('/api/lucky-wheel/spin', { method: 'POST', body: JSON.stringify({ playerId }) }),
   adminGetLuckyWheelSegments: (token: string) => request<{id:number;label:string;position:number;enabled:number}[]>('/api/lucky-wheel/segments', { headers: { Authorization: `Bearer ${token}` } }),
   saveLuckyWheel: (token: string, segments: { label: string; enabled: boolean }[]) => request<any>('/api/lucky-wheel/segments', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ segments }) }),
   adminLogin: (password: string) => request<{ token: string; expiresIn: number }>('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
