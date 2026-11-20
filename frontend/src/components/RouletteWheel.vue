@@ -14,8 +14,16 @@ const redNumbers = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 const landed = ref(!props.spinning && (props.resultNumber !== null || props.previousResultNumber != null));
 const lastResult = ref<number | null>(props.resultNumber ?? props.previousResultNumber ?? null);
 
-const visibleResult = computed(() => props.resultNumber ?? props.previousResultNumber ?? lastResult.value);
-const winningIndex = computed(() => visibleResult.value === null ? 0 : wheelOrder.indexOf(visibleResult.value));
+// The backend result is available as soon as the spin phase starts, but it
+// must not be revealed until the wheel animation has actually landed.
+const targetResult = computed(() => props.resultNumber ?? props.previousResultNumber ?? lastResult.value);
+const visibleResult = computed(() => {
+  if (props.spinning && !landed.value) {
+    return props.previousResultNumber ?? lastResult.value;
+  }
+  return props.resultNumber ?? props.previousResultNumber ?? lastResult.value;
+});
+const winningIndex = computed(() => targetResult.value === null ? 0 : wheelOrder.indexOf(targetResult.value));
 const pocketStep = 360 / wheelOrder.length;
 const wheelStyle = computed(() => ({
   // Six full turns, then settle at the winning pocket. The resting transform
