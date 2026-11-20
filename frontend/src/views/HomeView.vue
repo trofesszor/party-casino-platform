@@ -78,7 +78,7 @@ function logout() {
   <main v-else class="page-shell">
     <header class="topbar">
       <a class="brand" href="/">PARTY<span>CASINO</span></a>
-      <nav><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
+      <nav><a href="/leaderboard">Ranglista</a><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
     </header>
 
     <section class="hero">
