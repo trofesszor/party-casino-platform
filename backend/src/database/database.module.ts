@@ -45,6 +45,21 @@ export const DATABASE = Symbol('DATABASE');
           payout_amount INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS lucky_wheel_segments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          label TEXT NOT NULL,
+          position INTEGER NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS lucky_wheel_state (
+          id INTEGER PRIMARY KEY CHECK(id = 1),
+          status TEXT NOT NULL DEFAULT 'IDLE' CHECK(status IN ('IDLE','SPINNING','RESULT')),
+          spin_id TEXT,
+          winning_segment_id INTEGER,
+          started_at INTEGER,
+          ends_at INTEGER,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS token_transactions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -64,6 +79,14 @@ export const DATABASE = Symbol('DATABASE');
       if (!payoutColumns.some(column => column.name === 'payout_amount')) {
         sqlite.exec('ALTER TABLE casino_roulette_bets ADD COLUMN payout_amount INTEGER NOT NULL DEFAULT 0');
       }
+
+      const wheelCount = sqlite.prepare('SELECT COUNT(*) AS count FROM lucky_wheel_segments').get() as { count: number };
+      if (wheelCount.count === 0) {
+        const defaults = ['Ossz ki 2 italt', 'Te iszol', 'Lányok isznak', 'Fiúk isznak', 'Mindenki iszik', 'Passz', 'Válassz valakit, aki iszik'];
+        const insertSegment = sqlite.prepare('INSERT INTO lucky_wheel_segments (label, position, enabled) VALUES (?, ?, 1)');
+        defaults.forEach((label, index) => insertSegment.run(label, index));
+      }
+      sqlite.exec("INSERT OR IGNORE INTO lucky_wheel_state (id, status) VALUES (1, 'IDLE')");
 
       // Migrate the first prototype's one-bet-per-player table to a multi-bet table.
       const columns = sqlite.prepare('PRAGMA table_info(casino_roulette_bets)').all() as Array<{ name: string }>;
