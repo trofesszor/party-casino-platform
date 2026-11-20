@@ -5,11 +5,12 @@ import { api } from '../services/api';
 import { socket } from '../services/socket';
 
 type Segment = { id: number; label: string; position: number; enabled: number };
-type WheelState = { status: 'IDLE'|'SPINNING'|'RESULT'; spinId: string|null; startedAt: number|null; endsAt: number|null; winner: {id:number;label:string;position:number}|null; segments: Segment[]; durationMs: number };
+type WheelState = { status: 'IDLE'|'SPINNING'|'RESULT'; spinId: string|null; startedAt: number|null; endsAt: number|null; winner: {id:number;label:string;position:number}|null; segments: Segment[]; durationMs: number; spinCost: number; tokenBalance?: number };
 const route = useRoute();
 const isDisplay = computed(() => route.query.display === '1');
 const state = ref<WheelState|null>(null);
 const busy = ref(false);
+const playerId = ref(Number(localStorage.getItem('party-player-id')) || 0);
 const error = ref('');
 const rotation = ref(0);
 const transitionMs = ref(7000);
@@ -74,7 +75,13 @@ async function refresh(){ state.value=await api.getLuckyWheel(); if (state.value
 async function spin(){
   if(busy.value||isSpinning.value)return;
   busy.value=true;error.value='';
-  try{const next=await api.spinLuckyWheel();state.value=next;await animateSpin(next);}
+  try{
+    if (!playerId.value) throw new Error('A pörgetéshez előbb lépj be a játékosneveddel.');
+    const next=await api.spinLuckyWheel(playerId.value);
+    state.value=next;
+    window.dispatchEvent(new Event('party-player-changed'));
+    await animateSpin(next);
+  }
   catch(e:any){error.value=e.message;}
   finally{busy.value=false;}
 }
@@ -84,8 +91,9 @@ function onChanged(next:WheelState){
   if(newSpin) void animateSpin(next);
   else if(next.status!=='SPINNING')showWinner(next);
 }
-onMounted(()=>{refresh().catch(e=>error.value=e.message);socket.on('lucky-wheel:changed',onChanged);clock=setInterval(()=>now.value=Date.now(),100);});
-onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInterval(clock);});
+function syncPlayer(){playerId.value=Number(localStorage.getItem('party-player-id'))||0;}
+onMounted(()=>{refresh().catch(e=>error.value=e.message);socket.on('lucky-wheel:changed',onChanged);clock=setInterval(()=>now.value=Date.now(),100);window.addEventListener('party-player-changed',syncPlayer);window.addEventListener('storage',syncPlayer);});
+onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInterval(clock);window.removeEventListener('party-player-changed',syncPlayer);window.removeEventListener('storage',syncPlayer);});
 </script>
 
 <template>
@@ -115,7 +123,7 @@ onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInter
      <strong v-else-if="isSpinning">SOK SZERENCSÉT!</strong>
      <strong v-else>Ki lesz a szerencsés?</strong>
     </div>
-    <button v-if="!isDisplay" class="primary wheel-spin-button" :disabled="busy||isSpinning||!state?.segments?.length" @click="spin">{{ isSpinning?'Pörgetés folyamatban…':busy?'Indítás…':'KERÉK MEGPÖRGETÉSE' }}</button>
+    <button v-if="!isDisplay" class="primary wheel-spin-button"  :disabled="busy||isSpinning||!state?.segments?.length||!playerId" @click="spin">{{ isSpinning?'Pörgetés folyamatban…':busy?'Indítás…':!playerId?'LÉPJ BE A PÖRGETÉSHEZ':`MEGPÖRGETÉS · ${state?.spinCost ?? 5} CR` }}</button>
     <p v-else class="wheel-tv-hint">{{ isSpinning?'A pörgetés folyamatban van':'A játékosok telefonjukról indíthatják a pörgetést' }}</p>
     <p v-if="error" class="error">{{ error }}</p>
    </section>
