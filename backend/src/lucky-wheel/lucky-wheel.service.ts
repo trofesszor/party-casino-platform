@@ -86,7 +86,7 @@ export class LuckyWheelService implements OnModuleInit {
     }
     const next = this.getState();
     this.events.publish('lucky-wheel:changed', next);
-    return next;
+    return this.getAllSegments();
   }
 
   private readState() {
