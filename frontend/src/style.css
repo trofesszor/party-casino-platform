@@ -438,9 +438,12 @@
 .wallet-history>footer{display:flex;justify-content:space-between;padding:13px 18px;border-top:1px solid #ffffff14;color:#9da397;font-size:9px;letter-spacing:.12em}
 .wallet-history>footer strong{color:var(--accent);font:700 13px 'Space Grotesk';letter-spacing:0}
 @media(max-width:600px){
- .player-wallet{right:12px;bottom:12px;width:190px}
- .wallet-summary{padding:9px 11px;border-radius:12px}
- .wallet-coin{width:30px;height:30px;flex-basis:30px}
- .wallet-copy strong{font-size:16px}
- .wallet-history{width:min(360px,calc(100vw - 24px));max-height:60vh}
+ .player-wallet{right:10px;bottom:10px;width:max-content;max-width:calc(100vw - 20px)}
+ .wallet-summary{width:auto;min-width:0;gap:7px;padding:7px 9px;border-radius:11px}
+ .wallet-coin{width:25px;height:25px;flex-basis:25px;font-size:13px}
+ .wallet-copy small{font-size:7px;letter-spacing:.12em}
+ .wallet-copy strong{font-size:14px}
+ .wallet-copy em{font-size:9px}
+ .wallet-chevron{font-size:18px;margin-left:2px}
+ .wallet-history{width:min(360px,calc(100vw - 20px));max-height:60vh}
 }
