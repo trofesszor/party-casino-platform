@@ -19,6 +19,12 @@ async function enter() {
   } catch (e: any) { error.value = e.message; }
   finally { busy.value = false; }
 }
+function changeName() {
+  player.value = null;
+  localStorage.removeItem('party-player-id');
+  localStorage.removeItem('party-player-name');
+  name.value = '';
+}
 onMounted(() => {
   const savedName = localStorage.getItem('party-player-name');
   if (!savedName) return;
@@ -35,7 +41,7 @@ onMounted(() => {
     <header class="topbar"><a class="brand" href="/">PARTY<span>CASINO</span></a><nav><a href="/display" target="_blank">TV kijelző ↗</a></nav></header>
     <section class="hero"><p class="eyebrow">A TE HELYI KASZINÓD</p><h1>Válassz <span>játékot.</span></h1><p class="muted">Egy platform, állandó játékasztalok. Nincs esemény létrehozás vagy csatlakozás.</p></section>
     <section v-if="!player" class="join-panel panel"><div><p class="eyebrow">JÁTÉKOS BELÉPÉS</p><h2>Hogy hívnak?</h2><p class="muted">Csak a neved szükséges. Nincs regisztráció vagy jelszó.</p></div><form @submit.prevent="enter"><input v-model="name" maxlength="24" placeholder="Add meg a neved" autocomplete="nickname"><button class="primary" :disabled="busy || restoring || !name.trim()">Belépés →</button></form></section>
-    <section v-else class="welcome panel"><div><p class="eyebrow">JÁTÉKOS</p><h2>Szia, {{ player.name }}!</h2><p class="muted">Válassz az állandó játékok közül.</p></div><button class="ghost" @click="player=null; localStorage.removeItem('party-player-id'); localStorage.removeItem('party-player-name'); name=''">Név váltása</button></section>
+    <section v-else class="welcome panel"><div><p class="eyebrow">JÁTÉKOS</p><h2>Szia, {{ player.name }}!</h2><p class="muted">Válassz az állandó játékok közül.</p></div><button class="ghost" @click="changeName">Név váltása</button></section>
     <p v-if="error" class="error">{{ error }}</p>
     <section class="section-heading"><div><p class="eyebrow">JÁTÉKTEREM</p><h2>Válassz játékot</h2></div></section>
     <div class="game-grid">
