@@ -7,6 +7,7 @@ import RouletteView from './views/RouletteView.vue';
 import SlotsView from './views/SlotsView.vue';
 import AdminView from './views/AdminView.vue';
 import LuckyWheelView from './views/LuckyWheelView.vue';
+import LeaderboardView from './views/LeaderboardView.vue';
 import './style.css';
 const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', component: HomeView },
@@ -14,6 +15,7 @@ const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/roulette', component: RouletteView },
   { path: '/slots', component: SlotsView },
   { path: '/lucky-wheel', component: LuckyWheelView },
+  { path: '/leaderboard', component: LeaderboardView },
   { path: '/admin', component: AdminView },
 ] });
 createApp(App).use(router).mount('#app');
