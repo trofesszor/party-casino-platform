@@ -22,6 +22,8 @@ export class PlayersController {
   @Get(':id/side-quests/:questId/verification-status') getSideQuestVerificationStatus(@Param('id') id:string,@Param('questId') questId:string) { return this.players.getSideQuestVerificationStatus(Number(id),Number(questId)); }
   @Post(':id/side-quests/:questId/verification') requestSideQuestVerification(@Param('id') id:string,@Param('questId') questId:string) { return this.players.requestSideQuestVerification(Number(id),Number(questId)); }
   @Get(':id/shop') getShop(@Param('id') id: string) { return this.players.getShop(Number(id)); }
+  @Get(':id/scratch-tickets') getScratchTickets(@Param('id') id:string) { return this.players.getScratchTickets(Number(id)); }
+  @Post(':id/scratch-tickets/:ticketId/reveal') revealScratchTicket(@Param('id') id:string,@Param('ticketId') ticketId:string) { return this.players.revealScratchTicket(Number(id),Number(ticketId)); }
   @Post(':id/shop/buy') buyShopItem(@Param('id') id: string, @Body() body:{itemKey:string}) { return this.players.buyShopItem(Number(id),body.itemKey); }
   @Post(':id/shop/use') useShopItem(@Param('id') id: string, @Body() body:{itemKey:string;questId:number}) { return this.players.useShopItem(Number(id),body.itemKey,Number(body.questId)); }
   @Get(':id/balance') getBalance(@Param('id') id: string) { return this.players.getBalance(Number(id)); }
