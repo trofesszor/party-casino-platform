@@ -13,9 +13,11 @@ export class PlayersController {
   @Post(':id/duels/:duelId/respond') respondToDuel(@Param('id') id:string,@Param('duelId') duelId:string,@Body() body:{accept:boolean}) { return this.players.respondToDuel(Number(duelId),Number(id),body.accept===true); }
   @Post(':id/duels/:duelId/type') chooseDuelType(@Param('id') id:string,@Param('duelId') duelId:string,@Body() body:{duelType:string}) { return this.players.chooseDuelType(Number(duelId),Number(id),body.duelType); }
   @Post(':id/duels/:duelId/result') submitDuelWinner(@Param('id') id:string,@Param('duelId') duelId:string,@Body() body:{winnerId:number}) { return this.players.submitDuelWinner(Number(duelId),Number(id),Number(body.winnerId)); }
+  @Get('side-quest-verifications/:token') getSideQuestVerification(@Param('token') token:string) { return this.players.getSideQuestVerification(token); }
+  @Post('side-quest-verifications/:token') verifySideQuest(@Param('token') token:string,@Body() body:{verifierId:number;approve:boolean}) { return this.players.verifySideQuest(token,Number(body.verifierId),body.approve); }
   @Get(':id/side-quests') getSideQuests(@Param('id') id: string) { return this.players.getSideQuests(Number(id)); }
   @Post(':id/side-quests') assignSideQuest(@Param('id') id: string) { return this.players.assignSideQuest(Number(id)); }
-  @Post(':id/side-quests/:questId/complete') completeSideQuest(@Param('id') id: string, @Param('questId') questId: string) { return this.players.completeSideQuest(Number(id), Number(questId)); }
+  @Post(':id/side-quests/:questId/verification') requestSideQuestVerification(@Param('id') id:string,@Param('questId') questId:string) { return this.players.requestSideQuestVerification(Number(id),Number(questId)); }
   @Get(':id/shop') getShop(@Param('id') id: string) { return this.players.getShop(Number(id)); }
   @Post(':id/shop/buy') buyShopItem(@Param('id') id: string, @Body() body:{itemKey:string}) { return this.players.buyShopItem(Number(id),body.itemKey); }
   @Post(':id/shop/use') useShopItem(@Param('id') id: string, @Body() body:{itemKey:string;questId:number}) { return this.players.useShopItem(Number(id),body.itemKey,Number(body.questId)); }
