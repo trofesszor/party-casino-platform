@@ -184,7 +184,14 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
         <div v-if="duel.status==='PENDING' && duel.opponentId===player.id" class="duel-action-row"><span>Elfogadod a kihívást?</span><button class="primary" :disabled="duelBusy" @click="respondDuel(duel,true)">Elfogadom</button><button class="ghost" :disabled="duelBusy" @click="respondDuel(duel,false)">Visszautasítom</button></div>
         <div v-if="duel.status==='CHOOSE_TYPE' && duel.opponentId===player.id" class="duel-type-picker"><span>Válaszd ki a párbaj típusát:</span><div><button v-for="type in duelTypes" :key="type.value" class="ghost" :disabled="duelBusy" @click="setDuelType(duel,type.value)">{{type.label}}</button></div></div>
         <div v-if="duel.status==='CHOOSE_TYPE' && duel.challengerId===player.id" class="duel-waiting">A másik játékos kiválasztja a párbaj típusát.</div>
-        <div v-if="duel.status==='IN_PROGRESS'" class="duel-action-row"><span>Játsszátok le a párbajt, majd mindketten jelöljétek meg a győztest.</span></div>
+        <div v-if="duel.status==='IN_PROGRESS'" class="duel-vote-area">
+          <strong>Ki nyerte a párbajt?</strong>
+          <p class="muted">Játsszátok le a párbajt, majd mindketten válasszátok ki a győztest.</p>
+          <div>
+            <button class="ghost" :disabled="duelBusy" @click="voteDuelWinner(duel,duel.challengerId)">{{duel.challengerName}} nyert</button>
+            <button class="ghost" :disabled="duelBusy" @click="voteDuelWinner(duel,duel.opponentId)">{{duel.opponentName}} nyert</button>
+          </div>
+        </div>
         <div v-if="duel.status==='AWAITING_CONFIRMATION'" class="duel-vote-area">
           <p v-if="duel.challengerWinnerId || duel.opponentWinnerId" class="muted">A győztesre leadott szavazatok: {{duel.challengerWinnerId?'kihívó ✓':'kihívó –'}} · {{duel.opponentWinnerId?'ellenfél ✓':'ellenfél –'}}</p>
           <strong>Ki nyerte a párbajt?</strong>
