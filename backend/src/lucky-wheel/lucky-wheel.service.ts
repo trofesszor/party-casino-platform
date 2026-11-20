@@ -3,13 +3,15 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
 
-const SPIN_DURATION_MS = 7000;
-const SPIN_COST = 5;
 
 @Injectable()
 export class LuckyWheelService implements OnModuleInit {
   private timer: NodeJS.Timeout | null = null;
   constructor(@Inject(DATABASE) private readonly database: any, private readonly events: EventsGateway) {}
+  private setting(key:string,fallback:number){const row=this.database.sqlite.prepare('SELECT setting_value AS value FROM casino_settings WHERE setting_key=?').get(key) as {value:string}|undefined;return Number(row?.value??fallback);}
+  private get spinDurationMs(){return this.setting('wheel_spin_duration_ms',7000);}
+  private get spinCost(){return this.setting('wheel_spin_cost',5);}
+
 
   onModuleInit() {
     const state = this.readState();
@@ -24,7 +26,7 @@ export class LuckyWheelService implements OnModuleInit {
     const segments = this.database.sqlite.prepare(
       'SELECT id, label, position, enabled FROM lucky_wheel_segments WHERE enabled = 1 ORDER BY position, id',
     ).all();
-    return { ...state, segments, durationMs: SPIN_DURATION_MS, spinCost: SPIN_COST };
+    return { ...state, segments, durationMs: this.spinDurationMs, spinCost: this.spinCost };
   }
 
   getAllSegments() {
@@ -38,7 +40,7 @@ export class LuckyWheelService implements OnModuleInit {
     let spinId = '';
     let winningSegment: any;
     const startedAt = Date.now();
-    const endsAt = startedAt + SPIN_DURATION_MS;
+    const endsAt = startedAt + this.spinDurationMs;
     try {
       const state = sqlite.prepare("SELECT status FROM lucky_wheel_state WHERE id = 1").get() as { status: string };
       if (state.status === 'SPINNING') throw new BadRequestException('A szerencsekerék már forog. Várd meg az eredményt!');
@@ -47,10 +49,10 @@ export class LuckyWheelService implements OnModuleInit {
       const segments = sqlite.prepare('SELECT id, label, position FROM lucky_wheel_segments WHERE enabled = 1 ORDER BY position, id').all() as any[];
       if (segments.length < 2) throw new BadRequestException('Legalább két aktív mező szükséges a kerékhez.');
       winningSegment = segments[randomInt(segments.length)];
-      const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(SPIN_COST, playerId, SPIN_COST);
-      if (Number(debit.changes) !== 1) throw new BadRequestException(`A kerék megpörgetéséhez ${SPIN_COST} CR szükséges.`);
+      const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(this.spinCost, playerId, this.spinCost);
+      if (Number(debit.changes) !== 1) throw new BadRequestException(`A kerék megpörgetéséhez ${this.spinCost} CR szükséges.`);
       const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
-      sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'LUCKY_WHEEL_SPIN', ?)").run(playerId, -SPIN_COST, balance.tokenBalance, 'Szerencsekerék: ' + winningSegment.label);
+      sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'LUCKY_WHEEL_SPIN', ?)").run(playerId, -this.spinCost, balance.tokenBalance, 'Szerencsekerék: ' + winningSegment.label);
       spinId = randomUUID();
       sqlite.prepare("UPDATE lucky_wheel_state SET status = 'SPINNING', spin_id = ?, winning_segment_id = ?, started_at = ?, ends_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1")
         .run(spinId, winningSegment.id, startedAt, endsAt);
@@ -63,7 +65,7 @@ export class LuckyWheelService implements OnModuleInit {
     const started = this.getState();
     this.events.publish('lucky-wheel:changed', started);
     if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.finishSpin(spinId), SPIN_DURATION_MS);
+    this.timer = setTimeout(() => this.finishSpin(spinId), this.spinDurationMs);
     const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
     return { ...started, tokenBalance: balance.tokenBalance };
   }
