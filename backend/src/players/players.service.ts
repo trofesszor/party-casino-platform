@@ -181,6 +181,18 @@ export class PlayersService {
     } catch(e) { sqlite.exec('ROLLBACK'); throw e; }
   }
 
+  getShopItemsForAdmin() {
+    return this.database.sqlite.prepare('SELECT item_key AS itemKey, name, description, price, enabled FROM shop_items ORDER BY name COLLATE NOCASE').all();
+  }
+
+  setShopItemEnabled(itemKeyInput: string, enabledInput: boolean) {
+    const itemKey = String(itemKeyInput ?? '').trim().toUpperCase();
+    if (typeof enabledInput !== 'boolean') throw new BadRequestException('Érvénytelen termékállapot.');
+    const result = this.database.sqlite.prepare('UPDATE shop_items SET enabled=? WHERE item_key=?').run(enabledInput ? 1 : 0, itemKey);
+    if (!result.changes) throw new BadRequestException('A termék nem található.');
+    return this.database.sqlite.prepare('SELECT item_key AS itemKey, name, description, price, enabled FROM shop_items WHERE item_key=?').get(itemKey);
+  }
+
   getShop(playerId: number) {
     const player = this.database.sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId);
     if (!player) throw new BadRequestException('A játékos nem található.');
