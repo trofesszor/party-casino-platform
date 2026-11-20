@@ -17,6 +17,7 @@ export const api = {
   adminLogout: (token: string) => request<{ success: boolean }>('/api/admin/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
   joinPlayer: (name: string) => request<Player>('/api/players/join', { method: 'POST', body: JSON.stringify({ name }) }),
   getPlayers: () => request<Player[]>('/api/players'),
+  getLeaderboard: () => request<{ id: number; name: string; tokenBalance: number }[]>('/api/players/leaderboard'),
   getPlayerBalance: (playerId: number) => request<{ tokenBalance: number }>(`/api/players/${playerId}/balance`),
   getPlayerTransactions: (playerId: number) => request<{ id: number; amount: number; balanceAfter: number; type: string; description: string; createdAt: string }[]>(`/api/players/${playerId}/transactions`),
   getRouletteState: () => request<RouletteState>('/api/roulette'),
