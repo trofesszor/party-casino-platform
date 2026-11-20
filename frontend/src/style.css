@@ -683,3 +683,14 @@ button.game-card{width:100%}
  .shop-quest-row{align-items:flex-start;flex-direction:column;padding:14px}
  .danger-button{width:100%}
 }
+
+
+/* Side quest QR verification */
+.quest-qr-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:#050607dd;backdrop-filter:blur(8px)}
+.quest-qr-modal{position:relative;width:min(100%,430px);display:flex;flex-direction:column;align-items:center;gap:13px;padding:28px;text-align:center}
+.quest-qr-modal h2{margin:0;font:600 25px 'Space Grotesk';letter-spacing:-.03em}
+.quest-qr-modal>p{margin:0;font-size:12px;line-height:1.55}
+.quest-qr-modal img{width: min(280px,75vw);height:auto;aspect-ratio:1;object-fit:contain;padding:10px;border-radius:15px;background:#fff}
+.quest-qr-modal>small{font-size:10px}
+.quest-qr-close{position:absolute;top:12px;right:12px;padding:7px 10px}
+.quest-qr-link{max-width:100%;overflow-wrap:anywhere;font-size:9px;text-decoration:underline}
