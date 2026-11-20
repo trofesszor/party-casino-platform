@@ -35,12 +35,32 @@ export const DATABASE = Symbol('DATABASE');
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           round_id INTEGER NOT NULL REFERENCES casino_roulette_rounds(id) ON DELETE CASCADE,
           player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-          bet_type TEXT NOT NULL CHECK(bet_type IN ('NUMBER','COLOR')),
+          bet_type TEXT NOT NULL,
           bet_value TEXT NOT NULL,
-          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE(round_id, player_id)
+          amount INTEGER NOT NULL DEFAULT 1 CHECK(amount BETWEEN 1 AND 100),
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
       `);
+
+      // Migrate the first prototype's one-bet-per-player table to a multi-bet table.
+      const columns = sqlite.prepare('PRAGMA table_info(casino_roulette_bets)').all() as Array<{ name: string }>;
+      if (!columns.some(column => column.name === 'amount')) {
+        sqlite.exec(`
+          ALTER TABLE casino_roulette_bets RENAME TO casino_roulette_bets_old;
+          CREATE TABLE casino_roulette_bets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            round_id INTEGER NOT NULL REFERENCES casino_roulette_rounds(id) ON DELETE CASCADE,
+            player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+            bet_type TEXT NOT NULL,
+            bet_value TEXT NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 1 CHECK(amount BETWEEN 1 AND 100),
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+          INSERT INTO casino_roulette_bets (id, round_id, player_id, bet_type, bet_value, amount, created_at)
+            SELECT id, round_id, player_id, bet_type, bet_value, 1, created_at FROM casino_roulette_bets_old;
+          DROP TABLE casino_roulette_bets_old;
+        `);
+      }
       return { sqlite, db: drizzle({ client: sqlite }) };
     },
   }],
