@@ -11,6 +11,11 @@ const selectedPlayer = ref<number | null>(null);
 const actionError = ref('');
 const wheelSegments = ref<{label:string;enabled:boolean}[]>([]);
 const wheelSaving = ref(false);
+type PoolQuest = { id:number; title:string; description:string; enabled:number };
+const sideQuestPool = ref<PoolQuest[]>([]);
+const newQuestTitle = ref('');
+const newQuestDescription = ref('');
+const sideQuestSaving = ref(false);
 const password = ref('');
 const token = ref(localStorage.getItem('party-admin-token') ?? '');
 const players = ref<AdminPlayer[]>([]);
@@ -26,6 +31,7 @@ async function loadPlayers() {
     authenticated.value = true;
     const wheel = await api.adminGetLuckyWheelSegments(token.value);
     wheelSegments.value = wheel.map(segment => ({ label: segment.label, enabled: !!segment.enabled }));
+    sideQuestPool.value = await api.adminSideQuestPool(token.value);
     localStorage.setItem('party-admin-token', token.value);
   } catch {
     token.value = '';
@@ -74,6 +80,26 @@ async function saveWheel() {
   try { const result=await api.saveLuckyWheel(token.value,wheelSegments.value); wheelSegments.value=result.map((segment:any)=>({label:segment.label,enabled:!!segment.enabled})); }
   catch(e:any){actionError.value=e.message;}
   finally{wheelSaving.value=false;}
+}
+
+async function addSideQuest() {
+  if (!newQuestTitle.value.trim()) return;
+  sideQuestSaving.value = true;
+  actionError.value = '';
+  try {
+    await api.adminAddSideQuest(token.value, newQuestTitle.value, newQuestDescription.value);
+    newQuestTitle.value = '';
+    newQuestDescription.value = '';
+    sideQuestPool.value = await api.adminSideQuestPool(token.value);
+  } catch (e:any) { actionError.value = e.message; }
+  finally { sideQuestSaving.value = false; }
+}
+async function deleteSideQuest(questId:number) {
+  if (!confirm('Biztosan törlöd ezt a side questet a poolból?')) return;
+  try {
+    await api.adminDeleteSideQuest(token.value, questId);
+    sideQuestPool.value = await api.adminSideQuestPool(token.value);
+  } catch (e:any) { actionError.value = e.message; }
 }
 
 async function logout() {
@@ -143,6 +169,19 @@ onMounted(loadPlayers);
         <div class="admin-section-heading"><div><p class="eyebrow">PARTY GAME</p><h2>Szerencsekerék mezői</h2><p class="muted">A módosítások azonnal megjelennek minden telefonon és a TV-n.</p></div><button class="ghost" @click="addWheelSegment" :disabled="wheelSegments.length>=24">+ Új mező</button></div>
         <div v-for="(segment,index) in wheelSegments" :key="index" class="admin-wheel-row"><span class="admin-wheel-index">{{ index+1 }}</span><input v-model="segment.label" maxlength="48" placeholder="Mező felirata"><label><input v-model="segment.enabled" type="checkbox"> Aktív</label><button class="ghost" @click="moveWheelSegment(index,-1)" :disabled="index===0">↑</button><button class="ghost" @click="moveWheelSegment(index,1)" :disabled="index===wheelSegments.length-1">↓</button><button class="ghost danger" @click="removeWheelSegment(index)">Törlés</button></div>
         <button class="primary" :disabled="wheelSaving||wheelSegments.length<2" @click="saveWheel">{{wheelSaving?'Mentés…':'Kerék mentése'}}</button>
+      </section>
+      <section class="panel admin-wheel-editor admin-side-quest-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">SIDE QUEST SYSTEM</p><h2>Side quest pool</h2><p class="muted">A játékosok véletlenszerűen kapnak egy küldetést ebből a listából. Egy játékosnak legfeljebb 2 aktív küldetése lehet.</p></div></div>
+        <form class="side-quest-admin-form" @submit.prevent="addSideQuest">
+          <input v-model="newQuestTitle" maxlength="120" placeholder="Side quest címe" required>
+          <textarea v-model="newQuestDescription" maxlength="500" rows="3" placeholder="Rövid leírás / teljesítési feltétel (opcionális)"></textarea>
+          <button class="primary" :disabled="sideQuestSaving || !newQuestTitle.trim()">{{ sideQuestSaving ? 'Mentés…' : '+ Küldetés hozzáadása' }}</button>
+        </form>
+        <div v-if="!sideQuestPool.length" class="admin-empty muted">A pool még üres. Adj hozzá néhány side questet.</div>
+        <div v-for="quest in sideQuestPool" :key="quest.id" class="side-quest-admin-row">
+          <div><strong>{{ quest.title }}</strong><p v-if="quest.description" class="muted">{{ quest.description }}</p></div>
+          <button class="ghost danger" @click="deleteSideQuest(quest.id)">Törlés</button>
+        </div>
       </section>
       <p v-if="actionError" class="error">{{ actionError }}</p>
       <p class="admin-footnote">A játékosadatok jelenleg az azonosítót, nevet, csatlakozás idejét és online állapotot tartalmazzák. További statisztikák később bővíthetők.</p>
