@@ -55,9 +55,7 @@ export class AdminController {
     this.admin.assertToken(this.token(authorization));
     const playerId = Number(id);
     if (!Number.isSafeInteger(playerId) || playerId <= 0) throw new BadRequestException('Érvénytelen játékosazonosító.');
-    return this.players['database'].sqlite.prepare(
-      'SELECT id, amount, balance_after AS balanceAfter, type, description, created_at AS createdAt FROM token_transactions WHERE player_id = ? ORDER BY id DESC LIMIT 100',
-    ).all(playerId);
+    return this.players.getTransactions(playerId);
   }
 
 }
