@@ -30,7 +30,7 @@ const slices = computed(() => {
     const large = 360/count > 180 ? 1 : 0;
     const path = `M 200 200 L ${sx} ${sy} A 178 178 0 ${large} 1 ${ex} ${ey} Z`;
     const [tx,ty] = point((start+end)/2,112);
-    const words = segment.label.trim().split(/\\s+/);
+    const words = segment.label.trim().split(/\s+/);
     const lines: string[] = [];
     let line = '';
     for (const word of words) {
