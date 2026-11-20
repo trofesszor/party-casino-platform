@@ -35,6 +35,12 @@ export class AdminController {
       online: onlineIds.has(player.id),
     }));
   }
+  @Get('game-settings')
+  getCasinoGameSettings(@Headers('authorization') authorization?:string){this.admin.assertToken(this.token(authorization));return this.players.getCasinoGameSettings();}
+
+  @Post('game-settings')
+  setCasinoGameSettings(@Body() body:any,@Headers('authorization') authorization?:string){this.admin.assertToken(this.token(authorization));return this.players.setCasinoGameSettings(body);}
+
   @Get('default-player-tokens')
   getDefaultPlayerTokens(@Headers('authorization') authorization?: string) {
     this.admin.assertToken(this.token(authorization));
@@ -65,6 +71,11 @@ export class AdminController {
   getShopItems(@Headers('authorization') authorization?: string) {
     this.admin.assertToken(this.token(authorization));
     return this.players.getShopItemsForAdmin();
+  }
+
+  @Post('shop/:itemKey')
+  updateShopItem(@Param('itemKey') itemKey:string,@Body() body:{price:number;name:string;description:string},@Headers('authorization') authorization?:string){
+    this.admin.assertToken(this.token(authorization));return this.players.updateShopItem(itemKey,body);
   }
 
   @Post('shop/:itemKey/enabled')
