@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../services/api';
 
@@ -11,14 +11,58 @@ const quest = ref<{questId:number;ownerId:number;ownerName:string;title:string;d
 const busy = ref(false);
 const error = ref('');
 const result = ref('');
+const video = ref<HTMLVideoElement|null>(null);
+const cameraError = ref('');
+const cameraActive = ref(false);
+let cameraStream: MediaStream|null = null;
+let scanFrame = 0;
 const isOwner = computed(() => quest.value?.ownerId === playerId);
 const loggedIn = computed(() => Number.isSafeInteger(playerId) && playerId > 0);
 
+async function startCamera() {
+  cameraError.value = '';
+  if (!navigator.mediaDevices?.getUserMedia) { cameraError.value = 'A kamera HTTPS kapcsolaton vagy localhost címen érhető el.'; return; }
+  if (!(window as any).BarcodeDetector) { cameraError.value = 'Ez a böngésző nem támogatja a beépített QR-olvasót. Próbáld Chrome vagy Edge böngészőben.'; return; }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    cameraActive.value = true;
+    await new Promise(resolve => requestAnimationFrame(() => resolve(true)));
+    if (video.value) { video.value.srcObject = cameraStream; await video.value.play(); scanQr(); }
+  } catch (e:any) { stopCamera(); cameraError.value = e.name === 'NotAllowedError' ? 'A kamera használatát engedélyezned kell a böngészőben.' : (e.message || 'Nem sikerült elindítani a kamerát.'); }
+}
+async function scanQr() {
+  const Detector = (window as any).BarcodeDetector;
+  if (!Detector || !video.value || !cameraActive.value) return;
+  try {
+    const detector = new Detector({formats:['qr_code']});
+    const codes = await detector.detect(video.value);
+    const raw = codes?.[0]?.rawValue;
+    if (raw) {
+      stopCamera();
+      try {
+        const scanned = new URL(raw, window.location.origin);
+        const scannedToken = scanned.searchParams.get('token');
+        if (scannedToken) window.location.href = window.location.origin + '/verify-quest?token=' + encodeURIComponent(scannedToken);
+        else cameraError.value = 'A beolvasott QR-kód nem érvényes küldetés-hitelesítő link.';
+      } catch { cameraError.value = 'A beolvasott QR-kód nem érvényes link.'; }
+      return;
+    }
+  } catch { /* Ignore undecodable frames and keep scanning. */ }
+  if (cameraActive.value) scanFrame = requestAnimationFrame(scanQr);
+}
+function stopCamera() {
+  cameraActive.value = false;
+  if (scanFrame) cancelAnimationFrame(scanFrame);
+  cameraStream?.getTracks().forEach(track => track.stop());
+  cameraStream = null;
+  if (video.value) video.value.srcObject = null;
+}
 onMounted(async () => {
-  if (!token) { error.value = 'Hiányzó QR-kód azonosító.'; return; }
+  if (!token) return;
   try { quest.value = await api.getSideQuestVerification(token); }
   catch (e:any) { error.value = e.message || 'A QR-kód nem érvényes.'; }
 });
+onUnmounted(stopCamera);
 async function decide(approve:boolean) {
   if (!quest.value || !loggedIn.value || isOwner.value || busy.value) return;
   busy.value = true; error.value = '';
@@ -38,7 +82,16 @@ async function decide(approve:boolean) {
     <section class="panel login-panel quest-verification-panel">
       <a class="brand" href="/">PARTY<span>CASINO</span></a>
       <p class="eyebrow">SIDE QUEST VERIFICATION</p>
-      <template v-if="result">
+      <template v-if="!token && !result">
+        <h1>QR-kód beolvasása</h1>
+        <p class="muted">Olvasd be a küldetést kérő játékos telefonján megjelenő QR-kódot a teljesítés ellenőrzéséhez.</p>
+        <div v-if="cameraActive" class="quest-camera-frame"><video ref="video" playsinline muted></video><span class="quest-camera-target"></span></div>
+        <button v-if="!cameraActive" class="primary" @click="startCamera">Kamera megnyitása</button>
+        <button v-else class="ghost" @click="stopCamera">Kamera leállítása</button>
+        <p v-if="cameraError" class="error">{{ cameraError }}</p>
+        <p class="muted quest-verification-note">A kamera használatához engedélyezd a hozzáférést. HTTPS vagy localhost szükséges.</p>
+      </template>
+      <template v-else-if="result">
         <h1>Visszaigazolás rögzítve</h1>
         <p class="muted">{{ result }}</p>
         <button class="primary" @click="router.push('/')">Vissza a főoldalra</button>
