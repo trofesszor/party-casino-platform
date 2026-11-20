@@ -15,7 +15,7 @@ const busy = ref(false);
 const savedPlayerId = Number(localStorage.getItem('party-player-id'));
 const savedPlayerName = localStorage.getItem('party-player-name');
 if (savedPlayerId > 0 && savedPlayerName) {
-  player.value = { id: savedPlayerId, name: savedPlayerName, joinedAt: '' };
+  player.value = { id: savedPlayerId, name: savedPlayerName, joinedAt: '', tokenBalance: 0 };
   name.value = savedPlayerName;
   identifyPlayer(savedPlayerId);
   api.getPlayerBalance(savedPlayerId).then(balance => tokenBalance.value = balance.tokenBalance).catch(() => {});
