@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, type Duel } from '../services/api';
 import type { Player } from '../types';
@@ -66,6 +66,7 @@ function challengePlayer() {
 function respondDuel(duel:Duel,accept:boolean) { return duelAction(()=>api.respondToDuel(player.value!.id,duel.id,accept)); }
 function setDuelType(duel:Duel,type:string) { return duelAction(()=>api.chooseDuelType(player.value!.id,duel.id,type)); }
 function voteDuelWinner(duel:Duel,winnerId:number) { return duelAction(()=>api.submitDuelWinner(player.value!.id,duel.id,winnerId)); }
+let duelRefreshTimer: ReturnType<typeof setInterval> | undefined;
 function duelStatusLabel(status:Duel['status']) {
   return ({PENDING:'Válaszra vár',CHOOSE_TYPE:'Típusválasztás',IN_PROGRESS:'Folyamatban',AWAITING_CONFIRMATION:'Eredmény megerősítése',COMPLETED:'Lezárva',REFUSED:'Visszautasítva'} as Record<string,string>)[status];
 }
@@ -120,7 +121,8 @@ function logout() {
   name.value = '';
   error.value = '';
 }
-onMounted(() => { loadDuels(); });
+onMounted(() => { loadDuels(); duelRefreshTimer = setInterval(loadDuels, 3000); });
+onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
 </script>
 
 <template>
@@ -178,6 +180,7 @@ onMounted(() => { loadDuels(); });
       <div v-for="duel in duels" :key="duel.id" class="duel-card">
         <div class="duel-card-top"><div><span class="eyebrow">PÁRBAJ #{{duel.id}}</span><h3>{{duel.challengerName}} <span>VS</span> {{duel.opponentName}}</h3></div><span class="duel-status" :class="'status-'+duel.status.toLowerCase()">{{duelStatusLabel(duel.status)}}</span></div>
         <p v-if="duel.duelType" class="duel-type-label">{{duelTypeLabel(duel.duelType)}}</p>
+        <div v-if="duel.status==='PENDING' && duel.challengerId===player.id" class="duel-waiting">Várakozás a kihívás elfogadására vagy visszautasítására.</div>
         <div v-if="duel.status==='PENDING' && duel.opponentId===player.id" class="duel-action-row"><span>Elfogadod a kihívást?</span><button class="primary" :disabled="duelBusy" @click="respondDuel(duel,true)">Elfogadom</button><button class="ghost" :disabled="duelBusy" @click="respondDuel(duel,false)">Visszautasítom</button></div>
         <div v-if="duel.status==='CHOOSE_TYPE' && duel.opponentId===player.id" class="duel-type-picker"><span>Válaszd ki a párbaj típusát:</span><div><button v-for="type in duelTypes" :key="type.value" class="ghost" :disabled="duelBusy" @click="setDuelType(duel,type.value)">{{type.label}}</button></div></div>
         <div v-if="duel.status==='CHOOSE_TYPE' && duel.challengerId===player.id" class="duel-waiting">A másik játékos kiválasztja a párbaj típusát.</div>
