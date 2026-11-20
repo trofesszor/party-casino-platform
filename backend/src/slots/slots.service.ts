@@ -33,7 +33,11 @@ const PAYTABLE = [
 export class SlotsService {
   constructor(@Inject(DATABASE) private readonly database: any) {}
 
-  spin(playerId: number) {
+  spin(playerId: number, betAmount: number) {
+    const allowedBets = [1, 5, 10, 25, 50];
+    if (!allowedBets.includes(betAmount)) {
+      throw new NotFoundException('Érvénytelen tét. Válassz az elérhető tétek közül.');
+    }
     const player = this.database.sqlite.prepare('SELECT id, name FROM players WHERE id = ?').get(playerId) as { id: number; name: string } | undefined;
     if (!player) throw new NotFoundException('A játékos nem található. Lépj be újra.');
 
@@ -60,6 +64,8 @@ export class SlotsService {
       reels,
       isWin: evaluation.multiplier > 0,
       multiplier: evaluation.multiplier,
+      betAmount,
+      payoutAmount: evaluation.multiplier * betAmount,
       winLabel: evaluation.label,
       freeSpinsAwarded,
       freeSpins: remaining.freeSpins,
