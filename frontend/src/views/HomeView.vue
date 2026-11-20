@@ -262,9 +262,9 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
         <span class="muted">{{ activeSideQuests.length === 2 ? 'Teljesíts egy küldetést, hogy újat kérhess.' : 'A kiosztott küldetés nem dobható el.' }}</span>
       </div>
       <p v-if="sideQuestError" class="error">{{ sideQuestError }}</p>
-      <div v-if="sideQuests.some(q => q.status === 'COMPLETED')" class="side-quest-completed">
+      <div v-if="sideQuests.some(q => q.status !== 'ACTIVE')" class="side-quest-completed">
         <h3>Teljesített küldetések</h3>
-        <div v-for="quest in sideQuests.filter(q => q.status === 'COMPLETED')" :key="quest.id"><span>{{ quest.title }}</span><small>✓ Teljesítve</small></div>
+        <div v-for="quest in sideQuests.filter(q => q.status !== 'ACTIVE')" :key="quest.id"><span>{{ quest.title }}</span><small>{{ quest.status === 'SKIPPED' ? '↷ Kihagyva' : '✓ Teljesítve' }}</small></div>
       </div>
     </section>
 
