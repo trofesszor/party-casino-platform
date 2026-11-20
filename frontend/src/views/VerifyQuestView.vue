@@ -130,4 +130,8 @@ async function decide(approve:boolean) {
 .quest-verification-actions { display: grid; gap: 10px; }
 .quest-verification-note { font-size: .82rem; }
 .quest-verification-error { display: grid; gap: 12px; }
+
+.quest-camera-frame{position:relative;width:100%;aspect-ratio:4/5;max-height:420px;overflow:hidden;border-radius:16px;background:#050607;border:1px solid #ffffff22}
+.quest-camera-frame video{width:100%;height:100%;object-fit:cover}
+.quest-camera-target{position:absolute;left:50%;top:50%;width:min(68vw,250px);height:min(68vw,250px);transform:translate(-50%,-50%);border:3px solid var(--accent);border-radius:18px;box-shadow:0 0 0 999px #0005,inset 0 0 20px #0004}
 </style>
