@@ -5,7 +5,7 @@ import { BadRequestException, ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   try { process.loadEnvFile(); } catch { /* .env is optional outside local development */ }
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.enableCors({ origin: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: false, transform: true }));
   app.useGlobalFilters({
