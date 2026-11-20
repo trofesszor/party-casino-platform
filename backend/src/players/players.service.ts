@@ -18,6 +18,10 @@ export class PlayersService {
     return this.database.sqlite.prepare('SELECT id, name, joined_at AS joinedAt, token_balance AS tokenBalance FROM players ORDER BY name COLLATE NOCASE').all();
   }
 
+  getLeaderboard() {
+    return this.database.sqlite.prepare('SELECT id, name, token_balance AS tokenBalance FROM players ORDER BY token_balance DESC, name COLLATE NOCASE ASC').all();
+  }
+
   getBalance(playerId: number) {
     const player = this.database.sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number } | undefined;
     if (!player) throw new BadRequestException('A játékos nem található.');
