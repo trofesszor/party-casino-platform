@@ -82,6 +82,95 @@ export class PlayersService {
     return { success: true };
   }
 
+
+  private duelView(duelId: number) {
+    return this.database.sqlite.prepare(`
+      SELECT d.id, d.challenger_id AS challengerId, a.name AS challengerName,
+        d.opponent_id AS opponentId, b.name AS opponentName, d.status,
+        d.duel_type AS duelType, d.challenger_winner_id AS challengerWinnerId,
+        d.opponent_winner_id AS opponentWinnerId, d.winner_id AS winnerId,
+        d.loser_id AS loserId, d.reward_amount AS rewardAmount,
+        d.created_at AS createdAt, d.completed_at AS completedAt
+      FROM duels d JOIN players a ON a.id=d.challenger_id JOIN players b ON b.id=d.opponent_id
+      WHERE d.id=?
+    `).get(duelId);
+  }
+
+  getDuels(playerId: number) {
+    if (!this.database.sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId)) throw new BadRequestException('A játékos nem található.');
+    return this.database.sqlite.prepare(`
+      SELECT d.id, d.challenger_id AS challengerId, a.name AS challengerName,
+        d.opponent_id AS opponentId, b.name AS opponentName, d.status,
+        d.duel_type AS duelType, d.challenger_winner_id AS challengerWinnerId,
+        d.opponent_winner_id AS opponentWinnerId, d.winner_id AS winnerId,
+        d.loser_id AS loserId, d.reward_amount AS rewardAmount,
+        d.created_at AS createdAt, d.completed_at AS completedAt
+      FROM duels d JOIN players a ON a.id=d.challenger_id JOIN players b ON b.id=d.opponent_id
+      WHERE d.challenger_id=? OR d.opponent_id=? ORDER BY d.id DESC LIMIT 100
+    `).all(playerId, playerId);
+  }
+
+  createDuel(challengerId: number, opponentId: number) {
+    if (!Number.isSafeInteger(challengerId) || !Number.isSafeInteger(opponentId) || challengerId<=0 || opponentId<=0 || challengerId===opponentId) throw new BadRequestException('Érvénytelen párbajkihívás.');
+    const sqlite=this.database.sqlite;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      if (!sqlite.prepare('SELECT id FROM players WHERE id=?').get(challengerId) || !sqlite.prepare('SELECT id FROM players WHERE id=?').get(opponentId)) throw new BadRequestException('A játékos nem található.');
+      const busy=sqlite.prepare("SELECT id FROM duels WHERE status IN ('PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION') AND (challenger_id IN (?,?) OR opponent_id IN (?,?)) LIMIT 1").get(challengerId,opponentId,challengerId,opponentId);
+      if (busy) throw new BadRequestException('Az egyik játékosnak már van folyamatban lévő párbaja.');
+      const result=sqlite.prepare("INSERT INTO duels (challenger_id,opponent_id,status) VALUES (?,?,'PENDING')").run(challengerId,opponentId);
+      sqlite.exec('COMMIT');
+      return this.duelView(Number(result.lastInsertRowid));
+    } catch(e) { sqlite.exec('ROLLBACK'); throw e; }
+  }
+
+  private getDuelForAction(duelId:number) {
+    const duel=this.duelView(duelId);
+    if (!duel) throw new BadRequestException('A párbaj nem található.');
+    return duel;
+  }
+
+  respondToDuel(duelId:number, playerId:number, accept:boolean) {
+    const duel=this.getDuelForAction(duelId);
+    if (duel.opponentId!==playerId || duel.status!=='PENDING') throw new BadRequestException('Ezt a kihívást nem fogadhatod el vagy már lezárult.');
+    this.database.sqlite.prepare("UPDATE duels SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?").run(accept?'CHOOSE_TYPE':'REFUSED',duelId);
+    return this.duelView(duelId);
+  }
+
+  chooseDuelType(duelId:number, playerId:number, duelTypeInput:string) {
+    const types=['SZKANDER','ROCK_PAPER_SCISSORS','PLANK','PUSH_UPS','DICE'];
+    const duel=this.getDuelForAction(duelId);
+    if (duel.opponentId!==playerId || duel.status!=='CHOOSE_TYPE') throw new BadRequestException('A párbajt elfogadó játékos választhat típust.');
+    const duelType=String(duelTypeInput??'').toUpperCase();
+    if (!types.includes(duelType)) throw new BadRequestException('Érvénytelen párbajtípus.');
+    this.database.sqlite.prepare("UPDATE duels SET duel_type=?, status='IN_PROGRESS', updated_at=CURRENT_TIMESTAMP WHERE id=?").run(duelType,duelId);
+    return this.duelView(duelId);
+  }
+
+  submitDuelWinner(duelId:number, playerId:number, winnerId:number) {
+    const sqlite=this.database.sqlite;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const duel=this.getDuelForAction(duelId);
+      if (![duel.challengerId,duel.opponentId].includes(playerId) || ![duel.challengerId,duel.opponentId].includes(winnerId)) throw new BadRequestException('Csak a párbaj résztvevői szavazhatnak a győztesre.');
+      if (!['IN_PROGRESS','AWAITING_CONFIRMATION'].includes(duel.status)) throw new BadRequestException('Ez a párbaj most nem vár eredményre.');
+      const voteColumn=playerId===duel.challengerId?'challenger_winner_id':'opponent_winner_id';
+      sqlite.prepare(`UPDATE duels SET ${voteColumn}=?, status='AWAITING_CONFIRMATION', updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(winnerId,duelId);
+      const updated=this.duelView(duelId);
+      if (updated.challengerWinnerId && updated.opponentWinnerId && updated.challengerWinnerId===updated.opponentWinnerId) {
+        const winnerId=updated.challengerWinnerId;
+        const loserId=winnerId===updated.challengerId?updated.opponentId:updated.challengerId;
+        const reward=updated.rewardAmount;
+        sqlite.prepare('UPDATE players SET token_balance=token_balance+? WHERE id=?').run(reward,winnerId);
+        const balance=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(winnerId) as {balance:number};
+        sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?, ?, ?, 'DUEL_WIN', ?)").run(winnerId,reward,balance.balance,'Párbaj győzelem');
+        sqlite.prepare("UPDATE duels SET status='COMPLETED',winner_id=?,loser_id=?,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(winnerId,loserId,duelId);
+      }
+      sqlite.exec('COMMIT');
+      return this.duelView(duelId);
+    } catch(e) { sqlite.exec('ROLLBACK'); throw e; }
+  }
+
   getBalance(playerId: number) {
     const player = this.database.sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number } | undefined;
     if (!player) throw new BadRequestException('A játékos nem található.');
