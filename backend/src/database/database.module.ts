@@ -53,6 +53,32 @@ export const DATABASE = Symbol('DATABASE');
           );
         `);
 
+        sqlite.exec(`
+          CREATE TABLE IF NOT EXISTS roulette_rounds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+            round_number INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','COMPLETED')),
+            result_number INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT,
+            UNIQUE(event_id, round_number)
+          );
+
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_roulette_one_open_round
+            ON roulette_rounds(event_id) WHERE status = 'OPEN';
+
+          CREATE TABLE IF NOT EXISTS roulette_bets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            round_id INTEGER NOT NULL REFERENCES roulette_rounds(id) ON DELETE CASCADE,
+            player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+            bet_type TEXT NOT NULL CHECK(bet_type IN ('NUMBER','COLOR')),
+            bet_value TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(round_id, player_id)
+          );
+        `);
+
         const db = drizzle({ client: sqlite });
 
         return { sqlite, db };
