@@ -41,6 +41,10 @@ export class PlayersService {
     return transaction(playerId, delta);
   }
 
+  getTransactions(playerId: number) {
+    return this.database.sqlite.prepare('SELECT id, amount, balance_after AS balanceAfter, type, description, created_at AS createdAt FROM token_transactions WHERE player_id = ? ORDER BY id DESC LIMIT 100').all(playerId);
+  }
+
   setBalance(playerId: number, balance: number) {
     const sqlite = this.database.sqlite;
     const transaction = sqlite.transaction((id: number, next: number) => {
