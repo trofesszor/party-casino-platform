@@ -259,7 +259,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
       <div v-else class="side-quest-empty">Még nincs aktív küldetésed. Kérj egy véletlenszerű kihívást!</div>
       <div class="side-quest-actions">
         <button class="primary" :disabled="sideQuestBusy || activeSideQuests.length >= 2" @click="requestSideQuest">{{ sideQuestBusy ? 'Feldolgozás…' : activeSideQuests.length >= 2 ? 'Elérted a 2 aktív küldetést' : '+ Új side quest kérése' }}</button>
-        <span class="muted">{{ activeSideQuests.length === 2 ? 'Teljesíts egy küldetést, hogy újat kérhess.' : 'A kiosztott küldetés nem dobható el.' }}</span>
+        <span class="muted">{{ activeSideQuests.length === 2 ? 'Teljesíts egy küldetést, hogy újat kérhess.' : 'A shopban vásárolt tárggyal kihagyhatod a küldetést.' }}</span>
       </div>
       <p v-if="sideQuestError" class="error">{{ sideQuestError }}</p>
       <div v-if="sideQuests.some(q => q.status !== 'ACTIVE')" class="side-quest-completed">
