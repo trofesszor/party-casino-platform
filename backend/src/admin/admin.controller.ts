@@ -51,6 +51,16 @@ export class AdminController {
     return this.players.setShopItemEnabled(itemKey, body.enabled);
   }
 
+  @Get('token-photo-settings') getTokenPhotoSettings(@Headers('authorization') authorization?:string) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.getTokenPhotoSettingsForAdmin();
+  }
+
+  @Post('token-photo-settings') setTokenPhotoSettings(@Body() body:{enabled:boolean;balanceThreshold:number;rewardAmount:number;cooldownMinutes:number;dailyLimit:number},@Headers('authorization') authorization?:string) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.setTokenPhotoSettings(body);
+  }
+
   @Get('side-quests')
   getSideQuestPool(@Headers('authorization') authorization?: string) {
     this.admin.assertToken(this.token(authorization));
