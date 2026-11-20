@@ -25,7 +25,7 @@ onUnmounted(() => {
 </script>
 <template>
   <main class="display-page">
-    <header class="display-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><div class="live-indicator"><i></i> PARTY LIVE</div></header>
+    <header class="display-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><div class="live-indicator"><i></i> PARTY LIVE · <a href="/lucky-wheel?display=1" target="_blank">SZERENCSEKERÉK ↗</a></div></header>
     <section class="display-intro"><p class="eyebrow">A KÖZÖS JÁTÉKTÉR</p><h1>Party <span>Casino</span></h1><p>Nyisd meg a játékokat a telefonodon, és csatlakozz a rulettasztalhoz.</p></section>
     <section v-if="state?.currentRound" class="tv-roulette panel">
       <p class="eyebrow">KÖZÖS RULETTASZTAL · {{ state.currentRound.status === 'BETTING' ? 'FOGADÁS' : 'EREDMÉNY' }}</p>
