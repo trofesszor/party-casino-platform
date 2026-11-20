@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { api } from '../services/api';
+import { api, type Duel } from '../services/api';
 import type { Player } from '../types';
 import { identifyPlayer } from '../services/socket';
 
@@ -32,6 +32,44 @@ async function finishSideQuest(quest:SideQuest) {
   catch (e:any) { sideQuestError.value = e.message; }
   finally { sideQuestBusy.value = false; }
 }
+
+const onlinePlayers = ref<Player[]>([]);
+const duels = ref<Duel[]>([]);
+const duelOpponentId = ref<number | ''>('');
+const duelBusy = ref(false);
+const duelError = ref('');
+const duelTypes = [
+  {value:'SZKANDER',label:'Szkander'},
+  {value:'ROCK_PAPER_SCISSORS',label:'Kő-papír-olló · best of 3'},
+  {value:'PLANK',label:'Plank'},
+  {value:'PUSH_UPS',label:'Fekvő'},
+  {value:'DICE',label:'Kockadobás'},
+];
+function duelTypeLabel(type:string|null) { return duelTypes.find(t=>t.value===type)?.label ?? type ?? 'Nincs kiválasztva'; }
+function otherDuelPlayer(duel:Duel) { return duel.challengerId===player.value?.id ? duel.opponentName : duel.challengerName; }
+async function loadDuels() {
+  if (!player.value) return;
+  try { [duels.value,onlinePlayers.value] = await Promise.all([api.getDuels(player.value.id),api.getPlayers()]); }
+  catch(e:any) { duelError.value=e.message || 'Nem sikerült betölteni a párbajokat.'; }
+}
+async function duelAction(action:()=>Promise<any>) {
+  if(!player.value||duelBusy.value)return;
+  duelBusy.value=true;duelError.value='';
+  try { await action(); await loadDuels(); }
+  catch(e:any){duelError.value=e.message;}
+  finally{duelBusy.value=false;}
+}
+function challengePlayer() {
+  if(typeof duelOpponentId.value!=='number'||!player.value)return;
+  return duelAction(()=>api.createDuel(player.value!.id,duelOpponentId.value as number));
+}
+function respondDuel(duel:Duel,accept:boolean) { return duelAction(()=>api.respondToDuel(player.value!.id,duel.id,accept)); }
+function setDuelType(duel:Duel,type:string) { return duelAction(()=>api.chooseDuelType(player.value!.id,duel.id,type)); }
+function voteDuelWinner(duel:Duel,winnerId:number) { return duelAction(()=>api.submitDuelWinner(player.value!.id,duel.id,winnerId)); }
+function duelStatusLabel(status:Duel['status']) {
+  return ({PENDING:'Válaszra vár',CHOOSE_TYPE:'Típusválasztás',IN_PROGRESS:'Folyamatban',AWAITING_CONFIRMATION:'Eredmény megerősítése',COMPLETED:'Lezárva',REFUSED:'Visszautasítva'} as Record<string,string>)[status];
+}
+
 const name = ref('');
 const error = ref('');
 const busy = ref(false);
@@ -43,6 +81,7 @@ if (savedPlayerId > 0 && savedPlayerName) {
   name.value = savedPlayerName;
   identifyPlayer(savedPlayerId);
   loadSideQuests();
+  loadDuels();
   api.getPlayerBalance(savedPlayerId).then(balance => tokenBalance.value = balance.tokenBalance).catch(() => {});
 }
 
@@ -63,6 +102,7 @@ async function enter() {
     window.dispatchEvent(new Event('party-player-changed'));
     identifyPlayer(player.value.id);
     await loadSideQuests();
+    await loadDuels();
   } catch (e: any) {
     error.value = e.message;
   } finally {
@@ -80,6 +120,8 @@ function logout() {
   name.value = '';
   error.value = '';
 }
+onMounted(() => { loadDuels(); });
+onUnmounted(() => {});
 </script>
 
 <template>
@@ -121,6 +163,36 @@ function logout() {
         <p class="muted">Válassz az állandó játékok közül.</p>
         <p class="player-token-balance">Tokenegyenleg: <strong>{{ tokenBalance }} CR</strong></p>
       </div>
+    </section>
+
+    <section class="duels-panel panel">
+      <div class="duels-heading"><div><p class="eyebrow">PLAYER CHALLENGES</p><h2>Párbajok</h2><p class="muted">Hívd ki egy játékost, mérjétek össze a tudásotokat, majd közösen erősítsétek meg az eredményt.</p></div><span class="duel-live-count">{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }} AKTÍV</span></div>
+      <div class="duel-challenge-form">
+        <select v-model.number="duelOpponentId">
+          <option value="">Válassz ellenfelet…</option>
+          <option v-for="p in onlinePlayers.filter(p=>p.id!==player?.id)" :key="p.id" :value="p.id">{{ p.name }}</option>
+        </select>
+        <button class="primary" :disabled="duelBusy || !duelOpponentId" @click="challengePlayer">Kihívás párbajra</button>
+      </div>
+      <p v-if="duelError" class="error">{{ duelError }}</p>
+      <div v-if="!duels.length" class="duel-empty">Még nincs párbajod. Hívd ki az egyik játékost!</div>
+      <div v-for="duel in duels" :key="duel.id" class="duel-card">
+        <div class="duel-card-top"><div><span class="eyebrow">PÁRBAJ #{{duel.id}}</span><h3>{{duel.challengerName}} <span>VS</span> {{duel.opponentName}}</h3></div><span class="duel-status" :class="'status-'+duel.status.toLowerCase()">{{duelStatusLabel(duel.status)}}</span></div>
+        <p v-if="duel.duelType" class="duel-type-label">{{duelTypeLabel(duel.duelType)}}</p>
+        <div v-if="duel.status==='PENDING' && duel.opponentId===player.id" class="duel-action-row"><span>Elfogadod a kihívást?</span><button class="primary" :disabled="duelBusy" @click="respondDuel(duel,true)">Elfogadom</button><button class="ghost" :disabled="duelBusy" @click="respondDuel(duel,false)">Visszautasítom</button></div>
+        <div v-if="duel.status==='CHOOSE_TYPE' && duel.opponentId===player.id" class="duel-type-picker"><span>Válaszd ki a párbaj típusát:</span><div><button v-for="type in duelTypes" :key="type.value" class="ghost" :disabled="duelBusy" @click="setDuelType(duel,type.value)">{{type.label}}</button></div></div>
+        <div v-if="duel.status==='CHOOSE_TYPE' && duel.challengerId===player.id" class="duel-waiting">A másik játékos kiválasztja a párbaj típusát.</div>
+        <div v-if="duel.status==='IN_PROGRESS'" class="duel-action-row"><span>Játsszátok le a párbajt, majd mindketten jelöljétek meg a győztest.</span></div>
+        <div v-if="duel.status==='AWAITING_CONFIRMATION'" class="duel-vote-area">
+          <p v-if="duel.challengerWinnerId || duel.opponentWinnerId" class="muted">A győztesre leadott szavazatok: {{duel.challengerWinnerId?'kihívó ✓':'kihívó –'}} · {{duel.opponentWinnerId?'ellenfél ✓':'ellenfél –'}}</p>
+          <strong>Ki nyerte a párbajt?</strong>
+          <div><button class="ghost" :disabled="duelBusy" @click="voteDuelWinner(duel,duel.challengerId)">{{duel.challengerName}} nyert</button><button class="ghost" :disabled="duelBusy" @click="voteDuelWinner(duel,duel.opponentId)">{{duel.opponentName}} nyert</button></div>
+          <small>Mindkét játékosnak ugyanazt a győztest kell megjelölnie.</small>
+        </div>
+        <div v-if="duel.status==='COMPLETED'" class="duel-result"><strong>🏆 {{duel.winnerId===duel.challengerId?duel.challengerName:duel.opponentName}} nyert</strong><span>+{{duel.rewardAmount}} CR · {{duel.loserId===player.id?'Neked kell innod!':'A vesztesnek innia kell.'}}</span></div>
+        <div v-if="duel.status==='REFUSED'" class="duel-waiting">A kihívást visszautasították.</div>
+      </div>
+      <button class="ghost duel-refresh" @click="loadDuels">Párbajok frissítése</button>
     </section>
 
     <section class="side-quests-panel panel">
