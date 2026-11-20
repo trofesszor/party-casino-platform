@@ -24,8 +24,8 @@ async function loadPlayers() {
     players.value = await api.adminPlayers(token.value);
     balanceInputs.value = Object.fromEntries(players.value.map(player => [player.id, player.tokenBalance ?? 0]));
     authenticated.value = true;
-    const wheel = await api.getLuckyWheel();
-    wheelSegments.value = wheel.segments.map(segment => ({ label: segment.label, enabled: !!segment.enabled }));
+    const wheel = await api.adminGetLuckyWheelSegments(token.value);
+    wheelSegments.value = wheel.map(segment => ({ label: segment.label, enabled: !!segment.enabled }));
     localStorage.setItem('party-admin-token', token.value);
   } catch {
     token.value = '';
