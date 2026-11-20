@@ -215,6 +215,13 @@ export class PlayersService {
     return this.database.sqlite.prepare('SELECT id, title, description, enabled, photo_enabled AS photoEnabled FROM side_quest_pool WHERE id = ?').get(result.lastInsertRowid);
   }
 
+  setSideQuestPhotoEnabled(questId:number,enabledInput:boolean) {
+    if(typeof enabledInput!=='boolean') throw new BadRequestException('Érvénytelen fotós teljesítési beállítás.');
+    const result=this.database.sqlite.prepare('UPDATE side_quest_pool SET photo_enabled=? WHERE id=?').run(enabledInput?1:0,questId);
+    if(!result.changes) throw new BadRequestException('A side quest nem található.');
+    return this.database.sqlite.prepare('SELECT id,title,description,enabled,photo_enabled AS photoEnabled FROM side_quest_pool WHERE id=?').get(questId);
+  }
+
   deleteSideQuestFromPool(questId: number) {
     const result = this.database.sqlite.prepare('DELETE FROM side_quest_pool WHERE id = ?').run(questId);
     if (!result.changes) throw new BadRequestException('A side quest nem található.');
