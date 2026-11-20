@@ -41,6 +41,7 @@ export const api = {
   adminSetSideQuestPhotoEnabled: (token:string,questId:number,enabled:boolean) => request<any>(`/api/admin/side-quests/${questId}/photo-enabled`,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:JSON.stringify({enabled})}),
   adminDeleteSideQuest: (token: string, questId: number) => request<any>(`/api/admin/side-quests/${questId}/delete`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
   adminLogin: (password: string) => request<{ token: string; expiresIn: number }>('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  adminCasinoStatistics: (token:string) => request<any>('/api/admin/statistics',{headers:{Authorization:`Bearer ${token}`}}),
   adminResetPlayerData: (token:string) => request<{success:boolean;deletedPlayers:number}>('/api/admin/reset-player-data',{method:'POST',headers:{Authorization:`Bearer ${token}`}}),
   adminPlayers: (token: string) => request<(Player & { online: boolean })[]>('/api/admin/players', { headers: { Authorization: `Bearer ${token}` } }),
   adminSetBalance: (token: string, playerId: number, balance: number) => request<{ playerId: number; tokenBalance: number }>(`/api/admin/players/${playerId}/balance`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ balance }) }),
