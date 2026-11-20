@@ -365,7 +365,7 @@ onMounted(loadPlayers);
           <label>Szerencsekerék animáció (ms)<input v-model.number="gameSettings.wheelSpinDurationMs" type="number" min="1000" max="60000" step="500"></label>
           <label>Rulett fogadási idő (mp)<input v-model.number="gameSettings.rouletteBettingSeconds" type="number" min="5" max="120"></label>
           <label>Rulett eredményidő (mp)<input v-model.number="gameSettings.rouletteResultSeconds" type="number" min="1" max="30"></label>
-          <label>Maximális rulett tét (CR)<input v-model.number="gameSettings.rouletteMaxBet" type="number" min="1" max="1000000"></label>
+          <label>Maximális rulett tét (CR)<input v-model.number="gameSettings.rouletteMaxBet" type="number" min="1" max="100"></label>
           <label>Párbaj győzelmi jutalom (CR)<input v-model.number="gameSettings.duelReward" type="number" min="0" max="1000000"></label>
           <label>Max. aktív side quest / játékos<input v-model.number="gameSettings.maxActiveSideQuests" type="number" min="1" max="10"></label>
           <label>PIN érvényesség (mp)<input v-model.number="gameSettings.questPinExpirySeconds" type="number" min="15" max="600"></label>
