@@ -51,7 +51,7 @@ export class PlayersService {
     try {
       const activeSession=sqlite.prepare("SELECT id,started_at AS startedAt FROM casino_sessions WHERE status='ACTIVE' ORDER BY id DESC LIMIT 1").get() as any;
       if(activeSession){
-        const snapshot=this.buildCasinoStats(activeSession.startedAt);
+        const snapshot:any=this.buildCasinoStats(activeSession.startedAt);
         const endedAt=new Date().toISOString();
         snapshot.endedAt=endedAt;
         sqlite.prepare("UPDATE casino_sessions SET status='COMPLETED',ended_at=?,stats_json=? WHERE id=? AND status='ACTIVE'").run(endedAt,JSON.stringify(snapshot),activeSession.id);
