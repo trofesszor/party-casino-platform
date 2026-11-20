@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../services/api';
 import type { Player } from '../types';
+import { identifyPlayer } from '../services/socket';
 const router = useRouter();
 const player = ref<Player | null>(null);
 const name = ref(localStorage.getItem('party-player-name') || '');
@@ -16,10 +17,12 @@ async function enter() {
     name.value = player.value.name;
     localStorage.setItem('party-player-name', player.value.name);
     localStorage.setItem('party-player-id', String(player.value.id));
+    identifyPlayer(player.value.id);
   } catch (e: any) { error.value = e.message; }
   finally { busy.value = false; }
 }
 function changeName() {
+  identifyPlayer(null);
   player.value = null;
   localStorage.removeItem('party-player-id');
   localStorage.removeItem('party-player-name');
@@ -32,6 +35,7 @@ onMounted(() => {
   api.joinPlayer(savedName).then((p) => {
     player.value = p; name.value = p.name;
     localStorage.setItem('party-player-id', String(p.id));
+    identifyPlayer(p.id);
     localStorage.setItem('party-player-name', p.name);
   }).catch((e: any) => { error.value = e.message; }).finally(() => { restoring.value = false; });
 });
