@@ -87,3 +87,20 @@
 .wheel-pocket.red{background:#a92730;color:#fff}
 .wheel-pocket.black{background:#171717;color:#fff}
 .wheel-pocket.green{background:#17663a;color:#e2ffbd}
+
+
+/* Keep the ball physically aligned with the winning pocket after the spin. */
+.roulette-wheel-stage.has-landed .roulette-wheel{transform:rotate(var(--wheel-rest))}
+.roulette-wheel-stage.has-landed .roulette-ball-track{transform:rotate(0deg) scale(.785)}
+.roulette-ball-track{inset:16.5%}
+.roulette-wheel-stage.is-spinning .roulette-ball-track{animation:roulette-ball-orbit 4.5s cubic-bezier(.18,.72,.16,1) forwards}
+@keyframes roulette-ball-orbit{
+  0%{transform:rotate(0deg) scale(1)}
+  68%{transform:rotate(-1080deg) scale(.99)}
+  86%{transform:rotate(-1330deg) scale(.9)}
+  100%{transform:rotate(-1440deg) scale(.785)}
+}
+@media(max-width:520px){
+  .roulette-wheel-stage.has-landed .roulette-ball-track{transform:rotate(0deg) scale(.785)}
+  .wheel-pocket{transform:rotate(var(--pocket-angle)) translateY(-28.8vw)}
+}
