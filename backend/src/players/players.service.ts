@@ -89,7 +89,7 @@ export class PlayersService {
 
   getSideQuestVerification(pinInput: string, verifierId: number) {
     const pin = String(pinInput ?? '').trim();
-    if (!/^\\d{3}$/.test(pin) || !Number.isSafeInteger(verifierId) || verifierId<=0) throw new BadRequestException('Adj meg egy érvényes háromjegyű PIN-kódot.');
+    if (!/^\d{3}$/.test(pin) || !Number.isSafeInteger(verifierId) || verifierId<=0) throw new BadRequestException('Adj meg egy érvényes háromjegyű PIN-kódot.');
     const sqlite = this.database.sqlite;
     if (!sqlite.prepare('SELECT id FROM players WHERE id=?').get(verifierId)) throw new BadRequestException('A hitelesítő játékos nem található.');
     sqlite.prepare("DELETE FROM side_quest_pin_attempts WHERE datetime(attempted_at)<datetime('now','-2 minutes')").run();
@@ -112,7 +112,7 @@ export class PlayersService {
   verifySideQuest(pinInput: string, verifierId: number, approveInput: boolean) {
     if (typeof approveInput !== 'boolean') throw new BadRequestException('Érvénytelen döntés.');
     const pin = String(pinInput ?? '').trim();
-    if (!/^\\d{3}$/.test(pin) || !Number.isSafeInteger(verifierId) || verifierId <= 0) throw new BadRequestException('Érvénytelen ellenőrzési kérés.');
+    if (!/^\d{3}$/.test(pin) || !Number.isSafeInteger(verifierId) || verifierId <= 0) throw new BadRequestException('Érvénytelen ellenőrzési kérés.');
     const sqlite = this.database.sqlite;
     sqlite.prepare("DELETE FROM side_quest_pin_attempts WHERE datetime(attempted_at)<datetime('now','-2 minutes')").run();
     const recentAttempts = sqlite.prepare("SELECT COUNT(*) AS count FROM side_quest_pin_attempts WHERE player_id=? AND datetime(attempted_at)>datetime('now','-90 seconds')").get(verifierId) as {count:number};
