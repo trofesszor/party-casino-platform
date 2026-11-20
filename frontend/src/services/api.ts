@@ -1,4 +1,5 @@
 import type { Player, RouletteBetType, RouletteState } from '../types';
+export type Duel = { id:number; challengerId:number; challengerName:string; opponentId:number; opponentName:string; status:'PENDING'|'CHOOSE_TYPE'|'IN_PROGRESS'|'AWAITING_CONFIRMATION'|'COMPLETED'|'REFUSED'; duelType:string|null; challengerWinnerId:number|null; opponentWinnerId:number|null; winnerId:number|null; loserId:number|null; rewardAmount:number; createdAt:string; completedAt:string|null };
 const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } });
   const data = await response.json().catch(() => ({}));
@@ -10,6 +11,11 @@ export const api = {
   spinLuckyWheel: (playerId: number) => request<any>('/api/lucky-wheel/spin', { method: 'POST', body: JSON.stringify({ playerId }) }),
   adminGetLuckyWheelSegments: (token: string) => request<{id:number;label:string;position:number;enabled:number}[]>('/api/lucky-wheel/segments', { headers: { Authorization: `Bearer ${token}` } }),
   saveLuckyWheel: (token: string, segments: { label: string; enabled: boolean }[]) => request<any>('/api/lucky-wheel/segments', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ segments }) }),
+  getDuels: (playerId:number) => request<Duel[]>(`/api/players/${playerId}/duels`),
+  createDuel: (playerId:number, opponentId:number) => request<Duel>(`/api/players/${playerId}/duels`, { method:'POST', body:JSON.stringify({opponentId}) }),
+  respondToDuel: (playerId:number, duelId:number, accept:boolean) => request<Duel>(`/api/players/${playerId}/duels/${duelId}/respond`, { method:'POST', body:JSON.stringify({accept}) }),
+  chooseDuelType: (playerId:number, duelId:number, duelType:string) => request<Duel>(`/api/players/${playerId}/duels/${duelId}/type`, { method:'POST', body:JSON.stringify({duelType}) }),
+  submitDuelWinner: (playerId:number, duelId:number, winnerId:number) => request<Duel>(`/api/players/${playerId}/duels/${duelId}/result`, { method:'POST', body:JSON.stringify({winnerId}) }),
   getPlayerSideQuests: (playerId: number) => request<{id:number;title:string;description:string;status:'ACTIVE'|'COMPLETED';assignedAt:string;completedAt:string|null}[]>(`/api/players/${playerId}/side-quests`),
   requestSideQuest: (playerId: number) => request<any>(`/api/players/${playerId}/side-quests`, { method: 'POST' }),
   completeSideQuest: (playerId: number, questId: number) => request<any>(`/api/players/${playerId}/side-quests/${questId}/complete`, { method: 'POST' }),
