@@ -141,51 +141,64 @@ export class PlayersService {
   }
 
   async createSideQuestPhotoSession(playerId: number, questId: number) {
-    const quest = this.database.sqlite.prepare("SELECT id, photo_enabled AS photoEnabled, status FROM player_side_quests WHERE id=? AND player_id=?").get(questId,playerId) as {id:number;photoEnabled:number;status:string}|undefined;
-    if (!quest || quest.status!=='ACTIVE') throw new BadRequestException('Az aktív küldetés nem található.');
-    if (!quest.photoEnabled) throw new BadRequestException('Ehhez a küldetéshez PIN-kódos igazolás szükséges.');
-    const baseUrl = String(process.env.SNAPPIN_API_URL ?? '').trim().replace(/\/$/,'');
-    const apiKey = String(process.env.SNAPPIN_API_KEY ?? '').trim();
-    if (!baseUrl || !apiKey) throw new BadRequestException('A Snappin API nincs konfigurálva a backend .env fájlban.');
-    const eventId = String(process.env.SNAPPIN_EVENT_ID ?? '').trim();
-    const response = await fetch(baseUrl + '/api/v1/sessions', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
-      body:JSON.stringify({eventId:eventId||undefined,playerId:String(playerId),playerName:this.database.sqlite.prepare('SELECT name FROM players WHERE id=?').get(playerId).name,questId,title:'Side quest: '+this.database.sqlite.prepare('SELECT title FROM player_side_quests WHERE id=?').get(questId).title,metadata:{source:'party-casino',questId,playerId}})
-    });
-    const payload:any = await response.json().catch(()=>({}));
-    if (!response.ok) throw new BadRequestException(payload.message || 'A Snappin fotófeltöltési munkamenet nem indítható el.');
-    const sessionId = String(payload.sessionId ?? payload.id ?? '');
-    const uploadUrl = String(payload.uploadUrl ?? payload.url ?? '');
-    if (!sessionId || !uploadUrl) throw new BadRequestException('A Snappin API válasza hiányos (sessionId/uploadUrl).');
-    const expiresAt = new Date(Date.now()+10*60_000).toISOString();
-    this.database.sqlite.prepare("INSERT INTO side_quest_photo_sessions (session_id,quest_id,player_id,expires_at) VALUES (?,?,?,?)").run(sessionId,questId,playerId,expiresAt);
-    return {sessionId,uploadUrl,expiresAt,publicKey:payload.publicKey ?? null};
-  }
-
-  async completeSideQuestWithPhoto(playerId:number, questId:number, sessionIdInput:string, photoIdInput:string) {
-    const sessionId=String(sessionIdInput??'').trim(), photoId=String(photoIdInput??'').trim();
-    if(!sessionId||!photoId||sessionId.length>200||photoId.length>300) throw new BadRequestException('Érvénytelen fotófeltöltési azonosító.');
     const sqlite=this.database.sqlite;
-    const session=sqlite.prepare("SELECT * FROM side_quest_photo_sessions WHERE session_id=? AND quest_id=? AND player_id=? AND status='PENDING' AND datetime(expires_at)>CURRENT_TIMESTAMP").get(sessionId,questId,playerId);
-    if(!session) throw new BadRequestException('A fotófeltöltési munkamenet lejárt vagy nem található.');
+    const quest=sqlite.prepare("SELECT id,photo_enabled AS photoEnabled,status,title FROM player_side_quests WHERE id=? AND player_id=?").get(questId,playerId) as {id:number;photoEnabled:number;status:string;title:string}|undefined;
+    if(!quest||quest.status!=='ACTIVE') throw new BadRequestException('Az aktív küldetés nem található.');
+    if(!quest.photoEnabled) throw new BadRequestException('Ehhez a küldetéshez PIN-kódos igazolás szükséges.');
     const baseUrl=String(process.env.SNAPPIN_API_URL??'').trim().replace(/\/$/,'');
     const apiKey=String(process.env.SNAPPIN_API_KEY??'').trim();
-    if(!baseUrl||!apiKey) throw new BadRequestException('A Snappin API nincs konfigurálva.');
-    const verifyResponse=await fetch(baseUrl+'/api/v1/sessions/'+encodeURIComponent(sessionId),{headers:{Authorization:'Bearer '+apiKey}});
+    const eventId=String(process.env.SNAPPIN_EVENT_ID??'').trim();
+    if(!baseUrl||!apiKey||!eventId) throw new BadRequestException('A Snappin integrációhoz SNAPPIN_API_URL, SNAPPIN_API_KEY és SNAPPIN_EVENT_ID beállítása szükséges.');
+    const player=sqlite.prepare('SELECT name FROM players WHERE id=?').get(playerId) as {name:string}|undefined;
+    const response=await fetch(baseUrl+'/v1/events/'+encodeURIComponent(eventId)+'/sessions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body:JSON.stringify({guestExternalId:'party-casino-player-'+playerId,guestName:player?.name??'Party Casino player'})
+    });
+    const payload:any=await response.json().catch(()=>({}));
+    if(!response.ok) throw new BadRequestException(payload.message||'A Snappin kamera-munkamenet nem indítható el.');
+    const sessionId=String(payload.sessionId??'');
+    const token=String(payload.token??'');
+    const cameraUrl=String(payload.cameraUrl??'');
+    const expiresAt=String(payload.expiresAt??'');
+    if(!sessionId||!token||!cameraUrl||!expiresAt) throw new BadRequestException('A Snappin API válasza hiányos (sessionId, token, cameraUrl, expiresAt).');
+    sqlite.prepare("INSERT INTO side_quest_photo_sessions (session_id,quest_id,player_id,expires_at) VALUES (?,?,?,?)").run(sessionId,questId,playerId,expiresAt);
+    const url=new URL(cameraUrl);
+    if(!url.searchParams.has('token')) url.searchParams.set('token',token);
+    return {sessionId,cameraUrl:url.toString(),expiresAt,questTitle:quest.title};
+  }
+
+  async completeSideQuestWithPhoto(playerId:number,questId:number,sessionIdInput:string) {
+    const sessionId=String(sessionIdInput??'').trim();
+    if(!sessionId||sessionId.length>200) throw new BadRequestException('Érvénytelen fotófeltöltési munkamenet.');
+    const sqlite=this.database.sqlite;
+    const localSession=sqlite.prepare("SELECT * FROM side_quest_photo_sessions WHERE session_id=? AND quest_id=? AND player_id=? AND status='PENDING' AND datetime(expires_at)>CURRENT_TIMESTAMP").get(sessionId,questId,playerId);
+    if(!localSession) {
+      const completed=sqlite.prepare("SELECT status,photo_id AS photoId FROM side_quest_photo_sessions WHERE session_id=? AND quest_id=? AND player_id=?").get(sessionId,questId,playerId) as {status:string;photoId:string|null}|undefined;
+      if(completed?.status==='COMPLETED') return {success:true,completed:true,questId,photoId:completed.photoId};
+      throw new BadRequestException('A fotófeltöltési munkamenet lejárt vagy nem található.');
+    }
+    const baseUrl=String(process.env.SNAPPIN_API_URL??'').trim().replace(/\/$/,'');
+    const apiKey=String(process.env.SNAPPIN_API_KEY??'').trim();
+    const eventId=String(process.env.SNAPPIN_EVENT_ID??'').trim();
+    if(!baseUrl||!apiKey||!eventId) throw new BadRequestException('A Snappin integráció nincs konfigurálva.');
+    const verifyResponse=await fetch(baseUrl+'/v1/events/'+encodeURIComponent(eventId)+'/sessions/'+encodeURIComponent(sessionId),{headers:{Authorization:'Bearer '+apiKey}});
     const verify:any=await verifyResponse.json().catch(()=>({}));
-    if(!verifyResponse.ok) throw new BadRequestException(verify.message||'Nem sikerült ellenőrizni a Snappin fotót.');
-    const photos=Array.isArray(verify.photos)?verify.photos:[];
-    const photo=photos.find((item:any)=>String(item.id??item.photoId)===photoId);
-    if(!photo||!['UPLOADED','READY','COMPLETED'].includes(String(photo.status??verify.status??'').toUpperCase())) throw new BadRequestException('A Snappin nem igazolta vissza a feltöltött fotót.');
+    if(!verifyResponse.ok) throw new BadRequestException(verify.message||'Nem sikerült ellenőrizni a Snappin munkamenetet.');
+    const expectedExternalId='party-casino-player-'+playerId;
+    if(String(verify.guestExternalId??'')!==expectedExternalId) throw new BadRequestException('A Snappin munkamenet nem ehhez a játékoshoz tartozik.');
+    const photoId=String(verify.photoId??verify.photo?.id??verify.photos?.[0]?.id??'');
+    const status=String(verify.status??'').toUpperCase();
+    const uploaded=!!photoId&&(['COMPLETED','UPLOADED','READY'].includes(status)||!!verify.completedAt||verify.completed===true);
+    if(!uploaded) return {success:true,completed:false,status:status||'PENDING'};
     sqlite.exec('BEGIN IMMEDIATE');
     try {
       const current=sqlite.prepare("SELECT status,photo_enabled FROM player_side_quests WHERE id=? AND player_id=?").get(questId,playerId) as {status:string;photo_enabled:number}|undefined;
       if(!current||current.status!=='ACTIVE'||!current.photo_enabled) throw new BadRequestException('Ez a küldetés már nem teljesíthető fotóval.');
-      sqlite.prepare("UPDATE player_side_quest_photo_sessions SET status='COMPLETED',photo_id=?,completed_at=CURRENT_TIMESTAMP WHERE session_id=?").run(photoId,sessionId);
-      sqlite.prepare("UPDATE player_side_quests SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP,completion_method='PHOTO',photo_id=? WHERE id=?").run(photoId,questId);
+      sqlite.prepare("UPDATE side_quest_photo_sessions SET status='COMPLETED',photo_id=?,completed_at=CURRENT_TIMESTAMP WHERE session_id=? AND status='PENDING'").run(photoId,sessionId);
+      sqlite.prepare("UPDATE player_side_quests SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP,completion_method='PHOTO',photo_id=? WHERE id=? AND status='ACTIVE'").run(photoId,questId);
       sqlite.exec('COMMIT');
-      return {success:true,questId,photoId,completionMethod:'PHOTO'};
+      return {success:true,completed:true,questId,photoId,completionMethod:'PHOTO'};
     } catch(error){sqlite.exec('ROLLBACK');throw error;}
   }
 
