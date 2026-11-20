@@ -132,3 +132,59 @@
 .bet-confirm>div{display:flex;flex-direction:column;gap:4px;font-size:12px}
 .bet-confirm strong{color:#fff}
 @media(max-width:680px){.roulette-layout{grid-template-columns:1fr}.roulette-number-board{grid-template-columns:40px minmax(0,1fr)}.roulette-number-grid button{min-height:39px}.roulette-outside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.outside-group:first-child{grid-column:1/-1}.bet-confirm{align-items:stretch;flex-direction:column}.bet-confirm .primary{width:100%}}
+
+
+/* Spin state handoff: remove the animation as soon as it lands and apply the
+   mathematically equivalent resting transforms in the same rendered frame. */
+.roulette-wheel{transform:rotate(var(--wheel-rest,0deg))}
+.roulette-ball-track{transform:rotate(0deg) scale(.785)}
+.roulette-wheel-stage.is-spinning:not(.has-landed) .roulette-wheel{animation:roulette-wheel-spin 4.5s cubic-bezier(.18,.72,.16,1) both}
+.roulette-wheel-stage.is-spinning:not(.has-landed) .roulette-ball-track{animation:roulette-ball-orbit 4.5s cubic-bezier(.18,.72,.16,1) both}
+.roulette-wheel-stage.has-landed .roulette-wheel{animation:none;transform:rotate(var(--wheel-rest,0deg))}
+.roulette-wheel-stage.has-landed .roulette-ball-track{animation:none;transform:rotate(0deg) scale(.785)}
+
+/* Mobile-first roulette betting controls */
+@media(max-width:760px){
+  .roulette-page{padding:0 12px 28px}
+  .roulette-header{height:62px}
+  .roulette-header .brand{font-size:14px}
+  .roulette-header .live-indicator{font-size:9px;letter-spacing:.08em}
+  .roulette-content{width:100%;margin:24px auto}
+  .roulette-content>h1{font-size:34px;margin-bottom:16px}
+  .roulette-round{padding:17px 12px;margin-bottom:12px}
+  .roulette-round h2{font-size:24px}
+  .roulette-wheel-wrap{padding:4px 0 12px}
+  .roulette-wheel-stage{width:min(330px,82vw)}
+  .roulette-bet,.roulette-participants{padding:15px 12px;border-radius:13px;margin-bottom:12px}
+  .bet-heading{align-items:flex-start;flex-direction:column;gap:12px}
+  .bet-heading h2{font-size:19px}
+  .chip-picker{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%;gap:8px}
+  .chip-picker button{width:100%;height:46px;border-radius:12px;border-style:solid;font-size:14px}
+  .roulette-bet-types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:15px 0 10px}
+  .roulette-bet-types button{min-height:44px;padding:8px 5px;font-size:11px}
+  .bet-instruction{font-size:11px;line-height:1.45}
+  .roulette-layout{display:flex;flex-direction:column;gap:14px}
+  .roulette-number-board{display:grid;grid-template-columns:38px minmax(0,1fr);gap:5px;overflow-x:auto;padding:3px 2px 8px}
+  .roulette-zero{min-height:116px;min-width:38px;font-size:16px}
+  .roulette-number-grid{display:grid;grid-template-columns:repeat(12,minmax(29px,1fr));grid-template-rows:repeat(3,38px);gap:3px;min-width:381px}
+  .roulette-number-grid button{min-width:29px;min-height:38px;padding:0;font-size:12px;border-radius:4px;touch-action:manipulation}
+  .roulette-outside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .outside-group{gap:6px;padding:10px;background:#101115;border:1px solid #30313a;border-radius:9px}
+  .outside-group:first-child{grid-column:1/-1}
+  .outside-group button{flex:1;min-height:42px;padding:8px 6px;font-size:10px;touch-action:manipulation}
+  .bet-confirm{position:sticky;bottom:8px;z-index:10;align-items:stretch;flex-direction:column;gap:10px;padding:12px;margin:14px -4px 0;background:#202229;border:1px solid #464852;border-radius:12px;box-shadow:0 8px 25px #0009}
+  .bet-confirm>div{display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:11px}
+  .bet-confirm>div .muted:first-child{grid-column:1/-1}
+  .bet-confirm .primary{width:100%;min-height:48px;font-size:14px}
+  .roulette-bet-row{gap:7px;flex-wrap:wrap;font-size:11px}
+  .roulette-bet-row strong{max-width:35%;overflow:hidden;text-overflow:ellipsis}
+  .roulette-bet-row span{margin-left:auto;text-align:right}
+  .roulette-bet-row b{font-size:10px}
+  .roulette-participants h2{font-size:17px;margin-bottom:10px}
+}
+@media(max-width:380px){
+  .roulette-bet-types{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .roulette-outside{grid-template-columns:1fr}
+  .outside-group:first-child{grid-column:auto}
+  .roulette-wheel-stage{width:78vw}
+}
