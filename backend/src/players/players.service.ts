@@ -24,39 +24,26 @@ export class PlayersService {
     return player;
   }
 
-  changeBalance(playerId: number, delta: number, type: string, description: string) {
-    const sqlite = this.database.sqlite;
-    const update = sqlite.prepare('UPDATE players SET token_balance = token_balance + ? WHERE id = ? AND token_balance + ? >= 0');
-    const transaction = sqlite.transaction((id: number, amount: number) => {
-      const result = update.run(amount, id, amount);
-      if (Number(result.changes) !== 1) {
-        const exists = sqlite.prepare('SELECT id FROM players WHERE id = ?').get(id);
-        if (!exists) throw new BadRequestException('A játékos nem található.');
-        throw new BadRequestException('Nincs elegendő token.');
-      }
-      const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(id) as { tokenBalance: number };
-      sqlite.prepare('INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, ?, ?)').run(id, amount, balance.tokenBalance, type, description);
-      return balance;
-    });
-    return transaction(playerId, delta);
-  }
-
   getTransactions(playerId: number) {
     return this.database.sqlite.prepare('SELECT id, amount, balance_after AS balanceAfter, type, description, created_at AS createdAt FROM token_transactions WHERE player_id = ? ORDER BY id DESC LIMIT 100').all(playerId);
   }
 
   setBalance(playerId: number, balance: number) {
     const sqlite = this.database.sqlite;
-    const transaction = sqlite.transaction((id: number, next: number) => {
-      const player = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(id) as { tokenBalance: number } | undefined;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const player = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number } | undefined;
       if (!player) throw new BadRequestException('A játékos nem található.');
-      const delta = next - player.tokenBalance;
+      const delta = balance - player.tokenBalance;
       if (delta !== 0) {
-        sqlite.prepare('UPDATE players SET token_balance = ? WHERE id = ?').run(next, id);
-        sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'ADMIN_ADJUSTMENT', 'Admin által beállított egyenleg')").run(id, delta, next);
+        sqlite.prepare('UPDATE players SET token_balance = ? WHERE id = ?').run(balance, playerId);
+        sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'ADMIN_ADJUSTMENT', 'Admin által beállított egyenleg')").run(playerId, delta, balance);
       }
-      return { tokenBalance: next };
-    });
-    return transaction(playerId, balance);
+      sqlite.exec('COMMIT');
+      return { tokenBalance: balance };
+    } catch (error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
   }
 }
