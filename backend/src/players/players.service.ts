@@ -6,6 +6,24 @@ import { DATABASE } from '../database/database.module';
 export class PlayersService {
   constructor(@Inject(DATABASE) private readonly database: any) {}
 
+  resetPlayerData() {
+    const sqlite=this.database.sqlite;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      sqlite.prepare('DELETE FROM duels').run();
+      sqlite.prepare('DELETE FROM casino_roulette_rounds').run();
+      const playerCount=(sqlite.prepare('SELECT COUNT(*) AS count FROM players').get() as {count:number}).count;
+      sqlite.prepare('DELETE FROM players').run();
+      sqlite.prepare("UPDATE lucky_wheel_state SET status='IDLE',spin_id=NULL,winning_segment_id=NULL,started_at=NULL,ends_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=1").run();
+      sqlite.prepare("DELETE FROM sqlite_sequence WHERE name IN ('players','duels','casino_roulette_rounds','casino_roulette_bets','player_side_quests','side_quest_verification_requests','side_quest_pin_attempts','side_quest_photo_sessions','token_transactions','scratch_tickets')").run();
+      sqlite.exec('COMMIT');
+      return {success:true,deletedPlayers:playerCount};
+    } catch(error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   join(nameInput: string) {
     const name = String(nameInput ?? '').trim().replace(/\s+/g, ' ');
     if (!name || name.length > 24) throw new BadRequestException('A név 1–24 karakter legyen.');
