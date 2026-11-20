@@ -42,9 +42,28 @@ export const DATABASE = Symbol('DATABASE');
           bet_type TEXT NOT NULL,
           bet_value TEXT NOT NULL,
           amount INTEGER NOT NULL DEFAULT 1 CHECK(amount BETWEEN 1 AND 100),
+          payout_amount INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS token_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          amount INTEGER NOT NULL,
+          balance_after INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          description TEXT NOT NULL,
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
       `);
+
+      const playerColumns = sqlite.prepare('PRAGMA table_info(players)').all() as Array<{ name: string }>;
+      if (!playerColumns.some(column => column.name === 'token_balance')) {
+        sqlite.exec('ALTER TABLE players ADD COLUMN token_balance INTEGER NOT NULL DEFAULT 0 CHECK(token_balance >= 0)');
+      }
+      const payoutColumns = sqlite.prepare('PRAGMA table_info(casino_roulette_bets)').all() as Array<{ name: string }>;
+      if (!payoutColumns.some(column => column.name === 'payout_amount')) {
+        sqlite.exec('ALTER TABLE casino_roulette_bets ADD COLUMN payout_amount INTEGER NOT NULL DEFAULT 0');
+      }
 
       // Migrate the first prototype's one-bet-per-player table to a multi-bet table.
       const columns = sqlite.prepare('PRAGMA table_info(casino_roulette_bets)').all() as Array<{ name: string }>;
