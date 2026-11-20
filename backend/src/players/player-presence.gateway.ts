@@ -1,5 +1,5 @@
 import { Inject } from '@nestjs/common';
-import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer, SubscribeMessage, ConnectedSocket, MessageBody } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
 import { DATABASE } from '../database/database.module';
 
@@ -19,7 +19,8 @@ export class PlayerPresenceGateway implements OnGatewayConnection, OnGatewayDisc
     this.publishOnlinePlayers();
   }
 
-  identify(client: Socket, playerIdInput: unknown) {
+  @SubscribeMessage('player:identify')
+  identify(@ConnectedSocket() client: Socket, @MessageBody() playerIdInput: unknown) {
     const playerId = Number(playerIdInput);
     if (!Number.isInteger(playerId) || playerId <= 0) return;
     const player = this.database.sqlite.prepare('SELECT id, name FROM players WHERE id = ?').get(playerId) as { id: number; name: string } | undefined;
