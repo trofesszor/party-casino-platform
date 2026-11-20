@@ -513,3 +513,37 @@
 .side-quest-admin-row p{font-size:11px;margin:5px 0 0}
 .side-quest-admin-row .danger{color:#ff9b8f}
 @media(max-width:600px){.side-quests-panel{padding:16px}.side-quest-grid{grid-template-columns:1fr}.side-quest-card{padding:14px}.side-quest-actions{align-items:stretch;flex-direction:column}.side-quest-actions .primary{width:100%}.side-quest-admin-row{align-items:flex-start}}
+
+
+/* Player duel system */
+.duels-panel{padding:24px;margin:4px 0 30px}
+.duels-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+.duels-heading h2{font:600 24px 'Space Grotesk';margin:0 0 5px}
+.duels-heading .muted{font-size:12px;margin:0;max-width:520px}
+.duel-live-count{flex:0 0 auto;padding:7px 10px;border:1px solid #b9f36a55;border-radius:99px;color:var(--accent);font-size:9px;font-weight:800;letter-spacing:.12em}
+.duel-challenge-form{display:flex;gap:9px;margin:18px 0}
+.duel-challenge-form select{flex:1;min-width:0}
+.duel-challenge-form .primary{white-space:nowrap}
+.duel-empty{padding:18px;border:1px dashed #ffffff22;border-radius:10px;text-align:center;color:#a5aa9f;font-size:12px}
+.duel-card{padding:17px;margin-top:12px;border:1px solid #ffffff1b;border-radius:12px;background:linear-gradient(145deg,#20221d,#151714)}
+.duel-card-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.duel-card-top h3{font:600 16px 'Space Grotesk';margin:5px 0 0}
+.duel-card-top h3 span{font-size:10px;color:var(--accent);padding:0 5px}
+.duel-status{padding:5px 8px;border-radius:6px;background:#ffffff10;color:#d1d2c9;font-size:9px;white-space:nowrap}
+.duel-status.status-completed{background:#b9f36a18;color:var(--accent)}
+.duel-status.status-refused{background:#ff9b8f18;color:#ff9b8f}
+.duel-type-label{font-size:11px;color:var(--accent);margin:10px 0 0}
+.duel-action-row,.duel-type-picker{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:14px}
+.duel-action-row>span,.duel-type-picker>span{font-size:11px;color:#c4c6bc;flex:1 1 100%}
+.duel-action-row button,.duel-type-picker button,.duel-vote-area button{font-size:10px;padding:9px 12px}
+.duel-type-picker>div,.duel-vote-area>div{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.duel-waiting{margin-top:12px;color:#a9ac9f;font-size:11px}
+.duel-vote-area{margin-top:14px;padding:13px;border:1px solid #d6b76b44;border-radius:9px;background:#d6b76b09}
+.duel-vote-area>strong{font-size:12px}
+.duel-vote-area>small{display:block;margin-top:9px;color:#9da397;font-size:9px}
+.duel-vote-area .muted{font-size:10px;margin:0 0 8px}
+.duel-result{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:13px;padding:12px;border-radius:9px;background:#b9f36a12}
+.duel-result strong{color:var(--accent);font-size:12px}
+.duel-result span{font-size:10px;color:#d0d2c9}
+.duel-refresh{margin-top:13px;font-size:10px}
+@media(max-width:600px){.duels-panel{padding:16px}.duels-heading{align-items:flex-start}.duels-heading h2{font-size:21px}.duel-challenge-form{flex-direction:column}.duel-challenge-form .primary{width:100%}.duel-card{padding:13px}.duel-card-top{align-items:flex-start;flex-direction:column}.duel-type-picker>div,.duel-vote-area>div{display:grid;grid-template-columns:1fr;width:100%}.duel-result{align-items:flex-start;flex-direction:column}}
