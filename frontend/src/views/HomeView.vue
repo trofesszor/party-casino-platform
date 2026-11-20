@@ -195,6 +195,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
       </article>
     </div>
 
+    <div class="dashboard-activity-grid">
     <section class="duels-panel panel">
       <div class="duels-heading"><div><p class="eyebrow">PLAYER CHALLENGES</p><h2>Párbajok</h2><p class="muted">Hívd ki egy játékost, mérjétek össze a tudásotokat, majd közösen erősítsétek meg az eredményt.</p></div><span class="duel-live-count">{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }} AKTÍV</span></div>
       <div class="duel-challenge-form">
@@ -268,6 +269,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
     </section>
 
 
+    </div>
 
     <footer>PARTY CASINO <span>•</span> Helyi hálózaton futó party platform</footer>
   </main>
