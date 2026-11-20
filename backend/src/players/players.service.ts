@@ -43,7 +43,7 @@ export class PlayersService {
         SELECT id, title, description FROM side_quest_pool
         WHERE enabled = 1 AND NOT EXISTS (
           SELECT 1 FROM player_side_quests assigned
-          WHERE assigned.player_id = ? AND assigned.pool_quest_id = side_quest_pool.id AND assigned.status = 'ACTIVE'
+          WHERE assigned.player_id = ? AND assigned.pool_quest_id = side_quest_pool.id
         )
         ORDER BY RANDOM() LIMIT 1
       `).get(playerId) as { id: number; title: string; description: string } | undefined;
