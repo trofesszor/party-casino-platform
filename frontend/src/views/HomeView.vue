@@ -12,7 +12,7 @@ type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|
 const sideQuests = ref<SideQuest[]>([]);
 const sideQuestBusy = ref(false);
 const sideQuestError = ref('');
-const verificationQr = ref<{questId:number;title:string;url:string;imageUrl:string;expiresAt:string}|null>(null);
+const verificationPin = ref<{questId:number;title:string;pin:string;expiresAt:string}|null>(null);
 const activeSideQuests = ref<SideQuest[]>([]);
 async function loadSideQuests() {
   if (!player.value) return;
@@ -31,8 +31,7 @@ async function finishSideQuest(quest:SideQuest) {
   sideQuestBusy.value = true; sideQuestError.value = '';
   try {
     const response = await api.requestSideQuestVerification(player.value.id,quest.id);
-    const url = `${window.location.origin}/verify-quest?token=${response.token}`;
-    verificationQr.value = {questId:quest.id,title:quest.title,url,imageUrl:`https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=12&data=${encodeURIComponent(url)}`,expiresAt:response.expiresAt};
+    verificationPin.value = {questId:quest.id,title:quest.title,pin:response.pin,expiresAt:response.expiresAt};
   } catch (e:any) { sideQuestError.value = e.message; }
   finally { sideQuestBusy.value = false; }
 }
@@ -152,7 +151,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
   <main v-else class="page-shell">
     <header class="topbar">
       <a class="brand" href="/">PARTY<span>CASINO</span></a>
-      <nav><a href="/shop">Shop</a><a href="/leaderboard">Ranglista</a><a href="/verify-quest">QR beolvasás</a><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
+      <nav><a href="/shop">Shop</a><a href="/leaderboard">Ranglista</a><a href="/verify-quest">PIN ellenőrzés</a><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
     </header>
 
     <section class="hero dashboard-hero">
@@ -272,7 +271,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
           <span class="side-quest-number">SIDE QUEST 0{{ index+1 }}</span>
           <h3>{{ quest.title }}</h3>
           <p v-if="quest.description">{{ quest.description }}</p>
-          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="finishSideQuest(quest)">QR-kód a teljesítéshez</button>
+          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="finishSideQuest(quest)">PIN-kód kérése</button>
         </article>
       </div>
       <div v-else class="side-quest-empty">Még nincs aktív küldetésed. Kérj egy véletlenszerű kihívást!</div>
@@ -290,15 +289,14 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
 
     </div>
 
-    <div v-if="verificationQr" class="quest-qr-overlay" @click.self="verificationQr=null">
+    <div v-if="verificationPin" class="quest-qr-overlay" @click.self="verificationPin=null">
       <section class="quest-qr-modal panel">
-        <button class="ghost quest-qr-close" @click="verificationQr=null">✕</button>
+        <button class="ghost quest-qr-close" @click="verificationPin=null">✕</button>
         <p class="eyebrow">SIDE QUEST VERIFICATION</p>
-        <h2>{{ verificationQr.title }}</h2>
-        <p class="muted">Mutasd meg a QR-kódot egy másik játékosnak. Ő olvassa be, majd jóváhagyja vagy elutasítja a teljesítést.</p>
-        <img :src="verificationQr.imageUrl" alt="Küldetés-hitelesítő QR-kód">
-        <small class="muted">A QR-kód 90 másodpercig érvényes, és csak egyszer használható.</small>
-        <a :href="verificationQr.url" class="muted quest-qr-link">{{ verificationQr.url }}</a>
+        <h2>{{ verificationPin.title }}</h2>
+        <p class="muted">Mutasd meg ezt a PIN-kódot egy másik játékosnak. Ő a saját eszközén megadja a kódot, majd jóváhagyja vagy elutasítja a teljesítést.</p>
+        <div class="quest-verification-pin">{{ verificationPin.pin }}</div>
+        <small class="muted">A PIN-kód 90 másodpercig érvényes, és csak egyszer használható.</small>
       </section>
     </div>
 
