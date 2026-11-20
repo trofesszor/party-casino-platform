@@ -70,6 +70,7 @@ function respondDuel(duel:Duel,accept:boolean) { return duelAction(()=>api.respo
 function setDuelType(duel:Duel,type:string) { return duelAction(()=>api.chooseDuelType(player.value!.id,duel.id,type)); }
 function voteDuelWinner(duel:Duel,winnerId:number) { return duelAction(()=>api.submitDuelWinner(player.value!.id,duel.id,winnerId)); }
 let duelRefreshTimer: ReturnType<typeof setInterval> | undefined;
+let sideQuestRefreshTimer: ReturnType<typeof setInterval> | undefined;
 function duelStatusLabel(status:Duel['status']) {
   return ({PENDING:'Válaszra vár',CHOOSE_TYPE:'Típusválasztás',IN_PROGRESS:'Folyamatban',AWAITING_CONFIRMATION:'Eredmény megerősítése',COMPLETED:'Lezárva',REFUSED:'Visszautasítva'} as Record<string,string>)[status];
 }
@@ -124,8 +125,8 @@ function logout() {
   name.value = '';
   error.value = '';
 }
-onMounted(() => { loadDuels(); duelRefreshTimer = setInterval(loadDuels, 3000); });
-onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
+onMounted(() => { loadDuels(); loadSideQuests(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(loadSideQuests, 5000); });
+onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); });
 </script>
 
 <template>
