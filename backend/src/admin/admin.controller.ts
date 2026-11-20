@@ -110,6 +110,13 @@ export class AdminController {
     return this.players.addSideQuestToPool(body.title, body.description ?? '', body.photoEnabled === true);
   }
 
+  @Post('side-quests/:id/enabled')
+  setSideQuestEnabled(@Param('id') id:string,@Body() body:{enabled:boolean},@Headers('authorization') authorization?:string){
+    this.admin.assertToken(this.token(authorization));
+    const questId=Number(id);if(!Number.isSafeInteger(questId)||questId<=0)throw new BadRequestException('Érvénytelen side quest azonosító.');
+    return this.players.setSideQuestEnabled(questId,body.enabled);
+  }
+
   @Post('side-quests/:id/photo-enabled')
   setSideQuestPhotoEnabled(@Param('id') id:string,@Body() body:{enabled:boolean},@Headers('authorization') authorization?:string) {
     this.admin.assertToken(this.token(authorization));
