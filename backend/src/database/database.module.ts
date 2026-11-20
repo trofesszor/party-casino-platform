@@ -78,6 +78,13 @@ export const DATABASE = Symbol('DATABASE');
           completed_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_player_side_quests_active ON player_side_quests(player_id, status);
+        CREATE TABLE IF NOT EXISTS player_inventory (
+          player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          item_key TEXT NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 0 CHECK(quantity >= 0),
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY(player_id, item_key)
+        );
         CREATE TABLE IF NOT EXISTS duels (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           challenger_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -104,6 +111,31 @@ export const DATABASE = Symbol('DATABASE');
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
       `);
+
+      const questTable = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='player_side_quests'").get() as {sql:string}|undefined;
+      if (questTable && !questTable.sql.includes("'SKIPPED'")) {
+        sqlite.exec(`
+          ALTER TABLE player_side_quests RENAME TO player_side_quests_old;
+          CREATE TABLE player_side_quests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+            pool_quest_id INTEGER REFERENCES side_quest_pool(id) ON DELETE SET NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','COMPLETED','SKIPPED')),
+            assigned_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT,
+            skipped_at TEXT
+          );
+          INSERT INTO player_side_quests (id,player_id,pool_quest_id,title,description,status,assigned_at,completed_at)
+            SELECT id,player_id,pool_quest_id,title,description,status,assigned_at,completed_at FROM player_side_quests_old;
+          DROP TABLE player_side_quests_old;
+          CREATE INDEX IF NOT EXISTS idx_player_side_quests_active ON player_side_quests(player_id, status);
+        `);
+      } else {
+        const questColumns = sqlite.prepare('PRAGMA table_info(player_side_quests)').all() as Array<{name:string}>;
+        if (!questColumns.some(column => column.name === 'skipped_at')) sqlite.exec('ALTER TABLE player_side_quests ADD COLUMN skipped_at TEXT');
+      }
 
       const playerColumns = sqlite.prepare('PRAGMA table_info(players)').all() as Array<{ name: string }>;
       if (!playerColumns.some(column => column.name === 'token_balance')) {
