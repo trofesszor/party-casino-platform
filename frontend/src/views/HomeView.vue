@@ -18,6 +18,51 @@ let verificationPinPollTimer: ReturnType<typeof setInterval> | undefined;
 const photoSession = ref<{questId:number;title:string;sessionId:string;cameraUrl:string;expiresAt:string}|null>(null);
 let photoPollTimer: ReturnType<typeof setInterval> | undefined;
 const activeSideQuests = ref<SideQuest[]>([]);
+type TokenPhotoStatus={enabled:boolean;eligible:boolean;balance:number;balanceThreshold:number;rewardAmount:number;dailyLimit:number;dailyUsed:number;dailyRemaining:number;pending:boolean;sessionId:string|null;expiresAt:string|null;reason:string|null};
+const tokenPhotoStatus=ref<TokenPhotoStatus|null>(null);
+const tokenPhotoSession=ref<{sessionId:string;cameraUrl:string;expiresAt:string;rewardAmount:number}|null>(null);
+const tokenPhotoBusy=ref(false);
+const tokenPhotoMessage=ref('');
+let tokenPhotoPollTimer:ReturnType<typeof setInterval>|undefined;
+async function loadTokenPhotoStatus(){
+  if(!player.value)return;
+  try{tokenPhotoStatus.value=await api.getTokenPhotoStatus(player.value.id);}
+  catch{tokenPhotoStatus.value=null;}
+}
+async function startTokenPhotoUpload(){
+  if(!player.value||tokenPhotoBusy.value)return;
+  tokenPhotoBusy.value=true;tokenPhotoMessage.value='';
+  const cameraTab=window.open('about:blank','_blank');
+  try{
+    const session=await api.createTokenPhotoSession(player.value.id);
+    tokenPhotoSession.value=session;
+    if(cameraTab){cameraTab.opener=null;cameraTab.location.href=session.cameraUrl;}
+    if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);
+    tokenPhotoPollTimer=setInterval(checkTokenPhotoUpload,2500);
+    await loadTokenPhotoStatus();
+  }catch(e:any){if(cameraTab)cameraTab.close();tokenPhotoMessage.value=e.message||'Nem sikerült elindítani a fotófeltöltést.';await loadTokenPhotoStatus();}
+  finally{tokenPhotoBusy.value=false;}
+}
+async function checkTokenPhotoUpload(){
+  if(!player.value||!tokenPhotoSession.value)return;
+  if(Date.now()>=Date.parse(tokenPhotoSession.value.expiresAt)){
+    if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);tokenPhotoPollTimer=undefined;tokenPhotoSession.value=null;
+    tokenPhotoMessage.value='A fotófeltöltési idő lejárt. Próbáld újra később.';await loadTokenPhotoStatus();return;
+  }
+  try{
+    const result=await api.checkTokenPhotoSession(player.value.id,tokenPhotoSession.value.sessionId);
+    if(result.completed){
+      if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);tokenPhotoPollTimer=undefined;tokenPhotoSession.value=null;
+      tokenPhotoMessage.value=`Sikeres feltöltés! +${result.rewardAmount} CR jóváírva.`;
+      const balance=await api.getPlayerBalance(player.value.id);tokenBalance.value=balance.tokenBalance;
+      await loadTokenPhotoStatus();
+    }else if(result.status==='EXPIRED'){
+      if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);tokenPhotoPollTimer=undefined;tokenPhotoSession.value=null;
+      tokenPhotoMessage.value='A fotófeltöltési munkamenet lejárt.';await loadTokenPhotoStatus();
+    }
+  }catch(e:any){if(/nem található|lejárt/i.test(e.message||'')){if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);tokenPhotoPollTimer=undefined;tokenPhotoSession.value=null;tokenPhotoMessage.value=e.message;await loadTokenPhotoStatus();}}
+}
+
 async function loadSideQuests() {
   if (!player.value) return;
   try { sideQuests.value = await api.getPlayerSideQuests(player.value.id); activeSideQuests.value = sideQuests.value.filter(q => q.status === 'ACTIVE'); sideQuestError.value = ''; }
@@ -153,6 +198,7 @@ if (savedPlayerId > 0 && savedPlayerName) {
   identifyPlayer(savedPlayerId);
   loadSideQuests();
   loadDuels();
+  loadTokenPhotoStatus();
   api.getPlayerBalance(savedPlayerId).then(balance => tokenBalance.value = balance.tokenBalance).catch(() => {});
 }
 
@@ -174,6 +220,7 @@ async function enter() {
     identifyPlayer(player.value.id);
     await loadSideQuests();
     await loadDuels();
+    await loadTokenPhotoStatus();
   } catch (e: any) {
     error.value = e.message;
   } finally {
@@ -193,8 +240,8 @@ function logout() {
   name.value = '';
   error.value = '';
 }
-onMounted(() => { loadDuels(); loadSideQuests(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(loadSideQuests, 5000); });
-onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); if(verificationPinPollTimer)clearInterval(verificationPinPollTimer); });
+onMounted(() => { loadDuels(); loadSideQuests(); loadTokenPhotoStatus(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(loadSideQuests, 5000); });
+onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); if(verificationPinPollTimer)clearInterval(verificationPinPollTimer); if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer); });
 </script>
 
 <template>
@@ -272,6 +319,11 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
       </button>
     </div>
 
+    <section v-if="tokenPhotoStatus?.enabled && (tokenPhotoStatus.eligible || tokenPhotoStatus.pending || tokenPhotoSession)" class="token-photo-reward panel">
+      <div><p class="eyebrow">SNAPPIN · TOKEN REWARD</p><h2>Fotóért tokeneket?</h2><p class="muted">Ha az egyenleged {{tokenPhotoStatus.balanceThreshold}} CR alatt van, egy fotófeltöltéssel {{tokenPhotoStatus.rewardAmount}} CR-t szerezhetsz.</p><small class="muted">Napi lehetőség: {{tokenPhotoStatus.dailyRemaining}} / {{tokenPhotoStatus.dailyLimit}} · Feltöltések közötti várakozás: {{tokenPhotoStatus.cooldownMinutes}} perc.</small></div>
+      <div class="token-photo-reward-action"><button class="primary" :disabled="tokenPhotoBusy || !tokenPhotoStatus.eligible || !!tokenPhotoSession" @click="startTokenPhotoUpload">{{tokenPhotoBusy?'Indítás…':tokenPhotoSession?'Feltöltés folyamatban…':'📷 Fotó feltöltése · +'+tokenPhotoStatus.rewardAmount+' CR'}}</button><span v-if="tokenPhotoStatus.pending" class="muted">Már van aktív feltöltésed.</span></div>
+      <p v-if="tokenPhotoMessage" class="token-photo-message">{{tokenPhotoMessage}}</p>
+    </section>
     <div class="dashboard-activity-grid">
     <section class="duels-panel panel">
       <div class="duels-heading"><div><p class="eyebrow">PLAYER CHALLENGES</p><h2>Párbajok</h2><p class="muted">Hívd ki egy játékost, mérjétek össze a tudásotokat, majd közösen erősítsétek meg az eredményt.</p></div><span class="duel-live-count">{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }} AKTÍV</span></div>
