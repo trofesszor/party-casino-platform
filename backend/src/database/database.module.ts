@@ -22,7 +22,11 @@ export const DATABASE = Symbol('DATABASE');
           name TEXT NOT NULL COLLATE NOCASE UNIQUE,
           joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE TABLE IF NOT EXISTS casino_roulette_rounds (
+        CREATE TABLE IF NOT EXISTS slot_player_state (
+        player_id INTEGER PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+        free_spins INTEGER NOT NULL DEFAULT 0 CHECK(free_spins >= 0)
+      );
+      CREATE TABLE IF NOT EXISTS casino_roulette_rounds (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           round_number INTEGER NOT NULL UNIQUE,
           status TEXT NOT NULL DEFAULT 'BETTING' CHECK(status IN ('BETTING','COMPLETED')),
