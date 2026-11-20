@@ -35,6 +35,14 @@ export class AdminController {
       online: onlineIds.has(player.id),
     }));
   }
+  @Post('reset-player-data')
+  resetPlayerData(@Headers('authorization') authorization?: string) {
+    this.admin.assertToken(this.token(authorization));
+    const result=this.players.resetPlayerData();
+    this.presence.resetPlayerPresence();
+    return result;
+  }
+
   @Get('shop')
   getShopItems(@Headers('authorization') authorization?: string) {
     this.admin.assertToken(this.token(authorization));
