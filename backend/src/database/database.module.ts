@@ -78,6 +78,22 @@ export const DATABASE = Symbol('DATABASE');
           completed_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_player_side_quests_active ON player_side_quests(player_id, status);
+        CREATE TABLE IF NOT EXISTS duels (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          challenger_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          opponent_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          status TEXT NOT NULL CHECK(status IN ('PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION','COMPLETED','DISPUTED','REFUSED')),
+          duel_type TEXT,
+          challenger_winner_id INTEGER REFERENCES players(id),
+          opponent_winner_id INTEGER REFERENCES players(id),
+          winner_id INTEGER REFERENCES players(id),
+          loser_id INTEGER REFERENCES players(id),
+          reward_amount INTEGER NOT NULL DEFAULT 10,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          completed_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_duels_players ON duels(challenger_id, opponent_id, status);
         CREATE TABLE IF NOT EXISTS token_transactions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
