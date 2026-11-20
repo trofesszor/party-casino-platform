@@ -8,7 +8,7 @@ import { identifyPlayer } from '../services/socket';
 const router = useRouter();
 const player = ref<Player | null>(null);
 const tokenBalance = ref(0);
-type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'; assignedAt:string; completedAt:string|null };
+type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'|'SKIPPED'; assignedAt:string; completedAt:string|null };
 const sideQuests = ref<SideQuest[]>([]);
 const sideQuestBusy = ref(false);
 const sideQuestError = ref('');
@@ -148,7 +148,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
   <main v-else class="page-shell">
     <header class="topbar">
       <a class="brand" href="/">PARTY<span>CASINO</span></a>
-      <nav><a href="/leaderboard">Ranglista</a><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
+      <nav><a href="/shop">Shop</a><a href="/leaderboard">Ranglista</a><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
     </header>
 
     <section class="hero dashboard-hero">
@@ -192,12 +192,12 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
         <span class="game-link">Kerék megnyitása →</span>
       </button>
 
-      <article class="game-card panel coming-soon">
+      <button class="game-card panel shop-game-card" @click="router.push('/shop')">
         <span class="game-icon">🛍️</span>
         <h3>Shop</h3>
-        <p class="muted">A későbbiekben itt válthatod be a játék során szerzett jutalmakat.</p>
-        <span class="game-link">Hamarosan</span>
-      </article>
+        <p class="muted">Vásárolj tárgyakat CR tokenekért, és használd őket a side questjeidnél.</p>
+        <span class="game-link">Shop megnyitása →</span>
+      </button>
     </div>
 
     <div class="dashboard-activity-grid">
