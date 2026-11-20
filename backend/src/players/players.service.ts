@@ -71,6 +71,30 @@ export class PlayersService {
     }
   }
 
+  private readonly gameSettingDefaults={wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:100,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1};
+  getCasinoGameSettings(){
+    const rows=this.database.sqlite.prepare("SELECT setting_key AS key,setting_value AS value FROM casino_settings").all() as Array<{key:string;value:string}>;
+    const values=Object.fromEntries(rows.map(r=>[r.key,Number(r.value)]));
+    return {
+      wheelSpinCost:values.wheel_spin_cost??5,wheelSpinDurationMs:values.wheel_spin_duration_ms??7000,
+      rouletteBettingSeconds:values.roulette_betting_seconds??20,rouletteResultSeconds:values.roulette_result_seconds??5,rouletteMaxBet:values.roulette_max_bet??100,
+      duelReward:values.duel_reward??10,maxActiveSideQuests:values.max_active_side_quests??2,questPinExpirySeconds:values.quest_pin_expiry_seconds??90,
+      scratchLossPercent:values.scratch_loss_percent??60,scratch10Percent:values.scratch_10_percent??25,scratch25Percent:values.scratch_25_percent??10,scratch50Percent:values.scratch_50_percent??4,scratch100Percent:values.scratch_100_percent??1
+    };
+  }
+  setCasinoGameSettings(input:any){
+    const keys=Object.keys(this.gameSettingDefaults) as Array<keyof typeof this.gameSettingDefaults>;
+    for(const key of keys){const value=input?.[key];if(!Number.isSafeInteger(value))throw new BadRequestException('Minden játékszabályhoz egész számot adj meg.');}
+    const limits:Record<string,[number,number]>={wheelSpinCost:[0,100000],wheelSpinDurationMs:[1000,60000],rouletteBettingSeconds:[5,120],rouletteResultSeconds:[1,30],rouletteMaxBet:[1,1000000],duelReward:[0,1000000],maxActiveSideQuests:[1,10],questPinExpirySeconds:[15,600],scratchLossPercent:[0,100],scratch10Percent:[0,100],scratch25Percent:[0,100],scratch50Percent:[0,100],scratch100Percent:[0,100]};
+    for(const key of keys){const [min,max]=limits[key];if(input[key]<min||input[key]>max)throw new BadRequestException('Egy vagy több beállítás kívül esik a megengedett tartományon.');}
+    const total=input.scratchLossPercent+input.scratch10Percent+input.scratch25Percent+input.scratch50Percent+input.scratch100Percent;
+    if(total!==100)throw new BadRequestException('A kaparós sorsjegy esélyeinek összege pontosan 100% legyen.');
+    const map:Record<string,string>={wheelSpinCost:'wheel_spin_cost',wheelSpinDurationMs:'wheel_spin_duration_ms',rouletteBettingSeconds:'roulette_betting_seconds',rouletteResultSeconds:'roulette_result_seconds',rouletteMaxBet:'roulette_max_bet',duelReward:'duel_reward',maxActiveSideQuests:'max_active_side_quests',questPinExpirySeconds:'quest_pin_expiry_seconds',scratchLossPercent:'scratch_loss_percent',scratch10Percent:'scratch_10_percent',scratch25Percent:'scratch_25_percent',scratch50Percent:'scratch_50_percent',scratch100Percent:'scratch_100_percent'};
+    const stmt=this.database.sqlite.prepare("INSERT INTO casino_settings (setting_key,setting_value) VALUES (?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value");
+    for(const key of keys)stmt.run(map[key],String(input[key]));
+    return this.getCasinoGameSettings();
+  }
+
   getDefaultPlayerTokens() {
     const row=this.database.sqlite.prepare("SELECT setting_value AS value FROM casino_settings WHERE setting_key='default_player_tokens'").get() as {value:string}|undefined;
     return {defaultTokens:Number(row?.value??100)};
@@ -123,7 +147,8 @@ export class PlayersService {
       const player = sqlite.prepare('SELECT id FROM players WHERE id = ?').get(playerId);
       if (!player) throw new BadRequestException('A játékos nem található.');
       const active = sqlite.prepare("SELECT COUNT(*) AS count FROM player_side_quests WHERE player_id = ? AND status = 'ACTIVE'").get(playerId) as { count: number };
-      if (active.count >= 2) throw new BadRequestException('Már van 2 aktív side quested.');
+      const maxActive=this.getCasinoGameSettings().maxActiveSideQuests;
+      if (active.count >= maxActive) throw new BadRequestException('Elérted az aktív side questek limitjét ('+maxActive+').');
       const quest = sqlite.prepare(`
         SELECT id, title, description, photo_enabled AS photoEnabled FROM side_quest_pool
         WHERE enabled = 1 AND NOT EXISTS (
@@ -160,7 +185,7 @@ export class PlayersService {
         pin = '';
       }
       if (!pin) throw new BadRequestException('Nem sikerült PIN-kódot generálni. Próbáld újra.');
-      const expiresAt = new Date(Date.now() + 90_000).toISOString();
+      const expiresAt = new Date(Date.now() + this.getCasinoGameSettings().questPinExpirySeconds * 1000).toISOString();
       sqlite.prepare("INSERT INTO side_quest_verification_requests (quest_id,owner_id,token_hash,expires_at) VALUES (?,?,?,?)").run(questId,playerId,pinHash,expiresAt);
       sqlite.exec('COMMIT');
       return { pin, expiresAt };
@@ -470,7 +495,7 @@ export class PlayersService {
       if (!sqlite.prepare('SELECT id FROM players WHERE id=?').get(challengerId) || !sqlite.prepare('SELECT id FROM players WHERE id=?').get(opponentId)) throw new BadRequestException('A játékos nem található.');
       const busy=sqlite.prepare("SELECT id FROM duels WHERE status IN ('PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION') AND (challenger_id IN (?,?) OR opponent_id IN (?,?)) LIMIT 1").get(challengerId,opponentId,challengerId,opponentId);
       if (busy) throw new BadRequestException('Az egyik játékosnak már van folyamatban lévő párbaja.');
-      const result=sqlite.prepare("INSERT INTO duels (challenger_id,opponent_id,status) VALUES (?,?,'PENDING')").run(challengerId,opponentId);
+      const result=sqlite.prepare("INSERT INTO duels (challenger_id,opponent_id,status,reward_amount) VALUES (?,?,'PENDING',?)").run(challengerId,opponentId,this.getCasinoGameSettings().duelReward);
       sqlite.exec('COMMIT');
       return this.duelView(Number(result.lastInsertRowid));
     } catch(e) { sqlite.exec('ROLLBACK'); throw e; }
@@ -537,6 +562,14 @@ export class PlayersService {
     return this.database.sqlite.prepare('SELECT item_key AS itemKey, name, description, price, enabled FROM shop_items ORDER BY name COLLATE NOCASE').all();
   }
 
+  updateShopItem(itemKeyInput:string,input:{price:number;name:string;description:string}){
+    const itemKey=String(itemKeyInput??'').trim().toUpperCase(),name=String(input?.name??'').trim(),description=String(input?.description??'').trim(),price=Number(input?.price);
+    if(!name||name.length>80||description.length>300||!Number.isSafeInteger(price)||price<0||price>2000000)throw new BadRequestException('Érvénytelen shop termékadatok.');
+    const result=this.database.sqlite.prepare('UPDATE shop_items SET name=?,description=?,price=? WHERE item_key=?').run(name,description,price,itemKey);
+    if(!result.changes)throw new BadRequestException('A termék nem található.');
+    return this.database.sqlite.prepare('SELECT item_key AS itemKey,name,description,price,enabled FROM shop_items WHERE item_key=?').get(itemKey);
+  }
+
   setShopItemEnabled(itemKeyInput: string, enabledInput: boolean) {
     const itemKey = String(itemKeyInput ?? '').trim().toUpperCase();
     if (typeof enabledInput !== 'boolean') throw new BadRequestException('Érvénytelen termékállapot.');
@@ -570,7 +603,9 @@ export class PlayersService {
       const balance=player.balance-item.price;
       sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?,?,?,'SHOP_PURCHASE',?)").run(playerId,-item.price,balance,'Shop vásárlás · '+item.name);
       if(itemKey==='SCRATCH_TICKET'){
-        const roll=randomInt(0,10000),prize=roll<6000?0:roll<8500?10:roll<9500?25:roll<9900?50:100;
+        const settings=this.getCasinoGameSettings();
+        const roll=randomInt(0,10000);let threshold=settings.scratchLossPercent*100,prize=0;
+        for(const [chance,value] of [[settings.scratch10Percent,10],[settings.scratch25Percent,25],[settings.scratch50Percent,50],[settings.scratch100Percent,100]] as Array<[number,number]>){threshold+=chance*100;if(roll>=settings.scratchLossPercent*100 && roll<threshold){prize=value;break;}}
         const result=sqlite.prepare('INSERT INTO scratch_tickets (player_id,prize_amount) VALUES (?,?)').run(playerId,prize);
         sqlite.exec('COMMIT'); return {success:true,itemKey:item.itemKey,ticketId:Number(result.lastInsertRowid),tokenBalance:balance};
       }
