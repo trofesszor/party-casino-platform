@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { api } from '../services/api';
 
 const playerId = Number(localStorage.getItem('party-player-id'));
 const reels = ref(['🍒', '7️⃣', '💎']);
+const reelStrips = ref<string[][]>(reels.value.map(symbol => Array(13).fill(symbol)));
+const reelOffsets = ref([6, 6, 6]);
+const reelDurations = [2300, 3150, 4000];
+const reelSymbols = ['🍒','🍋','🍇','🍉','🔔','💎','7️⃣','⭐','🪙'];
+const randomSymbol = () => reelSymbols[Math.floor(Math.random() * reelSymbols.length)];
 const busy = ref(false);
 const error = ref('');
 const result = ref('');
@@ -14,8 +19,6 @@ const paytable = ref<{ combination: string; multiplier: number; bonusSpins?: num
  {combination:'Three 7️⃣',multiplier:30},{combination:'Three 💎',multiplier:15},{combination:'Three 🔔',multiplier:8},{combination:'Three 🍉',multiplier:5},{combination:'Three 🍇',multiplier:4},{combination:'Three 🍋',multiplier:3},{combination:'Three 🍒',multiplier:2},{combination:'Two matching symbols',multiplier:1},{combination:'Three ⭐ (Wild)',multiplier:50},{combination:'Three 🪙 (Bonus)',multiplier:5,bonusSpins:5}
 ]);
 const canPlay = computed(() => Number.isInteger(playerId) && playerId > 0);
-const symbols = ['🍒','🍋','🍇','🍉','🔔','💎','7️⃣'];
-
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function spin() {
@@ -28,8 +31,21 @@ async function spin() {
   const startedAt = Date.now();
   try {
     const response = await api.spinSlots(playerId);
-    // Keep the reels moving long enough to make each spin feel deliberate.
-    await sleep(Math.max(0, 1650 - (Date.now() - startedAt)));
+
+    // Build a real vertical symbol strip for each reel. The server-selected
+    // result is placed at the end of each strip and the reel scrolls to it.
+    reelStrips.value = response.reels.map((winningSymbol) => [
+      ...Array.from({ length: 22 }, randomSymbol),
+      winningSymbol,
+    ]);
+    reelOffsets.value = [0, 0, 0];
+    await nextTick();
+
+    // Let the browser paint the starting position before applying the target.
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    reelOffsets.value = reelStrips.value.map(strip => strip.length - 1);
+    await sleep(reelDurations[2] + 180);
+
     reels.value = response.reels;
     winMultiplier.value = response.multiplier;
     freeSpins.value = response.freeSpins;
@@ -69,8 +85,10 @@ async function spin() {
         <div class="slot-reel-frame">
           <div class="slot-reel-labels"><span>1</span><span>2</span><span>3</span></div>
           <div class="slot-reels" :class="{ spinning: busy }">
-            <div v-for="(symbol,index) in reels" :key="index" class="slot-reel-window">
-              <div class="slot-reel-symbol" :class="{ 'symbol-winner': !busy && result.startsWith('JACKPOT') }">{{ busy ? symbols[(spinCount + index * 2) % symbols.length] : symbol }}</div>
+            <div v-for="(strip,index) in reelStrips" :key="index" class="slot-reel-window" :class="{ 'reel-stopped': !busy && spinCount > 0 }">
+              <div class="slot-reel-strip" :style="{ transform: `translate3d(0, -${reelOffsets[index] * 100}%, 0)`, transitionDuration: busy ? `${reelDurations[index]}ms` : '0ms' }">
+                <div v-for="(symbol, symbolIndex) in strip" :key="symbolIndex" class="slot-reel-symbol">{{ symbol }}</div>
+              </div>
               <div class="slot-reel-reflection"></div>
             </div>
           </div>
