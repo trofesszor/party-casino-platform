@@ -1,4 +1,4 @@
-import type { Player, RouletteState } from '../types';
+import type { Player, RouletteBetType, RouletteState } from '../types';
 const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } });
   const data = await response.json().catch(() => ({}));
@@ -9,7 +9,7 @@ export const api = {
   joinPlayer: (name: string) => request<Player>('/api/players/join', { method: 'POST', body: JSON.stringify({ name }) }),
   getPlayers: () => request<Player[]>('/api/players'),
   getRouletteState: () => request<RouletteState>('/api/roulette'),
-  placeRouletteBet: (playerId: number, betType: 'NUMBER' | 'COLOR', betValue: string | number) =>
-    request<RouletteState>('/api/roulette/bets', { method: 'POST', body: JSON.stringify({ playerId, betType, betValue }) }),
+  placeRouletteBet: (playerId: number, betType: RouletteBetType, betValue: string | number, amount: number) =>
+    request<RouletteState>('/api/roulette/bets', { method: 'POST', body: JSON.stringify({ playerId, betType, betValue, amount }) }),
   spinSlots: (playerId: number) => request<{ playerId: number; playerName: string; reels: string[]; isWin: boolean }>('/api/slots/spin', { method: 'POST', body: JSON.stringify({ playerId }) }),
 };
