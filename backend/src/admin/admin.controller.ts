@@ -35,6 +35,12 @@ export class AdminController {
       online: onlineIds.has(player.id),
     }));
   }
+  @Get('statistics')
+  getCasinoStatistics(@Headers('authorization') authorization?: string) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.getCasinoStatistics();
+  }
+
   @Post('reset-player-data')
   resetPlayerData(@Headers('authorization') authorization?: string) {
     this.admin.assertToken(this.token(authorization));
