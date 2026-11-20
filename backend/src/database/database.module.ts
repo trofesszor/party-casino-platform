@@ -65,6 +65,7 @@ export const DATABASE = Symbol('DATABASE');
           title TEXT NOT NULL,
           description TEXT NOT NULL DEFAULT '',
           enabled INTEGER NOT NULL DEFAULT 1,
+          photo_enabled INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS player_side_quests (
@@ -75,7 +76,10 @@ export const DATABASE = Symbol('DATABASE');
           description TEXT NOT NULL DEFAULT '',
           status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','COMPLETED')),
           assigned_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          completed_at TEXT
+          completed_at TEXT,
+          photo_enabled INTEGER NOT NULL DEFAULT 0,
+          completion_method TEXT,
+          photo_id TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_player_side_quests_active ON player_side_quests(player_id, status);
         CREATE TABLE IF NOT EXISTS side_quest_verification_requests (
@@ -158,6 +162,26 @@ export const DATABASE = Symbol('DATABASE');
         if (!questColumns.some(column => column.name === 'skipped_at')) sqlite.exec('ALTER TABLE player_side_quests ADD COLUMN skipped_at TEXT');
       }
 
+      const poolColumns = sqlite.prepare('PRAGMA table_info(side_quest_pool)').all() as Array<{name:string}>;
+      if (!poolColumns.some(column => column.name === 'photo_enabled')) sqlite.exec('ALTER TABLE side_quest_pool ADD COLUMN photo_enabled INTEGER NOT NULL DEFAULT 0');
+      const assignedQuestColumns = sqlite.prepare('PRAGMA table_info(player_side_quests)').all() as Array<{name:string}>;
+      if (!assignedQuestColumns.some(column => column.name === 'photo_enabled')) sqlite.exec('ALTER TABLE player_side_quests ADD COLUMN photo_enabled INTEGER NOT NULL DEFAULT 0');
+      if (!assignedQuestColumns.some(column => column.name === 'completion_method')) sqlite.exec('ALTER TABLE player_side_quests ADD COLUMN completion_method TEXT');
+      if (!assignedQuestColumns.some(column => column.name === 'photo_id')) sqlite.exec('ALTER TABLE player_side_quests ADD COLUMN photo_id TEXT');
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS integration_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS side_quest_photo_sessions (
+          session_id TEXT PRIMARY KEY,
+          quest_id INTEGER NOT NULL REFERENCES player_side_quests(id) ON DELETE CASCADE,
+          player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          expires_at TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','COMPLETED','EXPIRED')),
+          photo_id TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          completed_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_side_quest_photo_sessions_quest ON side_quest_photo_sessions(quest_id,status);
+      `);
       const playerColumns = sqlite.prepare('PRAGMA table_info(players)').all() as Array<{ name: string }>;
       if (!playerColumns.some(column => column.name === 'token_balance')) {
         sqlite.exec('ALTER TABLE players ADD COLUMN token_balance INTEGER NOT NULL DEFAULT 0 CHECK(token_balance >= 0)');
