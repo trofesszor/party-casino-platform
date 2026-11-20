@@ -71,7 +71,7 @@ export class PlayersService {
     }
   }
 
-  private readonly gameSettingDefaults={wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:100,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1};
+  private readonly gameSettingDefaults={wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:100,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1};
   getCasinoGameSettings(){
     const rows=this.database.sqlite.prepare("SELECT setting_key AS key,setting_value AS value FROM casino_settings").all() as Array<{key:string;value:string}>;
     const values=Object.fromEntries(rows.map(r=>[r.key,Number(r.value)]));
@@ -79,17 +79,18 @@ export class PlayersService {
       wheelSpinCost:values.wheel_spin_cost??5,wheelSpinDurationMs:values.wheel_spin_duration_ms??7000,
       rouletteBettingSeconds:values.roulette_betting_seconds??20,rouletteResultSeconds:values.roulette_result_seconds??5,rouletteMaxBet:values.roulette_max_bet??100,
       duelReward:values.duel_reward??10,maxActiveSideQuests:values.max_active_side_quests??2,questPinExpirySeconds:values.quest_pin_expiry_seconds??90,
-      scratchLossPercent:values.scratch_loss_percent??60,scratch10Percent:values.scratch_10_percent??25,scratch25Percent:values.scratch_25_percent??10,scratch50Percent:values.scratch_50_percent??4,scratch100Percent:values.scratch_100_percent??1
+      scratchLossPercent:values.scratch_loss_percent??60,scratch10Percent:values.scratch_10_percent??25,scratch25Percent:values.scratch_25_percent??10,scratch50Percent:values.scratch_50_percent??4,scratch100Percent:values.scratch_100_percent??1,
+      roulettePayoutNumber:values.roulette_payout_number??35,roulettePayoutSplit:values.roulette_payout_split??17,roulettePayoutStreet:values.roulette_payout_street??11,roulettePayoutCorner:values.roulette_payout_corner??8,roulettePayoutSixLine:values.roulette_payout_six_line??5,roulettePayoutDozen:values.roulette_payout_dozen??2,roulettePayoutColumn:values.roulette_payout_column??2,roulettePayoutColor:values.roulette_payout_color??1,roulettePayoutOddEven:values.roulette_payout_odd_even??1,roulettePayoutLowHigh:values.roulette_payout_low_high??1
     };
   }
   setCasinoGameSettings(input:any){
     const keys=Object.keys(this.gameSettingDefaults) as Array<keyof typeof this.gameSettingDefaults>;
     for(const key of keys){const value=input?.[key];if(!Number.isSafeInteger(value))throw new BadRequestException('Minden játékszabályhoz egész számot adj meg.');}
-    const limits:Record<string,[number,number]>={wheelSpinCost:[0,100000],wheelSpinDurationMs:[1000,60000],rouletteBettingSeconds:[5,120],rouletteResultSeconds:[1,30],rouletteMaxBet:[1,1000000],duelReward:[0,1000000],maxActiveSideQuests:[1,10],questPinExpirySeconds:[15,600],scratchLossPercent:[0,100],scratch10Percent:[0,100],scratch25Percent:[0,100],scratch50Percent:[0,100],scratch100Percent:[0,100]};
+    const limits:Record<string,[number,number]>={wheelSpinCost:[0,100000],wheelSpinDurationMs:[1000,60000],rouletteBettingSeconds:[5,120],rouletteResultSeconds:[1,30],rouletteMaxBet:[1,1000000],duelReward:[0,1000000],maxActiveSideQuests:[1,10],questPinExpirySeconds:[15,600],scratchLossPercent:[0,100],scratch10Percent:[0,100],scratch25Percent:[0,100],scratch50Percent:[0,100],scratch100Percent:[0,100],roulettePayoutNumber:[1,1000],roulettePayoutSplit:[1,1000],roulettePayoutStreet:[1,1000],roulettePayoutCorner:[1,1000],roulettePayoutSixLine:[1,1000],roulettePayoutDozen:[1,1000],roulettePayoutColumn:[1,1000],roulettePayoutColor:[1,1000],roulettePayoutOddEven:[1,1000],roulettePayoutLowHigh:[1,1000]};
     for(const key of keys){const [min,max]=limits[key];if(input[key]<min||input[key]>max)throw new BadRequestException('Egy vagy több beállítás kívül esik a megengedett tartományon.');}
     const total=input.scratchLossPercent+input.scratch10Percent+input.scratch25Percent+input.scratch50Percent+input.scratch100Percent;
     if(total!==100)throw new BadRequestException('A kaparós sorsjegy esélyeinek összege pontosan 100% legyen.');
-    const map:Record<string,string>={wheelSpinCost:'wheel_spin_cost',wheelSpinDurationMs:'wheel_spin_duration_ms',rouletteBettingSeconds:'roulette_betting_seconds',rouletteResultSeconds:'roulette_result_seconds',rouletteMaxBet:'roulette_max_bet',duelReward:'duel_reward',maxActiveSideQuests:'max_active_side_quests',questPinExpirySeconds:'quest_pin_expiry_seconds',scratchLossPercent:'scratch_loss_percent',scratch10Percent:'scratch_10_percent',scratch25Percent:'scratch_25_percent',scratch50Percent:'scratch_50_percent',scratch100Percent:'scratch_100_percent'};
+    const map:Record<string,string>={wheelSpinCost:'wheel_spin_cost',wheelSpinDurationMs:'wheel_spin_duration_ms',rouletteBettingSeconds:'roulette_betting_seconds',rouletteResultSeconds:'roulette_result_seconds',rouletteMaxBet:'roulette_max_bet',duelReward:'duel_reward',maxActiveSideQuests:'max_active_side_quests',questPinExpirySeconds:'quest_pin_expiry_seconds',scratchLossPercent:'scratch_loss_percent',scratch10Percent:'scratch_10_percent',scratch25Percent:'scratch_25_percent',scratch50Percent:'scratch_50_percent',scratch100Percent:'scratch_100_percent',roulettePayoutNumber:'roulette_payout_number',roulettePayoutSplit:'roulette_payout_split',roulettePayoutStreet:'roulette_payout_street',roulettePayoutCorner:'roulette_payout_corner',roulettePayoutSixLine:'roulette_payout_six_line',roulettePayoutDozen:'roulette_payout_dozen',roulettePayoutColumn:'roulette_payout_column',roulettePayoutColor:'roulette_payout_color',roulettePayoutOddEven:'roulette_payout_odd_even',roulettePayoutLowHigh:'roulette_payout_low_high'};
     const stmt=this.database.sqlite.prepare("INSERT INTO casino_settings (setting_key,setting_value) VALUES (?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value");
     for(const key of keys)stmt.run(map[key],String(input[key]));
     return this.getCasinoGameSettings();
@@ -444,6 +445,13 @@ export class PlayersService {
     if (description.length > 500) throw new BadRequestException('A leírás legfeljebb 500 karakter lehet.');
     const result = this.database.sqlite.prepare('INSERT INTO side_quest_pool (title, description, photo_enabled) VALUES (?, ?, ?)').run(title, description, photoEnabledInput ? 1 : 0);
     return this.database.sqlite.prepare('SELECT id, title, description, enabled, photo_enabled AS photoEnabled FROM side_quest_pool WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  setSideQuestEnabled(questId:number,enabled:boolean) {
+    if(typeof enabled!=='boolean')throw new BadRequestException('Érvénytelen küldetésállapot.');
+    const result=this.database.sqlite.prepare('UPDATE side_quest_pool SET enabled=? WHERE id=?').run(enabled?1:0,questId);
+    if(!result.changes)throw new BadRequestException('A küldetés nem található.');
+    return this.database.sqlite.prepare('SELECT id,title,description,enabled,photo_enabled AS photoEnabled FROM side_quest_pool WHERE id=?').get(questId);
   }
 
   setSideQuestPhotoEnabled(questId:number,enabledInput:boolean) {
