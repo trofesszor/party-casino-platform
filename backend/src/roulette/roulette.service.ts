@@ -6,6 +6,7 @@ import { EventsGateway } from '../events/events.gateway';
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const BETTING_SECONDS = 20;
 const RESULT_SECONDS = 5;
+const BET_TYPES = new Set(['NUMBER', 'SPLIT', 'STREET', 'CORNER', 'SIX_LINE', 'DOZEN', 'COLUMN', 'COLOR', 'ODD_EVEN', 'LOW_HIGH']);
 
 @Injectable()
 export class RouletteService implements OnModuleInit, OnModuleDestroy {
@@ -15,12 +16,8 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     const current = this.latestRound();
-    if (!current) {
-      this.openNextRound();
-      return;
-    }
+    if (!current) { this.openNextRound(); return; }
     if (current.status === 'BETTING') {
-      // Restarting the local server starts a fresh betting window rather than leaving a stale round locked.
       const endsAt = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
       this.database.sqlite.prepare('UPDATE casino_roulette_rounds SET betting_ends_at = ? WHERE id = ?').run(endsAt, current.id);
       this.schedule(BETTING_SECONDS * 1000, () => this.finishRound());
@@ -30,23 +27,19 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     this.publishState();
   }
 
-  onModuleDestroy() {
-    if (this.timer) clearTimeout(this.timer);
-  }
+  onModuleDestroy() { if (this.timer) clearTimeout(this.timer); }
 
   getState() {
     const currentRound = this.latestRound();
     if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: BETTING_SECONDS };
     const bets = this.database.sqlite.prepare(`
-      SELECT b.player_id AS playerId, p.name AS playerName,
-        b.bet_type AS betType, b.bet_value AS betValue
-      FROM casino_roulette_bets b
-      JOIN players p ON p.id = b.player_id
-      WHERE b.round_id = ? ORDER BY b.created_at, p.name
+      SELECT b.id AS id, b.player_id AS playerId, p.name AS playerName,
+        b.bet_type AS betType, b.bet_value AS betValue, b.amount AS amount
+      FROM casino_roulette_bets b JOIN players p ON p.id = b.player_id
+      WHERE b.round_id = ? ORDER BY b.created_at, b.id
     `).all(currentRound.id) as any[];
     const winners = currentRound.status === 'COMPLETED'
-      ? bets.filter((bet: any) => this.isWinner(bet, currentRound.resultNumber))
-      : [];
+      ? bets.filter((bet: any) => this.isWinner(bet, currentRound.resultNumber)) : [];
     const history = this.database.sqlite.prepare(`
       SELECT round_number AS roundNumber, result_number AS resultNumber, completed_at AS completedAt
       FROM casino_roulette_rounds WHERE status = 'COMPLETED' AND id < ?
@@ -55,32 +48,56 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     return { currentRound, bets, winners, history, bettingSeconds: BETTING_SECONDS };
   }
 
-  placeBet(playerId: number, input: { betType: string; betValue: string | number }) {
+  placeBet(playerId: number, input: { betType: string; betValue: string | number; amount?: number }) {
     const player = this.database.sqlite.prepare('SELECT id FROM players WHERE id = ?').get(playerId);
     if (!player) throw new NotFoundException('A játékos nem található. Lépj be újra a neveddel.');
     const round = this.latestRound();
-    if (!round || round.status !== 'BETTING') throw new BadRequestException('A fogadási időszak lezárult.');
-    if (Date.parse(round.bettingEndsAt) <= Date.now()) throw new BadRequestException('A fogadási időszak lezárult.');
+    if (!round || round.status !== 'BETTING' || Date.parse(round.bettingEndsAt) <= Date.now()) {
+      throw new BadRequestException('A fogadási időszak lezárult.');
+    }
 
     const betType = String(input?.betType ?? '').toUpperCase();
     const betValue = String(input?.betValue ?? '').toLowerCase();
-    if (betType === 'NUMBER') {
-      const number = Number(betValue);
-      if (!Number.isInteger(number) || number < 0 || number > 36) throw new BadRequestException('0 és 36 közötti számot válassz.');
-    } else if (betType === 'COLOR') {
-      if (!['red', 'black'].includes(betValue)) throw new BadRequestException('Pirosat vagy feketét válassz.');
-    } else {
-      throw new BadRequestException('Érvénytelen tét.');
-    }
+    const amount = Number(input?.amount ?? 1);
+    if (!BET_TYPES.has(betType)) throw new BadRequestException('Érvénytelen fogadástípus.');
+    if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new BadRequestException('A zseton értéke 1 és 100 között lehet.');
+    this.validateBet(betType, betValue);
 
-    try {
-      this.database.sqlite.prepare(
-        'INSERT INTO casino_roulette_bets (round_id, player_id, bet_type, bet_value) VALUES (?, ?, ?, ?)',
-      ).run(round.id, playerId, betType, betValue);
-    } catch {
-      throw new BadRequestException('Ebben a körben már leadtad a tippedet.');
-    }
+    this.database.sqlite.prepare(
+      'INSERT INTO casino_roulette_bets (round_id, player_id, bet_type, bet_value, amount) VALUES (?, ?, ?, ?, ?)',
+    ).run(round.id, playerId, betType, betValue, amount);
     return this.publishState();
+  }
+
+  private validateBet(type: string, value: string) {
+    const parts = value.split(',').map(Number);
+    const validNumbers = (count: number) => parts.length === count && parts.every(n => Number.isInteger(n) && n >= 1 && n <= 36) && new Set(parts).size === count;
+    if (type === 'NUMBER' && value !== '0' && !validNumbers(1)) throw new BadRequestException('Válassz egy számot 0 és 36 között.');
+    if (type === 'NUMBER' && value === '0') return;
+    if (type === 'SPLIT') {
+      if (!validNumbers(2)) throw new BadRequestException('A splithez két szomszédos szám kell.');
+      const [a,b] = parts.sort((x,y)=>x-y);
+      if (!(b-a===1 && Math.floor((a-1)/3)===Math.floor((b-1)/3)) && b-a!==3) throw new BadRequestException('A split mezőknek szomszédosnak kell lenniük.');
+    } else if (type === 'STREET') {
+      if (!validNumbers(3)) throw new BadRequestException('A streethez egy teljes háromszámos sor kell.');
+      const sorted = parts.sort((a,b)=>a-b);
+      if (sorted[1]!==sorted[0]+1 || sorted[2]!==sorted[0]+2 || (sorted[0]-1)%3!==0) throw new BadRequestException('A street mezőinek egy sorban kell lenniük.');
+    } else if (type === 'CORNER') {
+      if (!validNumbers(4)) throw new BadRequestException('A cornerhez négy szám kell.');
+      const sorted = parts.sort((a,b)=>a-b);
+      const base = sorted[0];
+      const expected = [base,base+1,base+3,base+4];
+      if ((base-1)%3===2 || Math.floor((base-1)/3)>=11 || expected.some(n=>!sorted.includes(n))) throw new BadRequestException('A corner mezőinek egy közös saroknál kell lenniük.');
+    } else if (type === 'SIX_LINE') {
+      if (!validNumbers(6)) throw new BadRequestException('A six line-hoz hat szám kell.');
+      const sorted = parts.sort((a,b)=>a-b);
+      const base = sorted[0];
+      if ((base-1)%3!==0 || Math.floor((base-1)/3)>=11 || sorted.some((n,i)=>n!==base+i)) throw new BadRequestException('A six line két egymást követő teljes sorból áll.');
+    } else if (type === 'DOZEN' && !['1','2','3'].includes(value)) throw new BadRequestException('Válassz egy tucatot.');
+    else if (type === 'COLUMN' && !['1','2','3'].includes(value)) throw new BadRequestException('Válassz egy oszlopot.');
+    else if (type === 'COLOR' && !['red','black'].includes(value)) throw new BadRequestException('Válassz pirosat vagy feketét.');
+    else if (type === 'ODD_EVEN' && !['odd','even'].includes(value)) throw new BadRequestException('Válassz páratlant vagy párosat.');
+    else if (type === 'LOW_HIGH' && !['low','high'].includes(value)) throw new BadRequestException('Válassz kis vagy nagy számot.');
   }
 
   private latestRound() {
@@ -94,9 +111,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
   private openNextRound() {
     const next = this.database.sqlite.prepare('SELECT COALESCE(MAX(round_number), 0) + 1 AS n FROM casino_roulette_rounds').get() as { n: number };
     const endsAt = new Date(Date.now() + BETTING_SECONDS * 1000).toISOString();
-    this.database.sqlite.prepare(
-      "INSERT INTO casino_roulette_rounds (round_number, status, betting_ends_at) VALUES (?, 'BETTING', ?)",
-    ).run(next.n, endsAt);
+    this.database.sqlite.prepare("INSERT INTO casino_roulette_rounds (round_number, status, betting_ends_at) VALUES (?, 'BETTING', ?)").run(next.n, endsAt);
     this.publishState();
     this.schedule(BETTING_SECONDS * 1000, () => this.finishRound());
   }
@@ -105,9 +120,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     const round = this.latestRound();
     if (!round || round.status !== 'BETTING') return;
     const result = randomInt(0, 37);
-    this.database.sqlite.prepare(
-      "UPDATE casino_roulette_rounds SET status = 'COMPLETED', result_number = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'BETTING'",
-    ).run(result, round.id);
+    this.database.sqlite.prepare("UPDATE casino_roulette_rounds SET status = 'COMPLETED', result_number = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'BETTING'").run(result, round.id);
     this.publishState();
     this.schedule(RESULT_SECONDS * 1000, () => this.openNextRound());
   }
@@ -124,8 +137,16 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
   }
 
   private isWinner(bet: any, result: number) {
-    if (bet.betType === 'NUMBER') return Number(bet.betValue) === result;
-    if (result === 0) return false;
-    return bet.betValue === (RED_NUMBERS.has(result) ? 'red' : 'black');
+    if (result === 0) return bet.betType === 'NUMBER' && Number(bet.betValue) === 0;
+    const values = bet.betValue.split(',').map(Number);
+    switch (bet.betType) {
+      case 'NUMBER': case 'SPLIT': case 'STREET': case 'CORNER': case 'SIX_LINE': return values.includes(result);
+      case 'DOZEN': return Math.ceil(result / 12) === Number(bet.betValue);
+      case 'COLUMN': return (result - 1) % 3 + 1 === Number(bet.betValue);
+      case 'COLOR': return bet.betValue === (RED_NUMBERS.has(result) ? 'red' : 'black');
+      case 'ODD_EVEN': return bet.betValue === (result % 2 ? 'odd' : 'even');
+      case 'LOW_HIGH': return bet.betValue === (result <= 18 ? 'low' : 'high');
+      default: return false;
+    }
   }
 }
