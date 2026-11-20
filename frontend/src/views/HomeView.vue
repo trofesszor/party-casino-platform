@@ -35,6 +35,7 @@ async function enter() {
     tokenBalance.value = player.value.tokenBalance ?? 0;
     localStorage.setItem('party-player-name', player.value.name);
     localStorage.setItem('party-player-id', String(player.value.id));
+    window.dispatchEvent(new Event('party-player-changed'));
     identifyPlayer(player.value.id);
   } catch (e: any) {
     error.value = e.message;
@@ -46,6 +47,7 @@ function logout() {
   identifyPlayer(null);
   localStorage.removeItem('party-player-id');
   localStorage.removeItem('party-player-name');
+  window.dispatchEvent(new Event('party-player-changed'));
   player.value = null;
   tokenBalance.value = 0;
   name.value = '';
