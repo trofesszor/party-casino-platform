@@ -13,6 +13,8 @@ const sideQuests = ref<SideQuest[]>([]);
 const sideQuestBusy = ref(false);
 const sideQuestError = ref('');
 const verificationPin = ref<{questId:number;title:string;pin:string;expiresAt:string}|null>(null);
+const verificationPinVisible = ref(false);
+let verificationPinPollTimer: ReturnType<typeof setInterval> | undefined;
 const photoSession = ref<{questId:number;title:string;sessionId:string;cameraUrl:string;expiresAt:string}|null>(null);
 let photoPollTimer: ReturnType<typeof setInterval> | undefined;
 const activeSideQuests = ref<SideQuest[]>([]);
@@ -30,12 +32,34 @@ async function requestSideQuest() {
 }
 async function finishSideQuest(quest:SideQuest) {
   if (!player.value || sideQuestBusy.value) return;
+  if (verificationPin.value?.questId === quest.id) {
+    verificationPinVisible.value = !verificationPinVisible.value;
+    return;
+  }
   sideQuestBusy.value = true; sideQuestError.value = '';
   try {
     const response = await api.requestSideQuestVerification(player.value.id,quest.id);
     verificationPin.value = {questId:quest.id,title:quest.title,pin:response.pin,expiresAt:response.expiresAt};
+    verificationPinVisible.value = true;
+    if(verificationPinPollTimer) clearInterval(verificationPinPollTimer);
+    verificationPinPollTimer=setInterval(checkVerificationPinStatus,2000);
   } catch (e:any) { sideQuestError.value = e.message; }
   finally { sideQuestBusy.value = false; }
+}
+async function checkVerificationPinStatus() {
+  if(!player.value||!verificationPin.value)return;
+  try {
+    const status=await api.getSideQuestVerificationStatus(player.value.id,verificationPin.value.questId);
+    if(!status.active) {
+      if(verificationPinPollTimer)clearInterval(verificationPinPollTimer);
+      verificationPinPollTimer=undefined;
+      verificationPin.value=null;
+      verificationPinVisible.value=false;
+      await loadSideQuests();
+    }
+  } catch {
+    // Keep the displayed PIN during temporary network failures; the server remains authoritative.
+  }
 }
 async function startPhotoQuest(quest:SideQuest) {
   if(!player.value||sideQuestBusy.value)return;
@@ -162,13 +186,15 @@ function logout() {
   localStorage.removeItem('party-player-name');
   window.dispatchEvent(new Event('party-player-changed'));
   sideQuests.value = [];
+  if(verificationPinPollTimer)clearInterval(verificationPinPollTimer);
+  verificationPinPollTimer=undefined;verificationPin.value=null;verificationPinVisible.value=false;
   player.value = null;
   tokenBalance.value = 0;
   name.value = '';
   error.value = '';
 }
 onMounted(() => { loadDuels(); loadSideQuests(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(loadSideQuests, 5000); });
-onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); });
+onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); if(verificationPinPollTimer)clearInterval(verificationPinPollTimer); });
 </script>
 
 <template>
@@ -314,7 +340,12 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
           <span class="side-quest-number">SIDE QUEST 0{{ index+1 }}</span>
           <h3>{{ quest.title }}</h3>
           <p v-if="quest.description">{{ quest.description }}</p>
-          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="quest.photoEnabled ? startPhotoQuest(quest) : finishSideQuest(quest)">{{ sideQuestBusy ? 'Feldolgozás…' : quest.photoEnabled ? '📷 Fotó feltöltése' : 'PIN-kód kérése' }}</button>
+          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="quest.photoEnabled ? startPhotoQuest(quest) : finishSideQuest(quest)">{{ sideQuestBusy ? 'Feldolgozás…' : quest.photoEnabled ? '📷 Fotó feltöltése' : verificationPin?.questId===quest.id ? (verificationPinVisible ? 'PIN-kód elrejtése' : 'PIN-kód megjelenítése') : 'PIN-kód kérése' }}</button>
+          <div v-if="verificationPin?.questId===quest.id && verificationPinVisible" class="side-quest-active-pin">
+            <span class="eyebrow">AKTÍV PIN-KÓD</span>
+            <strong>{{ verificationPin.pin }}</strong>
+            <small>90 másodpercig érvényes, vagy a másik játékos jóváhagyásáig/elutasításáig.</small>
+          </div>
         </article>
       </div>
       <div v-else class="side-quest-empty">Még nincs aktív küldetésed. Kérj egy véletlenszerű kihívást!</div>
@@ -330,17 +361,6 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
     </section>
 
 
-    </div>
-
-    <div v-if="verificationPin" class="quest-qr-overlay" @click.self="verificationPin=null">
-      <section class="quest-qr-modal panel">
-        <button class="ghost quest-qr-close" @click="verificationPin=null">✕</button>
-        <p class="eyebrow">SIDE QUEST VERIFICATION</p>
-        <h2>{{ verificationPin.title }}</h2>
-        <p class="muted">Mutasd meg ezt a PIN-kódot egy másik játékosnak. Ő a saját eszközén megadja a kódot, majd jóváhagyja vagy elutasítja a teljesítést.</p>
-        <div class="quest-verification-pin">{{ verificationPin.pin }}</div>
-        <small class="muted">A PIN-kód 90 másodpercig érvényes, és csak egyszer használható.</small>
-      </section>
     </div>
 
     <div v-if="photoSession" class="quest-qr-overlay" @click.self="closePhotoSession">
