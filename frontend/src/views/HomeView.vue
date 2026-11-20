@@ -152,7 +152,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
   <main v-else class="page-shell">
     <header class="topbar">
       <a class="brand" href="/">PARTY<span>CASINO</span></a>
-      <nav><a href="/shop">Shop</a><a href="/leaderboard">Ranglista</a><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
+      <nav><a href="/shop">Shop</a><a href="/leaderboard">Ranglista</a><a href="/verify-quest">QR beolvasás</a><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
     </header>
 
     <section class="hero dashboard-hero">
