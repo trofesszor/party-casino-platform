@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { EventsGateway } from '../events/events.gateway';
+import { EventsModule } from '../events/events.module';
 import { RouletteController } from './roulette.controller';
 import { RouletteService } from './roulette.service';
 
 @Module({
   controllers: [RouletteController],
-  providers: [RouletteService, EventsGateway],
+  imports: [EventsModule],
+  providers: [RouletteService],
 })
 export class RouletteModule {}
