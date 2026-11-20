@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
+  try { process.loadEnvFile(); } catch { /* .env is optional outside local development */ }
   const app = await NestFactory.create(AppModule);
   app.enableCors({ origin: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: false, transform: true }));
