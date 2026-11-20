@@ -8,6 +8,30 @@ import { identifyPlayer } from '../services/socket';
 const router = useRouter();
 const player = ref<Player | null>(null);
 const tokenBalance = ref(0);
+type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'; assignedAt:string; completedAt:string|null };
+const sideQuests = ref<SideQuest[]>([]);
+const sideQuestBusy = ref(false);
+const sideQuestError = ref('');
+const activeSideQuests = ref<SideQuest[]>([]);
+async function loadSideQuests() {
+  if (!player.value) return;
+  try { sideQuests.value = await api.getPlayerSideQuests(player.value.id); activeSideQuests.value = sideQuests.value.filter(q => q.status === 'ACTIVE'); sideQuestError.value = ''; }
+  catch (e:any) { sideQuestError.value = e.message || 'Nem sikerült betölteni a küldetéseket.'; }
+}
+async function requestSideQuest() {
+  if (!player.value || activeSideQuests.value.length >= 2 || sideQuestBusy.value) return;
+  sideQuestBusy.value = true; sideQuestError.value = '';
+  try { await api.requestSideQuest(player.value.id); await loadSideQuests(); }
+  catch (e:any) { sideQuestError.value = e.message; }
+  finally { sideQuestBusy.value = false; }
+}
+async function finishSideQuest(quest:SideQuest) {
+  if (!player.value || sideQuestBusy.value) return;
+  sideQuestBusy.value = true; sideQuestError.value = '';
+  try { await api.completeSideQuest(player.value.id, quest.id); await loadSideQuests(); }
+  catch (e:any) { sideQuestError.value = e.message; }
+  finally { sideQuestBusy.value = false; }
+}
 const name = ref('');
 const error = ref('');
 const busy = ref(false);
@@ -18,6 +42,7 @@ if (savedPlayerId > 0 && savedPlayerName) {
   player.value = { id: savedPlayerId, name: savedPlayerName, joinedAt: '', tokenBalance: 0 };
   name.value = savedPlayerName;
   identifyPlayer(savedPlayerId);
+  loadSideQuests();
   api.getPlayerBalance(savedPlayerId).then(balance => tokenBalance.value = balance.tokenBalance).catch(() => {});
 }
 
@@ -37,6 +62,7 @@ async function enter() {
     localStorage.setItem('party-player-id', String(player.value.id));
     window.dispatchEvent(new Event('party-player-changed'));
     identifyPlayer(player.value.id);
+    await loadSideQuests();
   } catch (e: any) {
     error.value = e.message;
   } finally {
@@ -48,6 +74,7 @@ function logout() {
   localStorage.removeItem('party-player-id');
   localStorage.removeItem('party-player-name');
   window.dispatchEvent(new Event('party-player-changed'));
+  sideQuests.value = [];
   player.value = null;
   tokenBalance.value = 0;
   name.value = '';
@@ -93,6 +120,31 @@ function logout() {
         <h2>Szia, {{ player.name }}!</h2>
         <p class="muted">Válassz az állandó játékok közül.</p>
         <p class="player-token-balance">Tokenegyenleg: <strong>{{ tokenBalance }} CR</strong></p>
+      </div>
+    </section>
+
+    <section class="side-quests-panel panel">
+      <div class="side-quests-heading">
+        <div><p class="eyebrow">EXTRA CHALLENGES</p><h2>Side quests</h2><p class="muted">Vállalj titkos küldetéseket a buli alatt.</p></div>
+        <div class="side-quest-counter"><strong>{{ activeSideQuests.length }}/2</strong><small>AKTÍV</small></div>
+      </div>
+      <div v-if="activeSideQuests.length" class="side-quest-grid">
+        <article v-for="(quest,index) in activeSideQuests" :key="quest.id" class="side-quest-card">
+          <span class="side-quest-number">SIDE QUEST 0{{ index+1 }}</span>
+          <h3>{{ quest.title }}</h3>
+          <p v-if="quest.description">{{ quest.description }}</p>
+          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="finishSideQuest(quest)">Küldetés teljesítve</button>
+        </article>
+      </div>
+      <div v-else class="side-quest-empty">Még nincs aktív küldetésed. Kérj egy véletlenszerű kihívást!</div>
+      <div class="side-quest-actions">
+        <button class="primary" :disabled="sideQuestBusy || activeSideQuests.length >= 2" @click="requestSideQuest">{{ sideQuestBusy ? 'Feldolgozás…' : activeSideQuests.length >= 2 ? 'Elérted a 2 aktív küldetést' : '+ Új side quest kérése' }}</button>
+        <span class="muted">{{ activeSideQuests.length === 2 ? 'Teljesíts egy küldetést, hogy újat kérhess.' : 'A kiosztott küldetés nem dobható el.' }}</span>
+      </div>
+      <p v-if="sideQuestError" class="error">{{ sideQuestError }}</p>
+      <div v-if="sideQuests.some(q => q.status === 'COMPLETED')" class="side-quest-completed">
+        <h3>Teljesített küldetések</h3>
+        <div v-for="quest in sideQuests.filter(q => q.status === 'COMPLETED')" :key="quest.id"><span>{{ quest.title }}</span><small>✓ Teljesítve</small></div>
       </div>
     </section>
 
