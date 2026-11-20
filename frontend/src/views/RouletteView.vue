@@ -40,7 +40,7 @@ onUnmounted(() => { socket.off('roulette:changed', onChanged); if (clock) clearI
   <header class="roulette-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><span class="live-indicator">● {{ isDisplay ? 'TV KIJELZŐ' : 'KÖZÖS RULETTASZTAL' }}</span></header>
   <section v-if="state?.currentRound" class="roulette-content">
    <p class="eyebrow">EURÓPAI RULETT · 0–36</p><h1>Rulettasztal</h1>
-   <div class="roulette-round panel"><span class="eyebrow">KÖR #{{ state.currentRound.roundNumber }}</span><h2>{{ state.currentRound.status === 'BETTING' ? secondsLeft + ' mp' : 'Eredmény' }}</h2><p class="muted">{{ state.currentRound.status === 'BETTING' ? 'Add le a tippedet a fogadási időszak végéig.' : 'A következő kör automatikusan indul.' }}</p><div v-if="state.currentRound.status === 'COMPLETED'" class="roulette-result" :class="resultColor">{{ state.currentRound.resultNumber }}</div></div>
+   <div class="roulette-round panel"><span class="eyebrow">KÖR #{{ state.currentRound.roundNumber }}</span><h2>{{ state.currentRound.status === 'BETTING' ? secondsLeft + ' mp' : 'Eredmény' }}</h2><p class="muted">{{ state.currentRound.status === 'BETTING' ? 'Add le a tippedet a fogadási időszak végéig.' : 'A következő kör automatikusan indul.' }}</p></div>
    <RouletteWheel :result-number="state.currentRound.resultNumber" :spinning="state.currentRound.status === 'COMPLETED'" :round-number="state.currentRound.roundNumber" />
    <section v-if="!isDisplay && state.currentRound.status === 'BETTING'" class="panel roulette-bet">
     <h2>Add le a tipped</h2><p v-if="myBet" class="joined-label">A tipped: {{ myBet.betType === 'NUMBER' ? myBet.betValue : myBet.betValue === 'red' ? 'Piros' : 'Fekete' }}</p>
