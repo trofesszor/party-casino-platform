@@ -219,6 +219,17 @@ export const DATABASE = Symbol('DATABASE');
       const insertTokenPhotoSetting=sqlite.prepare('INSERT OR IGNORE INTO token_photo_settings (setting_key,setting_value) VALUES (?,?)');
       tokenPhotoDefaults.forEach(([key,value])=>insertTokenPhotoSetting.run(key,value));
 
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS casino_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          ended_at TEXT,
+          status TEXT NOT NULL CHECK(status IN ('ACTIVE','COMPLETED')),
+          stats_json TEXT
+        );
+      `);
+      sqlite.prepare("INSERT INTO casino_sessions (status) SELECT 'ACTIVE' WHERE NOT EXISTS (SELECT 1 FROM casino_sessions WHERE status='ACTIVE')").run();
+
       const wheelCount = sqlite.prepare('SELECT COUNT(*) AS count FROM lucky_wheel_segments').get() as { count: number };
       if (wheelCount.count === 0) {
         const defaults = ['Ossz ki 2 italt', 'Te iszol', 'Lányok isznak', 'Fiúk isznak', 'Mindenki iszik', 'Passz', 'Válassz valakit, aki iszik'];
