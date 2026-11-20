@@ -306,6 +306,10 @@ export class PlayersService {
     const verify:any=await this.snappinRequest('/api/integrations/sessions/'+encodeURIComponent(sessionId));
     if(String(verify.eventId??'')!==eventId||String(verify.externalReference??'')!==local.externalReference) throw new BadRequestException('A Snappin munkamenet esemény- vagy külső hivatkozása nem egyezik.');
     const photoId=String(verify.photo?.id??''),remoteStatus=String(verify.status??'').toUpperCase();
+    if(remoteStatus==='EXPIRED'||remoteStatus==='CANCELLED'){
+      sqlite.prepare("UPDATE token_photo_sessions SET status='EXPIRED' WHERE session_id=? AND status='PENDING'").run(sessionId);
+      return {success:true,completed:false,status:'EXPIRED'};
+    }
     if(remoteStatus!=='UPLOADED'||!photoId) return {success:true,completed:false,status:remoteStatus||'PENDING'};
     sqlite.exec('BEGIN IMMEDIATE');
     try {
