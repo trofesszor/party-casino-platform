@@ -20,6 +20,9 @@ const sideQuestSaving = ref(false);
 type AdminShopItem = { itemKey:string; name:string; description:string; price:number; enabled:number };
 const shopItems = ref<AdminShopItem[]>([]);
 const shopSavingKey = ref('');
+const tokenPhotoSettings=ref({enabled:true,balanceThreshold:50,rewardAmount:10,cooldownMinutes:60,dailyLimit:2});
+const tokenPhotoSaving=ref(false);
+
 const password = ref('');
 const token = ref(localStorage.getItem('party-admin-token') ?? '');
 const players = ref<AdminPlayer[]>([]);
@@ -37,6 +40,7 @@ async function loadPlayers() {
     wheelSegments.value = wheel.map(segment => ({ label: segment.label, enabled: !!segment.enabled }));
     sideQuestPool.value = await api.adminSideQuestPool(token.value);
     shopItems.value = await api.adminShopItems(token.value);
+    tokenPhotoSettings.value = await api.adminGetTokenPhotoSettings(token.value);
     localStorage.setItem('party-admin-token', token.value);
   } catch {
     token.value = '';
@@ -98,6 +102,13 @@ async function toggleShopItem(item: AdminShopItem) {
   } finally {
     shopSavingKey.value = '';
   }
+}
+
+async function saveTokenPhotoSettings(){
+  tokenPhotoSaving.value=true;actionError.value='';
+  try{tokenPhotoSettings.value=await api.adminSaveTokenPhotoSettings(token.value,tokenPhotoSettings.value);}
+  catch(e:any){actionError.value=e.message||'Nem sikerült menteni a fotófeltöltési beállításokat.';}
+  finally{tokenPhotoSaving.value=false;}
 }
 
 async function addSideQuest() {
@@ -210,6 +221,18 @@ onMounted(loadPlayers);
           </div>
           <button class="ghost" :disabled="shopSavingKey === item.itemKey" @click="toggleShopItem(item)">{{ shopSavingKey === item.itemKey ? 'Mentés…' : item.enabled ? 'Inaktiválás' : 'Aktiválás' }}</button>
         </div>
+      </section>
+      <section class="panel admin-wheel-editor admin-token-photo-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">PLAYER REWARDS</p><h2>Fotófeltöltés tokenekért</h2><p class="muted">Automatikus jutalom Snappin-fotó sikeres feltöltése után. A limitet a szerver ellenőrzi.</p></div></div>
+        <div class="token-photo-admin-settings">
+          <label class="admin-photo-quest-option"><input v-model="tokenPhotoSettings.enabled" type="checkbox"> Jutalomrendszer aktív</label>
+          <label>Tokenegyenleg küszöb<input v-model.number="tokenPhotoSettings.balanceThreshold" type="number" min="0" max="2000000000"></label>
+          <label>Jutalom (CR)<input v-model.number="tokenPhotoSettings.rewardAmount" type="number" min="1" max="1000000"></label>
+          <label>Várakozási idő (perc)<input v-model.number="tokenPhotoSettings.cooldownMinutes" type="number" min="0" max="10080"></label>
+          <label>Napi feltöltési limit<input v-model.number="tokenPhotoSettings.dailyLimit" type="number" min="1" max="24"></label>
+        </div>
+        <p class="muted">A játékos csak a küszöbérték alatti egyenleggel jogosult. Egyidejűleg egy aktív feltöltése lehet; az indított feltöltés a napi limitbe beleszámít, akkor is, ha nem fejezi be.</p>
+        <button class="primary" :disabled="tokenPhotoSaving" @click="saveTokenPhotoSettings">{{tokenPhotoSaving?'Mentés…':'Fotójutalom beállításainak mentése'}}</button>
       </section>
       <section class="panel admin-wheel-editor admin-side-quest-editor">
         <div class="admin-section-heading"><div><p class="eyebrow">SIDE QUEST SYSTEM</p><h2>Side quest pool</h2><p class="muted">A játékosok véletlenszerűen kapnak egy küldetést ebből a listából. Egy játékosnak legfeljebb 2 aktív küldetése lehet.</p></div></div>
