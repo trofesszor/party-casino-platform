@@ -110,7 +110,8 @@ onMounted(loadPlayers);
           <table class="admin-table">
             <thead><tr><th>Állapot</th><th>Játékos</th><th>Azonosító</th><th>Csatlakozott</th><th>Tokenegyenleg</th><th>Műveletek</th></tr></thead>
             <tbody>
-              <tr v-for="player in players" :key="player.id">
+              <template v-for="player in players" :key="player.id">
+              <tr>
                 <td><span class="player-status" :class="{online:player.online}">{{ player.online ? 'Online' : 'Offline' }}</span></td>
                 <td class="player-name">{{ player.name }}</td>
                 <td>#{{ player.id }}</td>
@@ -119,6 +120,7 @@ onMounted(loadPlayers);
                 <td><button class="ghost" @click="saveBalance(player)">Mentés</button> <button class="ghost" @click="showTransactions(player)">Előzmények</button></td>
               </tr>
               <tr v-if="selectedPlayer === player.id"><td colspan="6"><strong>Token tranzakciók</strong><div v-if="!transactions.length" class="muted">Nincs tranzakció.</div><div v-for="tx in transactions" :key="tx.id" class="admin-transaction"><span>{{ new Date(tx.createdAt).toLocaleString() }} · {{ tx.description }}</span><b :class="{ winner: tx.amount > 0 }">{{ tx.amount > 0 ? '+' : '' }}{{ tx.amount }} → {{ tx.balanceAfter }}</b></div></td></tr>
+              </template>
             </tbody>
           </table>
         </div>
