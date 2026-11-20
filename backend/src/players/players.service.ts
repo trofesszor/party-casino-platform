@@ -114,7 +114,15 @@ export class PlayersService {
     const pin = String(pinInput ?? '').trim();
     if (!/^\\d{3}$/.test(pin) || !Number.isSafeInteger(verifierId) || verifierId <= 0) throw new BadRequestException('Érvénytelen ellenőrzési kérés.');
     const sqlite = this.database.sqlite;
+    sqlite.prepare("DELETE FROM side_quest_pin_attempts WHERE datetime(attempted_at)<datetime('now','-2 minutes')").run();
+    const recentAttempts = sqlite.prepare("SELECT COUNT(*) AS count FROM side_quest_pin_attempts WHERE player_id=? AND datetime(attempted_at)>datetime('now','-90 seconds')").get(verifierId) as {count:number};
+    if (recentAttempts.count>=5) throw new BadRequestException('Túl sok hibás PIN-kód. Várj egy percet, majd próbáld újra.');
     const pinHash = createHash('sha256').update(pin).digest('hex');
+    const candidate = sqlite.prepare("SELECT id FROM side_quest_verification_requests WHERE token_hash=? AND status='PENDING' AND datetime(expires_at)>CURRENT_TIMESTAMP").get(pinHash);
+    if (!candidate) {
+      sqlite.prepare('INSERT INTO side_quest_pin_attempts (player_id) VALUES (?)').run(verifierId);
+      throw new BadRequestException('A PIN-kód hibás, lejárt vagy már felhasználták.');
+    }
     sqlite.exec('BEGIN IMMEDIATE');
     try {
       const request = sqlite.prepare(`SELECT r.id, r.quest_id AS questId, r.owner_id AS ownerId, q.title FROM side_quest_verification_requests r JOIN player_side_quests q ON q.id=r.quest_id WHERE r.token_hash=? AND r.status='PENDING' AND datetime(r.expires_at)>CURRENT_TIMESTAMP AND q.status='ACTIVE'`).get(pinHash) as {id:number;questId:number;ownerId:number;title:string}|undefined;
