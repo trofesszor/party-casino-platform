@@ -116,6 +116,13 @@ function logout() {
         <span class="game-link">Játék megnyitása →</span>
       </button>
 
+      <button class="game-card panel" @click="router.push('/lucky-wheel')">
+        <span class="game-icon">🎡</span>
+        <h3>Szerencsekerék</h3>
+        <p class="muted">Közös party kihívások. Egy játékos pörget, mindenki ugyanazt látja.</p>
+        <span class="game-link">Kerék megnyitása →</span>
+      </button>
+
       <article class="game-card panel coming-soon">
         <span class="game-icon">🛍️</span>
         <h3>Shop</h3>
