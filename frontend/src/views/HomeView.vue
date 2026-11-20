@@ -37,6 +37,15 @@ async function finishSideQuest(quest:SideQuest) {
   } catch (e:any) { sideQuestError.value = e.message; }
   finally { sideQuestBusy.value = false; }
 }
+function handleSnappinMessage(event:MessageEvent) {
+  if(!photoSession.value)return;
+  try {
+    if(event.origin!==new URL(photoSession.value.cameraUrl).origin)return;
+  } catch { return; }
+  const data=event.data;
+  if(data?.type!=='SNAPPIN_PHOTO_COMPLETED'||data.sessionId!==photoSession.value.sessionId)return;
+  void checkPhotoQuestCompletion();
+}
 async function startPhotoQuest(quest:SideQuest) {
   if(!player.value||sideQuestBusy.value)return;
   sideQuestBusy.value=true;sideQuestError.value='';
@@ -163,8 +172,8 @@ function logout() {
   name.value = '';
   error.value = '';
 }
-onMounted(() => { loadDuels(); loadSideQuests(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(loadSideQuests, 5000); });
-onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); });
+onMounted(() => { window.addEventListener('message',handleSnappinMessage); loadDuels(); loadSideQuests(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(loadSideQuests, 5000); });
+onUnmounted(() => { window.removeEventListener('message',handleSnappinMessage); if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); });
 </script>
 
 <template>
@@ -345,8 +354,8 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         <p class="eyebrow">SNAPPIN PHOTO VERIFICATION</p>
         <h2>{{ photoSession.title }}</h2>
         <p class="muted">Nyisd meg a Snappin kamerát, készítsd el és töltsd fel a küldetés bizonyítékát. A küldetés automatikusan teljesül, amint a Snappin visszaigazolja a fotót.</p>
-        <a class="primary photo-camera-link" :href="photoSession.cameraUrl" target="_blank" rel="noopener noreferrer">📷 Kamera megnyitása</a>
-        <small class="muted">A feltöltés állapotát automatikusan ellenőrizzük. Lejárat: {{ new Date(photoSession.expiresAt).toLocaleTimeString() }}</small>
+        <div class="photo-camera-frame"><iframe :src="photoSession.cameraUrl" title="Snappin camera" allow="camera; fullscreen" referrerpolicy="no-referrer"></iframe></div>
+        <small class="muted">Készítsd el a fotót a kamerában. A feltöltés állapotát automatikusan ellenőrizzük. Lejárat: {{ new Date(photoSession.expiresAt).toLocaleTimeString() }}</small>
         <span class="photo-upload-wait"><span class="online-dot"></span> Fotófeltöltésre várakozás…</span>
         <button class="ghost" @click="closePhotoSession">Bezárás</button>
       </section>
