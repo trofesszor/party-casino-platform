@@ -200,6 +200,25 @@ export const DATABASE = Symbol('DATABASE');
       sqlite.exec("CREATE TABLE IF NOT EXISTS scratch_tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE, prize_amount INTEGER NOT NULL CHECK(prize_amount IN (0,10,25,50,100)), status TEXT NOT NULL DEFAULT 'UNSCRATCHED' CHECK(status IN ('UNSCRATCHED','REVEALED')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, revealed_at TEXT)");
       sqlite.exec('CREATE INDEX IF NOT EXISTS idx_scratch_tickets_player ON scratch_tickets(player_id,status)');
 
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS token_photo_sessions (
+          session_id TEXT PRIMARY KEY,
+          external_reference TEXT NOT NULL UNIQUE,
+          player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          expires_at TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'CREATING' CHECK(status IN ('CREATING','PENDING','COMPLETED','EXPIRED')),
+          photo_id TEXT UNIQUE,
+          reward_amount INTEGER NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          completed_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_token_photo_player_status ON token_photo_sessions(player_id,status,created_at);
+        CREATE TABLE IF NOT EXISTS token_photo_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL);
+      `);
+      const tokenPhotoDefaults: Array<[string,string]> = [['enabled','1'],['balance_threshold','50'],['reward_amount','10'],['cooldown_minutes','60'],['daily_limit','2']];
+      const insertTokenPhotoSetting=sqlite.prepare('INSERT OR IGNORE INTO token_photo_settings (setting_key,setting_value) VALUES (?,?)');
+      tokenPhotoDefaults.forEach(([key,value])=>insertTokenPhotoSetting.run(key,value));
+
       const wheelCount = sqlite.prepare('SELECT COUNT(*) AS count FROM lucky_wheel_segments').get() as { count: number };
       if (wheelCount.count === 0) {
         const defaults = ['Ossz ki 2 italt', 'Te iszol', 'Lányok isznak', 'Fiúk isznak', 'Mindenki iszik', 'Passz', 'Válassz valakit, aki iszik'];
