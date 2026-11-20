@@ -216,7 +216,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
       </div>
       <p v-if="duelError" class="error">{{ duelError }}</p>
       <div v-if="!duels.length" class="duel-empty">Még nincs párbajod. Hívd ki az egyik játékost!</div>
-      <div v-for="duel in duels" :key="duel.id" class="duel-card">
+      <div v-for="duel in duels.filter(d=>!['COMPLETED','REFUSED'].includes(d.status))" :key="duel.id" class="duel-card">
         <div class="duel-card-top"><div><span class="eyebrow">PÁRBAJ #{{duel.id}}</span><h3>{{duel.challengerName}} <span>VS</span> {{duel.opponentName}}</h3></div><span class="duel-status" :class="'status-'+duel.status.toLowerCase()">{{duelStatusLabel(duel.status)}}</span></div>
         <p v-if="duel.duelType" class="duel-type-label">{{duelTypeLabel(duel.duelType)}}</p>
         <div v-if="duel.status==='PENDING' && duel.challengerId===player.id" class="duel-waiting">Várakozás a kihívás elfogadására vagy visszautasítására.</div>
@@ -244,6 +244,21 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         </div>
         <div v-if="duel.status==='REFUSED'" class="duel-waiting">A kihívást visszautasították.</div>
       </div>
+      <details v-if="duels.some(d=>['COMPLETED','REFUSED'].includes(d.status))" class="duel-history">
+        <summary>Korábbi párbajok · {{ duels.filter(d=>['COMPLETED','REFUSED'].includes(d.status)).length }}</summary>
+        <div class="duel-history-list">
+          <article v-for="duel in duels.filter(d=>['COMPLETED','REFUSED'].includes(d.status))" :key="duel.id" class="duel-card duel-history-card">
+            <div class="duel-card-top"><div><span class="eyebrow">PÁRBAJ #{{duel.id}}</span><h3>{{duel.challengerName}} <span>VS</span> {{duel.opponentName}}</h3></div><span class="duel-status" :class="'status-'+duel.status.toLowerCase()">{{duelStatusLabel(duel.status)}}</span></div>
+            <p v-if="duel.duelType" class="duel-type-label">{{duelTypeLabel(duel.duelType)}}</p>
+            <div v-if="duel.status==='COMPLETED'" class="duel-result">
+              <strong>🏆 {{duel.winnerId===duel.challengerId?duel.challengerName:duel.opponentName}} nyert</strong>
+              <span>Ellenfél: {{otherDuelPlayer(duel)}} · Típus: {{duelTypeLabel(duel.duelType)}}</span>
+              <span>+{{duel.rewardAmount}} CR · {{duel.loserId===player.id?'Neked kellett innod!':'A vesztesnek innia kellett.'}}</span>
+            </div>
+            <div v-else class="duel-waiting">A kihívást visszautasították.</div>
+          </article>
+        </div>
+      </details>
       <button class="ghost duel-refresh" @click="loadDuels">Párbajok frissítése</button>
     </section>
 
