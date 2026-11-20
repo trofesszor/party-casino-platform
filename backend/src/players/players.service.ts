@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { createHash, randomBytes } from 'node:crypto';
 import { DATABASE } from '../database/database.module';
 
 @Injectable()
@@ -26,8 +27,13 @@ export class PlayersService {
     const player = this.database.sqlite.prepare('SELECT id FROM players WHERE id = ?').get(playerId);
     if (!player) throw new BadRequestException('A játékos nem található.');
     return this.database.sqlite.prepare(`
-      SELECT id, title, description, status, assigned_at AS assignedAt, completed_at AS completedAt
-      FROM player_side_quests WHERE player_id = ? ORDER BY CASE status WHEN 'ACTIVE' THEN 0 ELSE 1 END, id DESC
+      SELECT q.id, q.title, q.description, q.status, q.assigned_at AS assignedAt,
+        q.completed_at AS completedAt, verifier.name AS approvedByName, v.verified_at AS approvedAt
+      FROM player_side_quests q
+      LEFT JOIN side_quest_verification_requests v ON v.quest_id=q.id AND v.status='APPROVED'
+      LEFT JOIN players verifier ON verifier.id=v.verified_by
+      WHERE q.player_id = ?
+      ORDER BY CASE q.status WHEN 'ACTIVE' THEN 0 ELSE 1 END, q.id DESC
     `).all(playerId);
   }
 
@@ -57,10 +63,58 @@ export class PlayersService {
     }
   }
 
-  completeSideQuest(playerId: number, questId: number) {
-    const result = this.database.sqlite.prepare("UPDATE player_side_quests SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP WHERE id = ? AND player_id = ? AND status = 'ACTIVE'").run(questId, playerId);
-    if (!result.changes) throw new BadRequestException('Az aktív side quest nem található.');
-    return this.database.sqlite.prepare('SELECT id, title, description, status, assigned_at AS assignedAt, completed_at AS completedAt FROM player_side_quests WHERE id = ?').get(questId);
+  requestSideQuestVerification(playerId: number, questId: number) {
+    const sqlite = this.database.sqlite;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const quest = sqlite.prepare("SELECT id FROM player_side_quests WHERE id=? AND player_id=? AND status='ACTIVE'").get(questId, playerId);
+      if (!quest) throw new BadRequestException('Az aktív side quest nem található.');
+      sqlite.prepare("UPDATE side_quest_verification_requests SET status='EXPIRED' WHERE quest_id=? AND status='PENDING' AND datetime(expires_at)<=CURRENT_TIMESTAMP").run(questId);
+      if (sqlite.prepare("SELECT id FROM side_quest_verification_requests WHERE quest_id=? AND status='PENDING'").get(questId)) throw new BadRequestException('Ehhez a küldetéshez már van aktív QR-kód.');
+      const token = randomBytes(32).toString('hex');
+      const tokenHash = createHash('sha256').update(token).digest('hex');
+      const expiresAt = new Date(Date.now() + 90_000).toISOString();
+      sqlite.prepare("INSERT INTO side_quest_verification_requests (quest_id,owner_id,token_hash,expires_at) VALUES (?,?,?,?)").run(questId,playerId,tokenHash,expiresAt);
+      sqlite.exec('COMMIT');
+      return { token, expiresAt };
+    } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
+  }
+
+  getSideQuestVerification(tokenInput: string) {
+    const token = String(tokenInput ?? '').trim();
+    if (!/^[a-f0-9]{64}$/i.test(token)) throw new BadRequestException('Érvénytelen QR-kód.');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const request = this.database.sqlite.prepare(`
+      SELECT r.quest_id AS questId, r.owner_id AS ownerId, r.expires_at AS expiresAt,
+        q.title, q.description, p.name AS ownerName
+      FROM side_quest_verification_requests r
+      JOIN player_side_quests q ON q.id=r.quest_id JOIN players p ON p.id=r.owner_id
+      WHERE r.token_hash=? AND r.status='PENDING' AND datetime(r.expires_at)>CURRENT_TIMESTAMP AND q.status='ACTIVE'
+    `).get(tokenHash);
+    if (!request) throw new BadRequestException('A QR-kód lejárt vagy már felhasználták.');
+    return request;
+  }
+
+  verifySideQuest(tokenInput: string, verifierId: number, approveInput: boolean) {
+    if (typeof approveInput !== 'boolean') throw new BadRequestException('Érvénytelen döntés.');
+    const token = String(tokenInput ?? '').trim();
+    if (!/^[a-f0-9]{64}$/i.test(token) || !Number.isSafeInteger(verifierId) || verifierId <= 0) throw new BadRequestException('Érvénytelen ellenőrzési kérés.');
+    const sqlite = this.database.sqlite;
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const request = sqlite.prepare(`SELECT r.id, r.quest_id AS questId, r.owner_id AS ownerId, q.title FROM side_quest_verification_requests r JOIN player_side_quests q ON q.id=r.quest_id WHERE r.token_hash=? AND r.status='PENDING' AND datetime(r.expires_at)>CURRENT_TIMESTAMP AND q.status='ACTIVE'`).get(tokenHash) as {id:number;questId:number;ownerId:number;title:string}|undefined;
+      if (!request) throw new BadRequestException('A QR-kód lejárt vagy már felhasználták.');
+      if (request.ownerId === verifierId) throw new BadRequestException('A saját küldetésedet nem igazolhatod.');
+      if (!sqlite.prepare('SELECT id FROM players WHERE id=?').get(verifierId)) throw new BadRequestException('A hitelesítő játékos nem található.');
+      if (sqlite.prepare('SELECT id FROM side_quest_verification_requests WHERE quest_id=? AND verified_by=?').get(request.questId,verifierId)) throw new BadRequestException('Ezt a küldetést már ellenőrizted.');
+      const status = approveInput ? 'APPROVED' : 'REJECTED';
+      sqlite.prepare('UPDATE side_quest_verification_requests SET status=?,verified_by=?,verified_at=CURRENT_TIMESTAMP WHERE id=?').run(status,verifierId,request.id);
+      if (approveInput) sqlite.prepare("UPDATE player_side_quests SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE id=? AND status='ACTIVE'").run(request.questId);
+      sqlite.exec('COMMIT');
+      const verifier = sqlite.prepare('SELECT name FROM players WHERE id=?').get(verifierId) as {name:string};
+      return {success:true,status,questId:request.questId,questTitle:request.title,verifiedByName:verifier.name};
+    } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
   }
 
   getSideQuestPool() {
