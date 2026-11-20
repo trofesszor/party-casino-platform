@@ -173,8 +173,10 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
   }
 
   private payoutOdds(type: string) {
-    const odds: Record<string, number> = { NUMBER: 35, SPLIT: 17, STREET: 11, CORNER: 8, SIX_LINE: 5, DOZEN: 2, COLUMN: 2, COLOR: 1, ODD_EVEN: 1, LOW_HIGH: 1 };
-    return odds[type] ?? 0;
+    const keys:Record<string,[string,number]>={NUMBER:['roulette_payout_number',35],SPLIT:['roulette_payout_split',17],STREET:['roulette_payout_street',11],CORNER:['roulette_payout_corner',8],SIX_LINE:['roulette_payout_six_line',5],DOZEN:['roulette_payout_dozen',2],COLUMN:['roulette_payout_column',2],COLOR:['roulette_payout_color',1],ODD_EVEN:['roulette_payout_odd_even',1],LOW_HIGH:['roulette_payout_low_high',1]};
+    const setting=keys[type];if(!setting)return 0;
+    const row=this.database.sqlite.prepare('SELECT setting_value AS value FROM casino_settings WHERE setting_key=?').get(setting[0]) as {value:string}|undefined;
+    return Number(row?.value??setting[1]);
   }
 
   private isWinner(bet: any, result: number) {
