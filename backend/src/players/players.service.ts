@@ -43,7 +43,7 @@ export class PlayersService {
         SELECT id, title, description FROM side_quest_pool
         WHERE enabled = 1 AND NOT EXISTS (
           SELECT 1 FROM player_side_quests assigned
-          WHERE assigned.player_id = ? AND assigned.pool_quest_id = side_quest_pool.id
+          WHERE assigned.player_id = ? AND assigned.pool_quest_id = side_quest_pool.id AND assigned.status <> 'SKIPPED'
         )
         ORDER BY RANDOM() LIMIT 1
       `).get(playerId) as { id: number; title: string; description: string } | undefined;
@@ -179,6 +179,64 @@ export class PlayersService {
       sqlite.exec('COMMIT');
       return this.duelView(duelId);
     } catch(e) { sqlite.exec('ROLLBACK'); throw e; }
+  }
+
+  getShop(playerId: number) {
+    const player = this.database.sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId);
+    if (!player) throw new BadRequestException('A játékos nem található.');
+    return this.database.sqlite.prepare(`
+      SELECT s.item_key AS itemKey, s.name, s.description, s.price,
+        COALESCE(i.quantity,0) AS quantity
+      FROM shop_items s
+      LEFT JOIN player_inventory i ON i.item_key=s.item_key AND i.player_id=?
+      WHERE s.enabled=1 ORDER BY s.price ASC, s.name ASC
+    `).all(playerId);
+  }
+
+  buyShopItem(playerId: number, itemKeyInput: string) {
+    const itemKey=String(itemKeyInput ?? '').trim().toUpperCase();
+    const sqlite=this.database.sqlite;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const player=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(playerId) as {balance:number}|undefined;
+      if (!player) throw new BadRequestException('A játékos nem található.');
+      const item=sqlite.prepare('SELECT item_key AS itemKey,name,price FROM shop_items WHERE item_key=? AND enabled=1').get(itemKey) as {itemKey:string;name:string;price:number}|undefined;
+      if (!item) throw new BadRequestException('Ez a termék jelenleg nem elérhető.');
+      if (player.balance < item.price) throw new BadRequestException('Nincs elég CR az egyenlegeden.');
+      sqlite.prepare('UPDATE players SET token_balance=token_balance-? WHERE id=?').run(item.price,playerId);
+      sqlite.prepare(`INSERT INTO player_inventory (player_id,item_key,quantity) VALUES (?,?,1)
+        ON CONFLICT(player_id,item_key) DO UPDATE SET quantity=quantity+1,updated_at=CURRENT_TIMESTAMP`).run(playerId,item.itemKey);
+      const balance=player.balance-item.price;
+      sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?,?,?,'SHOP_PURCHASE',?)").run(playerId,-item.price,balance,`Shop vásárlás · ${item.name}`);
+      sqlite.exec('COMMIT');
+      return {success:true,itemKey:item.itemKey,quantity:sqlite.prepare('SELECT quantity FROM player_inventory WHERE player_id=? AND item_key=?').get(playerId,item.itemKey).quantity,tokenBalance:balance};
+    } catch(error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  useShopItem(playerId: number, itemKeyInput: string, questId: number) {
+    const itemKey=String(itemKeyInput ?? '').trim().toUpperCase();
+    if (itemKey !== 'QUEST_SKIP') throw new BadRequestException('Ez a termék nem használható.');
+    if (!Number.isSafeInteger(questId) || questId<=0) throw new BadRequestException('Érvénytelen side quest.');
+    const sqlite=this.database.sqlite;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const player=sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId);
+      if (!player) throw new BadRequestException('A játékos nem található.');
+      const inventory=sqlite.prepare('SELECT quantity FROM player_inventory WHERE player_id=? AND item_key=?').get(playerId,itemKey) as {quantity:number}|undefined;
+      if (!inventory || inventory.quantity<1) throw new BadRequestException('Nincs ilyen tárgy a készletedben.');
+      const quest=sqlite.prepare("SELECT id,title FROM player_side_quests WHERE id=? AND player_id=? AND status='ACTIVE'").get(questId,playerId) as {id:number;title:string}|undefined;
+      if (!quest) throw new BadRequestException('Az aktív side quest nem található.');
+      sqlite.prepare("UPDATE player_side_quests SET status='SKIPPED',skipped_at=CURRENT_TIMESTAMP WHERE id=?").run(questId);
+      sqlite.prepare('UPDATE player_inventory SET quantity=quantity-1,updated_at=CURRENT_TIMESTAMP WHERE player_id=? AND item_key=?').run(playerId,itemKey);
+      sqlite.exec('COMMIT');
+      return {success:true,skippedQuestId:quest.id,inventoryQuantity:inventory.quantity-1};
+    } catch(error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   getBalance(playerId: number) {
