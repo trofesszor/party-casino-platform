@@ -198,7 +198,11 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
           <div><button class="ghost" :disabled="duelBusy" @click="voteDuelWinner(duel,duel.challengerId)">{{duel.challengerName}} nyert</button><button class="ghost" :disabled="duelBusy" @click="voteDuelWinner(duel,duel.opponentId)">{{duel.opponentName}} nyert</button></div>
           <small>Mindkét játékosnak ugyanazt a győztest kell megjelölnie.</small>
         </div>
-        <div v-if="duel.status==='COMPLETED'" class="duel-result"><strong>🏆 {{duel.winnerId===duel.challengerId?duel.challengerName:duel.opponentName}} nyert</strong><span>+{{duel.rewardAmount}} CR · {{duel.loserId===player.id?'Neked kell innod!':'A vesztesnek innia kell.'}}</span></div>
+        <div v-if="duel.status==='COMPLETED'" class="duel-result">
+          <strong>🏆 {{duel.winnerId===duel.challengerId?duel.challengerName:duel.opponentName}} nyert</strong>
+          <span>Ellenfél: {{otherDuelPlayer(duel)}} · Típus: {{duelTypeLabel(duel.duelType)}}</span>
+          <span>+{{duel.rewardAmount}} CR · {{duel.loserId===player.id?'Neked kell innod!':'A vesztesnek innia kell.'}}</span>
+        </div>
         <div v-if="duel.status==='REFUSED'" class="duel-waiting">A kihívást visszautasították.</div>
       </div>
       <button class="ghost duel-refresh" @click="loadDuels">Párbajok frissítése</button>
