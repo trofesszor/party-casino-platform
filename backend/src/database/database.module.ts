@@ -172,6 +172,7 @@ export const DATABASE = Symbol('DATABASE');
         CREATE TABLE IF NOT EXISTS integration_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS side_quest_photo_sessions (
           session_id TEXT PRIMARY KEY,
+          external_reference TEXT,
           quest_id INTEGER NOT NULL REFERENCES player_side_quests(id) ON DELETE CASCADE,
           player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
           expires_at TEXT NOT NULL,
@@ -182,6 +183,9 @@ export const DATABASE = Symbol('DATABASE');
         );
         CREATE INDEX IF NOT EXISTS idx_side_quest_photo_sessions_quest ON side_quest_photo_sessions(quest_id,status);
       `);
+      const photoSessionColumns = sqlite.prepare('PRAGMA table_info(side_quest_photo_sessions)').all() as Array<{name:string}>;
+      if (!photoSessionColumns.some(column => column.name === 'external_reference')) sqlite.exec('ALTER TABLE side_quest_photo_sessions ADD COLUMN external_reference TEXT');
+
       const playerColumns = sqlite.prepare('PRAGMA table_info(players)').all() as Array<{ name: string }>;
       if (!playerColumns.some(column => column.name === 'token_balance')) {
         sqlite.exec('ALTER TABLE players ADD COLUMN token_balance INTEGER NOT NULL DEFAULT 0 CHECK(token_balance >= 0)');
