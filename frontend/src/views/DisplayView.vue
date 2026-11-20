@@ -30,7 +30,7 @@ onUnmounted(() => {
     <section v-if="state?.currentRound" class="tv-roulette panel">
       <p class="eyebrow">KÖZÖS RULETTASZTAL · {{ state.currentRound.status === 'BETTING' ? 'FOGADÁS' : 'EREDMÉNY' }}</p>
       <h2>{{ state.currentRound.status === 'BETTING' ? 'Tétek leadása folyamatban' : 'A kör eredménye' }}</h2>
-      <RouletteWheel :result-number="state.currentRound.resultNumber" :spinning="state.currentRound.status === 'COMPLETED'" :round-number="state.currentRound.roundNumber" />
+      <RouletteWheel :result-number="state.currentRound.resultNumber" :previous-result-number="state.history[0]?.resultNumber ?? null" :spinning="state.currentRound.status === 'COMPLETED'" :round-number="state.currentRound.roundNumber" />
       
       <div class="tv-meta"><span>Online játékosok: {{ players.length }}</span><span>Leadott tippek: {{ state.bets.length }}</span></div>
       <div class="online-players"><span v-for="player in players" :key="player.id" class="online-player">{{ player.name }}</span><span v-if="!players.length" class="muted">Jelenleg nincs online játékos.</span></div>
