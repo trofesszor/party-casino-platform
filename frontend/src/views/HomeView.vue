@@ -8,11 +8,13 @@ import { identifyPlayer } from '../services/socket';
 const router = useRouter();
 const player = ref<Player | null>(null);
 const tokenBalance = ref(0);
-type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'|'SKIPPED'; assignedAt:string; completedAt:string|null; approvedByName?:string|null; approvedAt?:string|null };
+type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'|'SKIPPED'; assignedAt:string; completedAt:string|null; photoEnabled?:number; completionMethod?:string|null; approvedByName?:string|null; approvedAt?:string|null };
 const sideQuests = ref<SideQuest[]>([]);
 const sideQuestBusy = ref(false);
 const sideQuestError = ref('');
 const verificationPin = ref<{questId:number;title:string;pin:string;expiresAt:string}|null>(null);
+const photoSession = ref<{questId:number;title:string;sessionId:string;cameraUrl:string;expiresAt:string}|null>(null);
+let photoPollTimer: ReturnType<typeof setInterval> | undefined;
 const activeSideQuests = ref<SideQuest[]>([]);
 async function loadSideQuests() {
   if (!player.value) return;
@@ -34,6 +36,43 @@ async function finishSideQuest(quest:SideQuest) {
     verificationPin.value = {questId:quest.id,title:quest.title,pin:response.pin,expiresAt:response.expiresAt};
   } catch (e:any) { sideQuestError.value = e.message; }
   finally { sideQuestBusy.value = false; }
+}
+async function startPhotoQuest(quest:SideQuest) {
+  if(!player.value||sideQuestBusy.value)return;
+  sideQuestBusy.value=true;sideQuestError.value='';
+  try {
+    const session=await api.createSideQuestPhotoSession(player.value.id,quest.id);
+    photoSession.value={questId:quest.id,title:session.questTitle,sessionId:session.sessionId,cameraUrl:session.cameraUrl,expiresAt:session.expiresAt};
+    if(photoPollTimer)clearInterval(photoPollTimer);
+    photoPollTimer=setInterval(checkPhotoQuestCompletion,2500);
+  } catch(e:any) { sideQuestError.value=e.message||'Nem sikerült elindítani a fotófeltöltést.'; }
+  finally { sideQuestBusy.value=false; }
+}
+async function checkPhotoQuestCompletion() {
+  if(!player.value||!photoSession.value)return;
+  if(Date.now()>=Date.parse(photoSession.value.expiresAt)) {
+    if(photoPollTimer)clearInterval(photoPollTimer);
+    photoPollTimer=undefined;photoSession.value=null;
+    sideQuestError.value='A fotófeltöltési munkamenet lejárt. Indítsd újra a küldetés teljesítését.';
+    return;
+  }
+  try {
+    const result=await api.completeSideQuestWithPhoto(player.value.id,photoSession.value.questId,photoSession.value.sessionId);
+    if(result.completed) {
+      if(photoPollTimer)clearInterval(photoPollTimer);
+      photoPollTimer=undefined;photoSession.value=null;
+      await loadSideQuests();
+    }
+  } catch(e:any) {
+    if(/lejárt|nem található/i.test(e.message||'')) {
+      if(photoPollTimer)clearInterval(photoPollTimer);
+      photoPollTimer=undefined;photoSession.value=null;sideQuestError.value=e.message;
+    }
+  }
+}
+function closePhotoSession() {
+  if(photoPollTimer)clearInterval(photoPollTimer);
+  photoPollTimer=undefined;photoSession.value=null;
 }
 const onlinePlayers = ref<Player[]>([]);
 const duels = ref<Duel[]>([]);
@@ -125,7 +164,7 @@ function logout() {
   error.value = '';
 }
 onMounted(() => { loadDuels(); loadSideQuests(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(loadSideQuests, 5000); });
-onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); });
+onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); });
 </script>
 
 <template>
@@ -271,7 +310,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
           <span class="side-quest-number">SIDE QUEST 0{{ index+1 }}</span>
           <h3>{{ quest.title }}</h3>
           <p v-if="quest.description">{{ quest.description }}</p>
-          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="finishSideQuest(quest)">PIN-kód kérése</button>
+          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="quest.photoEnabled ? startPhotoQuest(quest) : finishSideQuest(quest)">{{ sideQuestBusy ? 'Feldolgozás…' : quest.photoEnabled ? '📷 Fotó feltöltése' : 'PIN-kód kérése' }}</button>
         </article>
       </div>
       <div v-else class="side-quest-empty">Még nincs aktív küldetésed. Kérj egy véletlenszerű kihívást!</div>
@@ -300,6 +339,18 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
       </section>
     </div>
 
+    <div v-if="photoSession" class="quest-qr-overlay" @click.self="closePhotoSession">
+      <section class="quest-qr-modal panel photo-quest-modal">
+        <button class="ghost quest-qr-close" @click="closePhotoSession">✕</button>
+        <p class="eyebrow">SNAPPIN PHOTO VERIFICATION</p>
+        <h2>{{ photoSession.title }}</h2>
+        <p class="muted">Nyisd meg a Snappin kamerát, készítsd el és töltsd fel a küldetés bizonyítékát. A küldetés automatikusan teljesül, amint a Snappin visszaigazolja a fotót.</p>
+        <a class="primary photo-camera-link" :href="photoSession.cameraUrl" target="_blank" rel="noopener noreferrer">📷 Kamera megnyitása</a>
+        <small class="muted">A feltöltés állapotát automatikusan ellenőrizzük. Lejárat: {{ new Date(photoSession.expiresAt).toLocaleTimeString() }}</small>
+        <span class="photo-upload-wait"><span class="online-dot"></span> Fotófeltöltésre várakozás…</span>
+        <button class="ghost" @click="closePhotoSession">Bezárás</button>
+      </section>
+    </div>
     <footer>PARTY CASINO <span>•</span> Helyi hálózaton futó party platform</footer>
   </main>
 </template>
