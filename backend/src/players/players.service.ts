@@ -221,6 +221,108 @@ export class PlayersService {
     return this.checkSideQuestPhotoSession(local.playerId,local.questId,String(body.sessionId));
   }
 
+
+  private getTokenPhotoSettings() {
+    const rows=this.database.sqlite.prepare('SELECT setting_key AS key,setting_value AS value FROM token_photo_settings').all() as Array<{key:string;value:string}>;
+    const values=Object.fromEntries(rows.map(row=>[row.key,row.value]));
+    return {
+      enabled:values.enabled!=='0',
+      balanceThreshold:Math.max(0,Number(values.balance_threshold??50)),
+      rewardAmount:Math.max(1,Number(values.reward_amount??10)),
+      cooldownMinutes:Math.max(0,Number(values.cooldown_minutes??60)),
+      dailyLimit:Math.max(1,Number(values.daily_limit??2)),
+    };
+  }
+
+  getTokenPhotoStatus(playerId:number) {
+    const sqlite=this.database.sqlite;
+    const player=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(playerId) as {balance:number}|undefined;
+    if(!player) throw new BadRequestException('A játékos nem található.');
+    const settings=this.getTokenPhotoSettings();
+    const pending=sqlite.prepare("SELECT session_id AS sessionId,expires_at AS expiresAt,status FROM token_photo_sessions WHERE player_id=? AND status IN ('CREATING','PENDING') ORDER BY created_at DESC LIMIT 1").get(playerId) as {sessionId:string|null;expiresAt:string;status:string}|undefined;
+    const last=sqlite.prepare("SELECT created_at AS createdAt FROM token_photo_sessions WHERE player_id=? ORDER BY created_at DESC LIMIT 1").get(playerId) as {createdAt:string}|undefined;
+    const daily=sqlite.prepare("SELECT COUNT(*) AS count FROM token_photo_sessions WHERE player_id=? AND datetime(created_at)>=datetime('now','-1 day')").get(playerId) as {count:number};
+    const cooldownUntil=last?new Date(new Date(last.createdAt.replace(' ','T')+'Z').getTime()+settings.cooldownMinutes*60000).toISOString():null;
+    const coolingDown=!!cooldownUntil&&Date.now()<Date.parse(cooldownUntil);
+    const eligible=settings.enabled&&player.balance<settings.balanceThreshold&&!pending&&!coolingDown&&daily.count<settings.dailyLimit;
+    return {enabled:settings.enabled,eligible,balance:player.balance,balanceThreshold:settings.balanceThreshold,rewardAmount:settings.rewardAmount,cooldownMinutes:settings.cooldownMinutes,dailyLimit:settings.dailyLimit,dailyUsed:daily.count,dailyRemaining:Math.max(0,settings.dailyLimit-daily.count),pending:!!pending,sessionId:pending?.sessionId??null,expiresAt:pending?.expiresAt??null,cooldownUntil,reason:!settings.enabled?'DISABLED':player.balance>=settings.balanceThreshold?'BALANCE_TOO_HIGH':pending?'PENDING':coolingDown?'COOLDOWN':daily.count>=settings.dailyLimit?'DAILY_LIMIT':null};
+  }
+
+  getTokenPhotoSettingsForAdmin() { return this.getTokenPhotoSettings(); }
+
+  setTokenPhotoSettings(input:{enabled:boolean;balanceThreshold:number;rewardAmount:number;cooldownMinutes:number;dailyLimit:number}) {
+    if(typeof input.enabled!=='boolean'||![input.balanceThreshold,input.rewardAmount,input.cooldownMinutes,input.dailyLimit].every(Number.isSafeInteger)||input.balanceThreshold<0||input.balanceThreshold>2000000000||input.rewardAmount<1||input.rewardAmount>1000000||input.cooldownMinutes<0||input.cooldownMinutes>10080||input.dailyLimit<1||input.dailyLimit>24) throw new BadRequestException('Érvénytelen fotófeltöltési beállítás.');
+    const values:[string,string][]=[['enabled',input.enabled?'1':'0'],['balance_threshold',String(input.balanceThreshold)],['reward_amount',String(input.rewardAmount)],['cooldown_minutes',String(input.cooldownMinutes)],['daily_limit',String(input.dailyLimit)]];
+    const stmt=this.database.sqlite.prepare('INSERT INTO token_photo_settings (setting_key,setting_value) VALUES (?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value');
+    for(const [key,value] of values) stmt.run(key,value);
+    return this.getTokenPhotoSettings();
+  }
+
+  async createTokenPhotoSession(playerId:number) {
+    const sqlite=this.database.sqlite;
+    const status=this.getTokenPhotoStatus(playerId);
+    if(!status.eligible) {
+      const messages:Record<string,string>={DISABLED:'A fotófeltöltés jelenleg nem érhető el.',BALANCE_TOO_HIGH:'A tokenegyenleged túl magas a fotófeltöltéshez.',PENDING:'Már van folyamatban lévő fotófeltöltésed.',COOLDOWN:'A következő fotófeltöltésig várnod kell.',DAILY_LIMIT:'Elérted a napi fotófeltöltési limitet.'};
+      throw new BadRequestException(messages[status.reason??'']??'Most nem indíthatsz fotófeltöltést.');
+    }
+    const player=sqlite.prepare('SELECT name FROM players WHERE id=?').get(playerId) as {name:string};
+    const externalReference=`party-casino:token-reward:player:${playerId}:${randomUUID()}`;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const recheck=this.getTokenPhotoStatus(playerId);
+      if(!recheck.eligible) throw new BadRequestException('A fotófeltöltési lehetőség időközben megváltozott. Frissítsd az oldalt.');
+      sqlite.prepare("INSERT INTO token_photo_sessions (session_id,external_reference,player_id,expires_at,status,reward_amount) VALUES (?,?,?,?, 'CREATING',?)").run('creating:'+externalReference,externalReference,playerId,new Date(Date.now()+300000).toISOString(),status.rewardAmount);
+      sqlite.exec('COMMIT');
+    } catch(error) { sqlite.exec('ROLLBACK'); throw error; }
+    try {
+      const {eventId}=this.snappinConfig();
+      const payload=await this.snappinRequest('/api/integrations/sessions',{method:'POST',body:JSON.stringify({eventId,externalReference,guest:{externalId:`party-casino-player-${playerId}`,displayName:player.name},expiresInSeconds:300})});
+      const sessionId=String(payload.sessionId??''),cameraUrl=String(payload.cameraUrl??''),expiresAt=String(payload.expiresAt??'');
+      if(!sessionId||!cameraUrl||!expiresAt) throw new BadRequestException('A Snappin API válasza hiányos.');
+      let parsedUrl:URL;try{parsedUrl=new URL(cameraUrl);}catch{throw new BadRequestException('A Snappin kamera URL érvénytelen.');}
+      if(parsedUrl.protocol!=='https:'&&!(parsedUrl.protocol==='http:'&&['localhost','127.0.0.1'].includes(parsedUrl.hostname)))throw new BadRequestException('A Snappin kamera URL-nek HTTPS-t kell használnia.');
+      sqlite.prepare("UPDATE token_photo_sessions SET session_id=?,expires_at=?,status='PENDING' WHERE external_reference=? AND status='CREATING'").run(sessionId,expiresAt,externalReference);
+      return {sessionId,cameraUrl:parsedUrl.toString(),expiresAt,rewardAmount:status.rewardAmount};
+    } catch(error) {
+      sqlite.prepare("DELETE FROM token_photo_sessions WHERE external_reference=? AND status='CREATING'").run(externalReference);
+      throw error;
+    }
+  }
+
+  async checkTokenPhotoSession(playerId:number,sessionIdInput:string) {
+    const sessionId=String(sessionIdInput??'').trim();
+    if(!sessionId||sessionId.length>200) throw new BadRequestException('Érvénytelen fotófeltöltési munkamenet.');
+    const sqlite=this.database.sqlite;
+    const local=sqlite.prepare('SELECT external_reference AS externalReference,expires_at AS expiresAt,status,photo_id AS photoId,reward_amount AS rewardAmount FROM token_photo_sessions WHERE session_id=? AND player_id=?').get(sessionId,playerId) as {externalReference:string;expiresAt:string;status:string;photoId:string|null;rewardAmount:number}|undefined;
+    if(!local) throw new BadRequestException('A fotófeltöltési munkamenet nem található.');
+    if(local.status==='COMPLETED') return {success:true,completed:true,rewardAmount:local.rewardAmount,photoId:local.photoId,...this.getTokenPhotoStatus(playerId)};
+    if(local.status!=='PENDING'||Date.parse(local.expiresAt)<=Date.now()) {
+      sqlite.prepare("UPDATE token_photo_sessions SET status='EXPIRED' WHERE session_id=? AND status='PENDING'").run(sessionId);
+      return {success:true,completed:false,status:'EXPIRED'};
+    }
+    const {eventId}=this.snappinConfig();
+    const verify:any=await this.snappinRequest('/api/integrations/sessions/'+encodeURIComponent(sessionId));
+    if(String(verify.eventId??'')!==eventId||String(verify.externalReference??'')!==local.externalReference) throw new BadRequestException('A Snappin munkamenet esemény- vagy külső hivatkozása nem egyezik.');
+    const photoId=String(verify.photo?.id??''),remoteStatus=String(verify.status??'').toUpperCase();
+    if(remoteStatus!=='UPLOADED'||!photoId) return {success:true,completed:false,status:remoteStatus||'PENDING'};
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const current=sqlite.prepare("SELECT status,photo_id AS photoId,reward_amount AS rewardAmount FROM token_photo_sessions WHERE session_id=? AND player_id=?").get(sessionId,playerId) as {status:string;photoId:string|null;rewardAmount:number}|undefined;
+      if(!current) throw new BadRequestException('A fotófeltöltési munkamenet nem található.');
+      if(current.status==='COMPLETED'){sqlite.exec('COMMIT');return {success:true,completed:true,rewardAmount:current.rewardAmount,photoId:current.photoId,...this.getTokenPhotoStatus(playerId)};}
+      if(current.status!=='PENDING') throw new BadRequestException('Ez a fotófeltöltés már nem teljesíthető.');
+      const duplicate=sqlite.prepare('SELECT session_id FROM token_photo_sessions WHERE photo_id=? AND session_id<>?').get(photoId,sessionId);
+      if(duplicate) throw new BadRequestException('Ezt a fotót már felhasználták egy jutalom igényléséhez.');
+      const update=sqlite.prepare("UPDATE token_photo_sessions SET status='COMPLETED',photo_id=?,completed_at=CURRENT_TIMESTAMP WHERE session_id=? AND status='PENDING'").run(photoId,sessionId);
+      if(!update.changes) throw new BadRequestException('A fotófeltöltés már feldolgozás alatt áll.');
+      sqlite.prepare('UPDATE players SET token_balance=token_balance+? WHERE id=?').run(current.rewardAmount,playerId);
+      const balance=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(playerId) as {balance:number};
+      sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?,?,?,'PHOTO_REWARD',?)").run(playerId,current.rewardAmount,balance.balance,'Snappin fotófeltöltési jutalom · +'+current.rewardAmount+' CR');
+      sqlite.exec('COMMIT');
+      return {success:true,completed:true,rewardAmount:current.rewardAmount,photoId,...this.getTokenPhotoStatus(playerId)};
+    } catch(error) { sqlite.exec('ROLLBACK'); throw error; }
+  }
+
   getSideQuestPool() {
     return this.database.sqlite.prepare('SELECT id, title, description, enabled, photo_enabled AS photoEnabled, created_at AS createdAt FROM side_quest_pool ORDER BY id DESC').all();
   }
