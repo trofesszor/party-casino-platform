@@ -105,7 +105,7 @@ function labelBet(bet: { betType: RouletteBetType; betValue: string }) {
  const values: Record<string,string> = { red:'Piros', black:'Fekete', odd:'Páratlan', even:'Páros', low:'1–18', high:'19–36' };
  return names[bet.betType] + ': ' + (values[bet.betValue] ?? bet.betValue.split(',').join(' / '));
 }
-function onChanged(payload: RouletteState) { state.value = payload; }
+function onChanged(payload: RouletteState) { state.value = payload; if (playerId > 0) api.getPlayerBalance(playerId).then(b => tokenBalance.value = b.tokenBalance).catch(() => {}); }
 onMounted(() => { refresh().catch(e => error.value = e.message); if (playerId > 0) api.getPlayerBalance(playerId).then(b => tokenBalance.value = b.tokenBalance).catch(e => error.value = e.message); socket.on('roulette:changed', onChanged); clock = setInterval(() => { now.value = Date.now(); }, 250); });
 onUnmounted(() => { socket.off('roulette:changed', onChanged); if (clock) clearInterval(clock); });
 </script>
