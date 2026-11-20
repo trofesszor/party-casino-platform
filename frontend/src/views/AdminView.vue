@@ -16,6 +16,9 @@ const sideQuestPool = ref<PoolQuest[]>([]);
 const newQuestTitle = ref('');
 const newQuestDescription = ref('');
 const sideQuestSaving = ref(false);
+type AdminShopItem = { itemKey:string; name:string; description:string; price:number; enabled:number };
+const shopItems = ref<AdminShopItem[]>([]);
+const shopSavingKey = ref('');
 const password = ref('');
 const token = ref(localStorage.getItem('party-admin-token') ?? '');
 const players = ref<AdminPlayer[]>([]);
@@ -32,6 +35,7 @@ async function loadPlayers() {
     const wheel = await api.adminGetLuckyWheelSegments(token.value);
     wheelSegments.value = wheel.map(segment => ({ label: segment.label, enabled: !!segment.enabled }));
     sideQuestPool.value = await api.adminSideQuestPool(token.value);
+    shopItems.value = await api.adminShopItems(token.value);
     localStorage.setItem('party-admin-token', token.value);
   } catch {
     token.value = '';
@@ -80,6 +84,19 @@ async function saveWheel() {
   try { const result=await api.saveLuckyWheel(token.value,wheelSegments.value); wheelSegments.value=result.map((segment:any)=>({label:segment.label,enabled:!!segment.enabled})); }
   catch(e:any){actionError.value=e.message;}
   finally{wheelSaving.value=false;}
+}
+
+async function toggleShopItem(item: AdminShopItem) {
+  shopSavingKey.value = item.itemKey;
+  actionError.value = '';
+  try {
+    const updated = await api.adminSetShopItemEnabled(token.value, item.itemKey, !item.enabled);
+    item.enabled = updated.enabled;
+  } catch (e:any) {
+    actionError.value = e.message || 'A termék állapotának módosítása nem sikerült.';
+  } finally {
+    shopSavingKey.value = '';
+  }
 }
 
 async function addSideQuest() {
@@ -169,6 +186,19 @@ onMounted(loadPlayers);
         <div class="admin-section-heading"><div><p class="eyebrow">PARTY GAME</p><h2>Szerencsekerék mezői</h2><p class="muted">A módosítások azonnal megjelennek minden telefonon és a TV-n.</p></div><button class="ghost" @click="addWheelSegment" :disabled="wheelSegments.length>=24">+ Új mező</button></div>
         <div v-for="(segment,index) in wheelSegments" :key="index" class="admin-wheel-row"><span class="admin-wheel-index">{{ index+1 }}</span><input v-model="segment.label" maxlength="48" placeholder="Mező felirata"><label><input v-model="segment.enabled" type="checkbox"> Aktív</label><button class="ghost" @click="moveWheelSegment(index,-1)" :disabled="index===0">↑</button><button class="ghost" @click="moveWheelSegment(index,1)" :disabled="index===wheelSegments.length-1">↓</button><button class="ghost danger" @click="removeWheelSegment(index)">Törlés</button></div>
         <button class="primary" :disabled="wheelSaving||wheelSegments.length<2" @click="saveWheel">{{wheelSaving?'Mentés…':'Kerék mentése'}}</button>
+      </section>
+      <section class="panel admin-wheel-editor admin-shop-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">STORE MANAGEMENT</p><h2>Shop termékek</h2><p class="muted">Az inaktív termékek nem jelennek meg a játékosok shopjában, és nem vásárolhatók meg. A már megvásárolt tárgyak a játékosok készletében maradnak.</p></div></div>
+        <div v-if="!shopItems.length" class="admin-empty muted">Nincs konfigurált shop termék.</div>
+        <div v-for="item in shopItems" :key="item.itemKey" class="side-quest-admin-row">
+          <div>
+            <strong>{{ item.name }}</strong>
+            <p class="muted">{{ item.description }}</p>
+            <small>{{ item.price }} CR · {{ item.itemKey }}</small>
+            <span class="player-status" :class="{ online: !!item.enabled }">{{ item.enabled ? 'Aktív' : 'Inaktív' }}</span>
+          </div>
+          <button class="ghost" :disabled="shopSavingKey === item.itemKey" @click="toggleShopItem(item)">{{ shopSavingKey === item.itemKey ? 'Mentés…' : item.enabled ? 'Inaktiválás' : 'Aktiválás' }}</button>
+        </div>
       </section>
       <section class="panel admin-wheel-editor admin-side-quest-editor">
         <div class="admin-section-heading"><div><p class="eyebrow">SIDE QUEST SYSTEM</p><h2>Side quest pool</h2><p class="muted">A játékosok véletlenszerűen kapnak egy küldetést ebből a listából. Egy játékosnak legfeljebb 2 aktív küldetése lehet.</p></div></div>
