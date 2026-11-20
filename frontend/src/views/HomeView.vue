@@ -11,7 +11,16 @@ const name = ref('');
 const error = ref('');
 const busy = ref(false);
 
-async function enter() {
+const savedPlayerId = Number(localStorage.getItem('party-player-id'));
+const savedPlayerName = localStorage.getItem('party-player-name');
+if (savedPlayerId > 0 && savedPlayerName) {
+  player.value = { id: savedPlayerId, name: savedPlayerName, joinedAt: '' };
+  name.value = savedPlayerName;
+  identifyPlayer(savedPlayerId);
+}
+
+
+async async function enter() {
   const trimmedName = name.value.trim();
   if (!trimmedName) return;
 
@@ -29,6 +38,14 @@ async function enter() {
   } finally {
     busy.value = false;
   }
+}
+function logout() {
+  identifyPlayer(null);
+  localStorage.removeItem('party-player-id');
+  localStorage.removeItem('party-player-name');
+  player.value = null;
+  name.value = '';
+  error.value = '';
 }
 </script>
 
@@ -55,7 +72,7 @@ async function enter() {
   <main v-else class="page-shell">
     <header class="topbar">
       <a class="brand" href="/">PARTY<span>CASINO</span></a>
-      <nav><a href="/display" target="_blank">TV kijelző ↗</a></nav>
+      <nav><a href="/display" target="_blank">TV kijelző ↗</a><button class="ghost exit-button" @click="logout">Kilépés</button></nav>
     </header>
 
     <section class="hero">
