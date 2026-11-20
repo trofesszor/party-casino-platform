@@ -11,5 +11,5 @@ export const api = {
   getRouletteState: () => request<RouletteState>('/api/roulette'),
   placeRouletteBet: (playerId: number, betType: RouletteBetType, betValue: string | number, amount: number) =>
     request<RouletteState>('/api/roulette/bets', { method: 'POST', body: JSON.stringify({ playerId, betType, betValue, amount }) }),
-  spinSlots: (playerId: number) => request<{ playerId: number; playerName: string; reels: string[]; isWin: boolean; multiplier: number; winLabel: string; freeSpinsAwarded: number; freeSpins: number; usedFreeSpin: boolean; paytable: { combination: string; multiplier: number; bonusSpins?: number }[] }>('/api/slots/spin', { method: 'POST', body: JSON.stringify({ playerId }) }),
+  spinSlots: (playerId: number, betAmount: number) => request<{ playerId: number; playerName: string; reels: string[]; isWin: boolean; multiplier: number; betAmount: number; payoutAmount: number; winLabel: string; freeSpinsAwarded: number; freeSpins: number; usedFreeSpin: boolean; paytable: { combination: string; multiplier: number; bonusSpins?: number }[] }>('/api/slots/spin', { method: 'POST', body: JSON.stringify({ playerId, betAmount }) }),
 };
