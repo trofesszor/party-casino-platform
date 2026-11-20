@@ -93,7 +93,7 @@ onUnmounted(() => { socket.off('roulette:changed', onChanged); if (clock) clearI
      <div class="roulette-number-board">
       <button class="roulette-zero" :class="{selected:selectedNumbers.includes(0)}" :disabled="selectedType!=='NUMBER'" @click="toggleNumber(0)">0</button>
       <div class="roulette-number-grid">
-       <button v-for="n in 36" :key="n" :class="[redNumbers.has(n)?'red':'black',{selected:selectedNumbers.includes(n)}]" @click="toggleNumber(n)">{{ n }}</button>
+       <button v-for="n in 36" :key="n" :style="{ gridRow: String((n - 1) % 3 + 1), gridColumn: String(Math.floor((n - 1) / 3) + 1) }" :class="[redNumbers.has(n)?'red':'black',{selected:selectedNumbers.includes(n)}]" @click="toggleNumber(n)">{{ n }}</button>
       </div>
      </div>
      <div class="roulette-outside">
