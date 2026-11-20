@@ -30,14 +30,6 @@ async function enter() {
     busy.value = false;
   }
 }
-
-function changeName() {
-  identifyPlayer(null);
-  player.value = null;
-  localStorage.removeItem('party-player-id');
-  localStorage.removeItem('party-player-name');
-  name.value = '';
-}
 </script>
 
 <template>
@@ -50,13 +42,7 @@ function changeName() {
       </div>
 
       <form @submit.prevent="enter">
-        <input
-          v-model="name"
-          maxlength="24"
-          placeholder="A neved"
-          autocomplete="nickname"
-          autofocus
-        >
+        <input v-model="name" maxlength="24" placeholder="A neved" autocomplete="nickname" autofocus>
         <button class="primary" :disabled="busy || !name.trim()">
           {{ busy ? 'Belépés...' : 'Belépés →' }}
         </button>
@@ -84,7 +70,6 @@ function changeName() {
         <h2>Szia, {{ player.name }}!</h2>
         <p class="muted">Válassz az állandó játékok közül.</p>
       </div>
-      <button class="ghost" @click="changeName">Név váltása</button>
     </section>
 
     <section class="section-heading">
