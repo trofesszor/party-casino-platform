@@ -78,6 +78,18 @@ export const DATABASE = Symbol('DATABASE');
           completed_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_player_side_quests_active ON player_side_quests(player_id, status);
+        CREATE TABLE IF NOT EXISTS side_quest_verification_requests (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          quest_id INTEGER NOT NULL REFERENCES player_side_quests(id) ON DELETE CASCADE,
+          owner_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          token_hash TEXT NOT NULL UNIQUE,
+          status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','APPROVED','REJECTED','EXPIRED')),
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          expires_at TEXT NOT NULL,
+          verified_by INTEGER REFERENCES players(id) ON DELETE SET NULL,
+          verified_at TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_side_quest_verification_pending ON side_quest_verification_requests(quest_id) WHERE status='PENDING';
         CREATE TABLE IF NOT EXISTS shop_items (
           item_key TEXT PRIMARY KEY,
           name TEXT NOT NULL,
