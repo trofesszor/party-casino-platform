@@ -6,14 +6,61 @@ import { DATABASE } from '../database/database.module';
 export class PlayersService {
   constructor(@Inject(DATABASE) private readonly database: any) {}
 
+  private buildCasinoStats(startedAt:string) {
+    const sqlite=this.database.sqlite;
+    const one=(sql:string,...args:any[])=>sqlite.prepare(sql).get(...args) as any;
+    const all=(sql:string,...args:any[])=>sqlite.prepare(sql).all(...args) as any[];
+    const playerCount=Number(one('SELECT COUNT(*) AS n FROM players').n);
+    const tx=one('SELECT COUNT(*) AS n, COALESCE(SUM(CASE WHEN amount<0 THEN -amount ELSE 0 END),0) AS spent, COALESCE(SUM(CASE WHEN amount>0 THEN amount ELSE 0 END),0) AS won FROM token_transactions');
+    const topWinner=all(`SELECT p.name, SUM(t.amount) AS amount FROM token_transactions t JOIN players p ON p.id=t.player_id WHERE t.amount>0 GROUP BY p.id ORDER BY amount DESC LIMIT 1`)[0]??null;
+    const mostActive=all(`SELECT p.name, COUNT(*) AS actions FROM token_transactions t JOIN players p ON p.id=t.player_id GROUP BY p.id ORDER BY actions DESC LIMIT 1`)[0]??null;
+    const topBalance=all('SELECT name,token_balance AS balance FROM players ORDER BY token_balance DESC,name COLLATE NOCASE LIMIT 1')[0]??null;
+    const roulette=one("SELECT COUNT(*) AS rounds FROM casino_roulette_rounds WHERE status='COMPLETED'");
+    const rouletteBets=one('SELECT COUNT(*) AS bets,COALESCE(SUM(amount),0) AS amount FROM casino_roulette_bets');
+    const duels=one("SELECT COUNT(*) AS count FROM duels WHERE status='COMPLETED'");
+    const duelChampion=all(`SELECT p.name,COUNT(*) AS wins FROM duels d JOIN players p ON p.id=d.winner_id WHERE d.status='COMPLETED' AND d.winner_id IS NOT NULL GROUP BY p.id ORDER BY wins DESC LIMIT 1`)[0]??null;
+    const quests=one("SELECT COUNT(*) AS assigned, SUM(CASE WHEN status='COMPLETED' THEN 1 ELSE 0 END) AS completed FROM player_side_quests");
+    const scratch=one("SELECT COUNT(*) AS tickets,SUM(CASE WHEN status='REVEALED' THEN 1 ELSE 0 END) AS revealed,SUM(CASE WHEN status='REVEALED' AND prize_amount>0 THEN 1 ELSE 0 END) AS wins,COALESCE(SUM(CASE WHEN status='REVEALED' THEN prize_amount ELSE 0 END),0) AS prizes FROM scratch_tickets");
+    const photo=one("SELECT COUNT(*) AS count FROM token_photo_sessions WHERE status='COMPLETED'");
+    const biggestWin=all("SELECT p.name,t.amount,t.description FROM token_transactions t JOIN players p ON p.id=t.player_id WHERE t.amount>0 ORDER BY t.amount DESC,t.id LIMIT 1")[0]??null;
+    return {
+      startedAt,endedAt:null,playerCount,transactionCount:Number(tx.n),tokensSpent:Number(tx.spent),tokensWon:Number(tx.won),
+      topWinner:topWinner?{name:topWinner.name,amount:Number(topWinner.amount)}:null,
+      mostActive:mostActive?{name:mostActive.name,actions:Number(mostActive.actions)}:null,
+      richestPlayer:topBalance?{name:topBalance.name,balance:Number(topBalance.balance)}:null,
+      biggestWin:biggestWin?{name:biggestWin.name,amount:Number(biggestWin.amount),description:biggestWin.description}:null,
+      rouletteRounds:Number(roulette.rounds),rouletteBets:Number(rouletteBets.bets),rouletteTokens:Number(rouletteBets.amount),
+      completedDuels:Number(duels.count),duelChampion:duelChampion?{name:duelChampion.name,wins:Number(duelChampion.wins)}:null,
+      questsAssigned:Number(quests.assigned??0),questsCompleted:Number(quests.completed??0),
+      scratchTickets:Number(scratch.tickets??0),scratchRevealed:Number(scratch.revealed??0),scratchWins:Number(scratch.wins??0),scratchPrizes:Number(scratch.prizes??0),
+      photoRewards:Number(photo.count),
+    };
+  }
+
+  getCasinoStatistics() {
+    const sqlite=this.database.sqlite;
+    const active=sqlite.prepare("SELECT id,started_at AS startedAt FROM casino_sessions WHERE status='ACTIVE' ORDER BY id DESC LIMIT 1").get() as any;
+    const current=active?this.buildCasinoStats(active.startedAt):null;
+    const previous=sqlite.prepare("SELECT id,started_at AS startedAt,ended_at AS endedAt,stats_json AS statsJson FROM casino_sessions WHERE status='COMPLETED' ORDER BY id DESC LIMIT 1").get() as any;
+    return {current:current?{...current,sessionId:active.id}:null,lastCompleted:previous?{...JSON.parse(previous.statsJson),sessionId:previous.id,endedAt:previous.endedAt}:null};
+  }
+
   resetPlayerData() {
     const sqlite=this.database.sqlite;
     sqlite.exec('BEGIN IMMEDIATE');
     try {
+      const activeSession=sqlite.prepare("SELECT id,started_at AS startedAt FROM casino_sessions WHERE status='ACTIVE' ORDER BY id DESC LIMIT 1").get() as any;
+      if(activeSession){
+        const snapshot=this.buildCasinoStats(activeSession.startedAt);
+        const endedAt=new Date().toISOString();
+        snapshot.endedAt=endedAt;
+        sqlite.prepare("UPDATE casino_sessions SET status='COMPLETED',ended_at=?,stats_json=? WHERE id=? AND status='ACTIVE'").run(endedAt,JSON.stringify(snapshot),activeSession.id);
+      }
       sqlite.prepare('DELETE FROM duels').run();
       sqlite.prepare('DELETE FROM casino_roulette_rounds').run();
       const playerCount=(sqlite.prepare('SELECT COUNT(*) AS count FROM players').get() as {count:number}).count;
       sqlite.prepare('DELETE FROM players').run();
+      sqlite.prepare("INSERT INTO casino_sessions (status) VALUES ('ACTIVE')").run();
       sqlite.prepare("UPDATE lucky_wheel_state SET status='IDLE',spin_id=NULL,winning_segment_id=NULL,started_at=NULL,ends_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=1").run();
       sqlite.prepare("DELETE FROM sqlite_sequence WHERE name IN ('players','duels','casino_roulette_rounds','casino_roulette_bets','player_side_quests','side_quest_verification_requests','side_quest_pin_attempts','side_quest_photo_sessions','token_transactions','scratch_tickets')").run();
       sqlite.exec('COMMIT');
