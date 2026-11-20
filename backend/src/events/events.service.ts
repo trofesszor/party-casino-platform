@@ -41,9 +41,34 @@ export class EventsService {
   }
 
   setStatus(eventId: number, status: 'RUNNING' | 'COMPLETED') {
-    this.getOne(eventId);
-    if (status === 'RUNNING') this.database.sqlite.prepare("UPDATE events SET status='RUNNING', started_at=CURRENT_TIMESTAMP WHERE id=? AND status='OPEN'").run(eventId);
-    else this.database.sqlite.prepare("UPDATE events SET status='COMPLETED', completed_at=CURRENT_TIMESTAMP WHERE id=? AND status!='COMPLETED'").run(eventId);
+    const event = this.getOne(eventId);
+
+    if (status === 'RUNNING') {
+      if (event.status !== 'OPEN') {
+        throw new BadRequestException('Csak nyitott eseményt lehet elindítani.');
+      }
+
+      const result = this.database.sqlite.prepare(
+        "UPDATE events SET status='RUNNING', started_at=CURRENT_TIMESTAMP WHERE id=? AND status='OPEN'",
+      ).run(eventId);
+
+      if (Number(result.changes) !== 1) {
+        throw new BadRequestException('Az esemény állapota időközben megváltozott.');
+      }
+    } else {
+      if (event.status === 'COMPLETED') {
+        throw new BadRequestException('Az esemény már le van zárva.');
+      }
+
+      const result = this.database.sqlite.prepare(
+        "UPDATE events SET status='COMPLETED', completed_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('OPEN','RUNNING')",
+      ).run(eventId);
+
+      if (Number(result.changes) !== 1) {
+        throw new BadRequestException('Az esemény állapota időközben megváltozott.');
+      }
+    }
+
     const updated = this.getOne(eventId);
     this.gateway.publish('events:changed', this.list());
     return updated;
