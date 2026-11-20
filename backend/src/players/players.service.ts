@@ -297,7 +297,7 @@ export class PlayersService {
     const sqlite=this.database.sqlite;
     const local=sqlite.prepare('SELECT external_reference AS externalReference,expires_at AS expiresAt,status,photo_id AS photoId,reward_amount AS rewardAmount FROM token_photo_sessions WHERE session_id=? AND player_id=?').get(sessionId,playerId) as {externalReference:string;expiresAt:string;status:string;photoId:string|null;rewardAmount:number}|undefined;
     if(!local) throw new BadRequestException('A fotófeltöltési munkamenet nem található.');
-    if(local.status==='COMPLETED') return {success:true,completed:true,rewardAmount:local.rewardAmount,photoId:local.photoId,...this.getTokenPhotoStatus(playerId)};
+    if(local.status==='COMPLETED') return {...this.getTokenPhotoStatus(playerId),success:true,completed:true,rewardAmount:local.rewardAmount,photoId:local.photoId};
     if(local.status!=='PENDING'||Date.parse(local.expiresAt)<=Date.now()) {
       sqlite.prepare("UPDATE token_photo_sessions SET status='EXPIRED' WHERE session_id=? AND status='PENDING'").run(sessionId);
       return {success:true,completed:false,status:'EXPIRED'};
@@ -315,7 +315,7 @@ export class PlayersService {
     try {
       const current=sqlite.prepare("SELECT status,photo_id AS photoId,reward_amount AS rewardAmount FROM token_photo_sessions WHERE session_id=? AND player_id=?").get(sessionId,playerId) as {status:string;photoId:string|null;rewardAmount:number}|undefined;
       if(!current) throw new BadRequestException('A fotófeltöltési munkamenet nem található.');
-      if(current.status==='COMPLETED'){sqlite.exec('COMMIT');return {success:true,completed:true,rewardAmount:current.rewardAmount,photoId:current.photoId,...this.getTokenPhotoStatus(playerId)};}
+      if(current.status==='COMPLETED'){sqlite.exec('COMMIT');return {...this.getTokenPhotoStatus(playerId),success:true,completed:true,rewardAmount:current.rewardAmount,photoId:current.photoId};}
       if(current.status!=='PENDING') throw new BadRequestException('Ez a fotófeltöltés már nem teljesíthető.');
       const duplicate=sqlite.prepare('SELECT session_id FROM token_photo_sessions WHERE photo_id=? AND session_id<>?').get(photoId,sessionId);
       if(duplicate) throw new BadRequestException('Ezt a fotót már felhasználták egy jutalom igényléséhez.');
@@ -325,7 +325,7 @@ export class PlayersService {
       const balance=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(playerId) as {balance:number};
       sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?,?,?,'PHOTO_REWARD',?)").run(playerId,current.rewardAmount,balance.balance,'Snappin fotófeltöltési jutalom · +'+current.rewardAmount+' CR');
       sqlite.exec('COMMIT');
-      return {success:true,completed:true,rewardAmount:current.rewardAmount,photoId,...this.getTokenPhotoStatus(playerId)};
+      return {...this.getTokenPhotoStatus(playerId),success:true,completed:true,rewardAmount:current.rewardAmount,photoId};
     } catch(error) { sqlite.exec('ROLLBACK'); throw error; }
   }
 
