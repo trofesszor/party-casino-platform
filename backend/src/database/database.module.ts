@@ -214,7 +214,10 @@ export const DATABASE = Symbol('DATABASE');
         );
         CREATE INDEX IF NOT EXISTS idx_token_photo_player_status ON token_photo_sessions(player_id,status,created_at);
         CREATE TABLE IF NOT EXISTS token_photo_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS casino_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL);
       `);
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('default_player_tokens','100')").run();
+
       const tokenPhotoDefaults: Array<[string,string]> = [['enabled','1'],['balance_threshold','50'],['reward_amount','10'],['cooldown_minutes','60'],['daily_limit','2']];
       const insertTokenPhotoSetting=sqlite.prepare('INSERT OR IGNORE INTO token_photo_settings (setting_key,setting_value) VALUES (?,?)');
       tokenPhotoDefaults.forEach(([key,value])=>insertTokenPhotoSetting.run(key,value));
