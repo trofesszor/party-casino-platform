@@ -8,11 +8,14 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
 export const api = {
   adminLogin: (password: string) => request<{ token: string; expiresIn: number }>('/api/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
   adminPlayers: (token: string) => request<(Player & { online: boolean })[]>('/api/admin/players', { headers: { Authorization: `Bearer ${token}` } }),
+  adminSetBalance: (token: string, playerId: number, balance: number) => request<{ playerId: number; tokenBalance: number }>(`/api/admin/players/${playerId}/balance`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ balance }) }),
+  adminTransactions: (token: string, playerId: number) => request<{ id: number; amount: number; balanceAfter: number; type: string; description: string; createdAt: string }[]>(`/api/admin/players/${playerId}/transactions`, { headers: { Authorization: `Bearer ${token}` } }),
   adminLogout: (token: string) => request<{ success: boolean }>('/api/admin/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
   joinPlayer: (name: string) => request<Player>('/api/players/join', { method: 'POST', body: JSON.stringify({ name }) }),
   getPlayers: () => request<Player[]>('/api/players'),
+  getPlayerBalance: (playerId: number) => request<{ tokenBalance: number }>(`/api/players/${playerId}/balance`),
   getRouletteState: () => request<RouletteState>('/api/roulette'),
   placeRouletteBet: (playerId: number, betType: RouletteBetType, betValue: string | number, amount: number) =>
     request<RouletteState>('/api/roulette/bets', { method: 'POST', body: JSON.stringify({ playerId, betType, betValue, amount }) }),
-  spinSlots: (playerId: number, betAmount: number) => request<{ playerId: number; playerName: string; reels: string[]; isWin: boolean; multiplier: number; betAmount: number; payoutAmount: number; winLabel: string; freeSpinsAwarded: number; freeSpins: number; usedFreeSpin: boolean; paytable: { combination: string; multiplier: number; bonusSpins?: number }[] }>('/api/slots/spin', { method: 'POST', body: JSON.stringify({ playerId, betAmount }) }),
+  spinSlots: (playerId: number, betAmount: number) => request<{ playerId: number; playerName: string; reels: string[]; isWin: boolean; multiplier: number; betAmount: number; payoutAmount: number; tokenBalance: number; winLabel: string; freeSpinsAwarded: number; freeSpins: number; usedFreeSpin: boolean; paytable: { combination: string; multiplier: number; bonusSpins?: number }[] }>('/api/slots/spin', { method: 'POST', body: JSON.stringify({ playerId, betAmount }) }),
 };
