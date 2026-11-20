@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { api } from '../services/api';
 import type { Player } from '../types';
 
@@ -24,6 +24,13 @@ const tokenPhotoSettings=ref({enabled:true,balanceThreshold:50,rewardAmount:10,c
 const tokenPhotoSaving=ref(false);
 const resetBusy=ref(false);
 const resetMessage=ref('');
+type CasinoStats={sessionId:number;startedAt:string;endedAt:string|null;playerCount:number;transactionCount:number;tokensSpent:number;tokensWon:number;topWinner:{name:string;amount:number}|null;mostActive:{name:string;actions:number}|null;richestPlayer:{name:string;balance:number}|null;biggestWin:{name:string;amount:number;description:string}|null;rouletteRounds:number;rouletteBets:number;rouletteTokens:number;completedDuels:number;duelChampion:{name:string;wins:number}|null;questsAssigned:number;questsCompleted:number;scratchTickets:number;scratchRevealed:number;scratchWins:number;scratchPrizes:number;photoRewards:number};
+const casinoStats=ref<{current:CasinoStats|null;lastCompleted:CasinoStats|null}>({current:null,lastCompleted:null});
+const statsLoading=ref(false);
+const statsExporting=ref(false);
+const statsMode=ref<'current'|'last'>('current');
+const displayedStats=computed(()=>statsMode.value==='last'?(casinoStats.value.lastCompleted??casinoStats.value.current):casinoStats.value.current);
+
 
 const password = ref('');
 const token = ref(localStorage.getItem('party-admin-token') ?? '');
@@ -31,6 +38,41 @@ const players = ref<AdminPlayer[]>([]);
 const error = ref('');
 const busy = ref(false);
 const authenticated = ref(false);
+
+async function loadCasinoStatistics(){
+  statsLoading.value=true;
+  try{casinoStats.value=await api.adminCasinoStatistics(token.value);}
+  catch(e:any){actionError.value=e.message||'A statisztikák betöltése nem sikerült.';}
+  finally{statsLoading.value=false;}
+}
+function formatStatDate(value:string){return new Date(value).toLocaleString('hu-HU',{dateStyle:'medium',timeStyle:'short'});}
+async function exportStatisticsImage(){
+  const s=displayedStats.value;if(!s)return;
+  statsExporting.value=true;
+  try{
+    const width=1200,height=1500,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d');if(!ctx)throw new Error('A kép exportálása nem támogatott ebben a böngészőben.');
+    const gradient=ctx.createLinearGradient(0,0,width,height);gradient.addColorStop(0,'#111827');gradient.addColorStop(.55,'#24143d');gradient.addColorStop(1,'#101114');
+    ctx.fillStyle=gradient;ctx.fillRect(0,0,width,height);
+    const glow=ctx.createRadialGradient(950,100,10,950,100,500);glow.addColorStop(0,'rgba(190,70,255,.24)');glow.addColorStop(1,'rgba(190,70,255,0)');ctx.fillStyle=glow;ctx.fillRect(0,0,width,height);
+    const text=(value:string,x:number,y:number,size:number,color='#f7f4ff',weight='600')=>{ctx.font=`${weight} ${size}px Arial`;ctx.fillStyle=color;ctx.fillText(value,x,y);};
+    const card=(x:number,y:number,w:number,h:number)=>{ctx.fillStyle='rgba(255,255,255,.075)';ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x,y,w,h,24);ctx.fill();ctx.stroke();};
+    text('PARTY CASINO',72,90,28,'#d7a7ff','700');text('THE NIGHT IN NUMBERS',72,175,58);
+    text('A buli statisztikái',74,225,28,'#c7bfd5','400');
+    text(`#${s.sessionId}  ·  ${formatStatDate(s.startedAt)}`,74,270,20,'#aaa2b8','400');
+    const metrics=[['JÁTÉKOSOK',String(s.playerCount)],['TRANZAKCIÓK',String(s.transactionCount)],['LEJÁTSZOTT RULETTKÖR',String(s.rouletteRounds)],['RULETTFOGADÁSOK',String(s.rouletteBets)],['PÁRBAJOK',String(s.completedDuels)],['TELJESÍTETT KÜLDETÉSEK',String(s.questsCompleted)],['KAPARÓS SORSJEGYEK',String(s.scratchTickets)],['FOTÓJUTALMAK',String(s.photoRewards)]];
+    metrics.forEach((m,i)=>{const col=i%2,row=Math.floor(i/2),x=72+col*540,y=325+row*145;card(x,y,500,112);text(m[0],x+28,y+42,17,'#bcb2cc','600');text(m[1],x+28,y+88,38);});
+    card(72,930,1040,230);text('AZ ÉJSZAKA LEGNAGYOBB SZTÁRJA',105,985,18,'#c9a3ff','700');
+    text(s.topWinner?.name??'Még nincs nyertes adat',105,1040,34);text(s.topWinner?`+${s.topWinner.amount.toLocaleString('hu-HU')} CR összes nyeremény`:'',105,1080,20,'#bcb2cc','400');
+    text('LEGAKTÍVABB JÁTÉKOS',650,985,18,'#c9a3ff','700');text(s.mostActive?.name??'—',650,1040,30);text(s.mostActive?`${s.mostActive.actions} tranzakció`:'',650,1080,20,'#bcb2cc','400');
+    card(72,1190,1040,150);
+    text('A KASZINÓBAN MEGFORDULT',105,1240,18,'#c9a3ff','700');
+    text(`${s.tokensSpent.toLocaleString('hu-HU')} CR tét · ${s.tokensWon.toLocaleString('hu-HU')} CR nyeremény · ${s.questsCompleted}/${s.questsAssigned} küldetés`,105,1295,22);
+    text('KÖSZI, HOGY JÁTSZOTTATOK!',105,1400,26,'#e4c8ff','700');
+    const link=document.createElement('a');link.download=`party-casino-stats-${s.sessionId}.png`;link.href=canvas.toDataURL('image/png');link.click();
+  }catch(e:any){actionError.value=e.message||'Nem sikerült elkészíteni a statisztikai képet.';}
+  finally{statsExporting.value=false;}
+}
 
 async function loadPlayers() {
   if (!token.value) return;
@@ -43,6 +85,7 @@ async function loadPlayers() {
     sideQuestPool.value = await api.adminSideQuestPool(token.value);
     shopItems.value = await api.adminShopItems(token.value);
     tokenPhotoSettings.value = await api.adminGetTokenPhotoSettings(token.value);
+    await loadCasinoStatistics();
     localStorage.setItem('party-admin-token', token.value);
   } catch {
     token.value = '';
@@ -157,6 +200,7 @@ async function resetPlayerData(){
     balanceInputs.value={};
     resetMessage.value=`Sikeres visszaállítás. Törölt játékosok: ${result.deletedPlayers}.`;
     await loadPlayers();
+    await loadCasinoStatistics();
   }catch(e:any){actionError.value=e.message||'A játékosadatok törlése nem sikerült.';}
   finally{resetBusy.value=false;}
 }
@@ -202,6 +246,34 @@ onMounted(loadPlayers);
         <article class="panel admin-stat"><span>ONLINE JÁTÉKOS</span><strong>{{ players.filter(p => p.online).length }}</strong></article>
       </div>
 
+      <section class="panel admin-wheel-editor admin-statistics-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">THE NIGHT IN NUMBERS</p><h2>Kaszinó statisztikák</h2><p class="muted">A legutóbbi újraindítás óta gyűjtött adatok. A lezárt buli statisztikái újraindítás után is megmaradnak.</p></div><button class="ghost" :disabled="statsLoading" @click="loadCasinoStatistics">{{statsLoading?'Frissítés…':'Frissítés'}}</button></div>
+        <div class="stats-mode-row"><button class="ghost" :class="{active:statsMode==='current'}" @click="statsMode='current'">Jelenlegi buli</button><button class="ghost" :class="{active:statsMode==='last'}" :disabled="!casinoStats.lastCompleted" @click="statsMode='last'">Előző buli</button></div>
+        <div v-if="!displayedStats" class="muted admin-empty">Még nincsenek statisztikák.</div>
+        <template v-else>
+          <div class="casino-stats-preview">
+            <div class="casino-stats-cover"><span>PARTY CASINO</span><strong>THE NIGHT<br>IN NUMBERS</strong><small>#{{displayedStats.sessionId}} · {{formatStatDate(displayedStats.startedAt)}}</small></div>
+            <div class="casino-stats-grid">
+              <article><small>Játékosok</small><strong>{{displayedStats.playerCount}}</strong></article>
+              <article><small>Tranzakciók</small><strong>{{displayedStats.transactionCount}}</strong></article>
+              <article><small>Rulettkörök</small><strong>{{displayedStats.rouletteRounds}}</strong></article>
+              <article><small>Rulettfogadások</small><strong>{{displayedStats.rouletteBets}}</strong></article>
+              <article><small>Párbajok</small><strong>{{displayedStats.completedDuels}}</strong></article>
+              <article><small>Teljesített küldetések</small><strong>{{displayedStats.questsCompleted}}</strong></article>
+              <article><small>Kapart sorsjegyek</small><strong>{{displayedStats.scratchTickets}}</strong></article>
+              <article><small>Fotójutalmak</small><strong>{{displayedStats.photoRewards}}</strong></article>
+            </div>
+            <div class="casino-stats-highlights">
+              <div><small>Legnagyobb össznyeremény</small><strong>{{displayedStats.topWinner?.name||'—'}}</strong><span>{{displayedStats.topWinner?'+'+displayedStats.topWinner.amount+' CR':'Nincs adat'}}</span></div>
+              <div><small>Legaktívabb játékos</small><strong>{{displayedStats.mostActive?.name||'—'}}</strong><span>{{displayedStats.mostActive?.actions||0}} tranzakció</span></div>
+              <div><small>Legnagyobb egyedi nyeremény</small><strong>{{displayedStats.biggestWin?.name||'—'}}</strong><span>{{displayedStats.biggestWin?.amount||0}} CR</span></div>
+              <div><small>Párbajbajnok</small><strong>{{displayedStats.duelChampion?.name||'—'}}</strong><span>{{displayedStats.duelChampion?.wins||0}} győzelem</span></div>
+            </div>
+            <div class="casino-stats-footer"><span>{{displayedStats.tokensSpent.toLocaleString('hu-HU')}} CR tét</span><span>{{displayedStats.tokensWon.toLocaleString('hu-HU')}} CR nyeremény</span><span>{{displayedStats.scratchWins}} kaparós nyeremény</span></div>
+          </div>
+          <button class="primary stats-export-button" :disabled="statsExporting" @click="exportStatisticsImage">{{statsExporting?'Kép készítése…':'Statisztika exportálása PNG-ként'}}</button>
+        </template>
+      </section>
       <section class="panel admin-wheel-editor admin-reset-editor">
         <div class="admin-section-heading"><div><p class="eyebrow">NEW GAME</p><h2>Kaszinó újraindítása</h2><p class="muted">Törli az összes játékost, egyenleget, tranzakciót, fogadást, párbajt, sorsjegyet, készletet és játékoshoz tartozó küldetéselőzményt. A side quest pool, kerékmezők, shop termékek és admin beállítások megmaradnak.</p></div></div>
         <p class="error">Figyelem: ez a művelet végleges, és minden játékosadatot töröl.</p>
