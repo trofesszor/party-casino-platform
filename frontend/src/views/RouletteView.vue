@@ -54,7 +54,7 @@ const betSpots = computed<BetSpot[]>(() => {
  } else if (selectedType.value === 'SIX_LINE') {
    for (let col = 0; col < 11; col += 2) {
      const n = col * 3 + 1;
-     spots.push({ type:'SIX_LINE', value:Array.from({length:6},(_,i)=>n+i).join(','), left:`${((col+2)/12)*100}%`, top:'50%', label:'6' });
+     spots.push({ type:'SIX_LINE', value:Array.from({length:6},(_,i)=>n+i).join(','), left:`${((col+1)/12)*100}%`, top:'50%', label:'6' });
    }
  }
  return spots;
