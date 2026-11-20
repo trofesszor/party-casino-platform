@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../services/api';
 
@@ -14,6 +14,15 @@ const error = ref('');
 const notice = ref('');
 const questSkipItem = computed(() => items.value.find(item => item.itemKey === 'QUEST_SKIP'));
 const activeQuests = computed(() => quests.value.filter(quest => quest.status === 'ACTIVE'));
+const scratchItem = computed(() => items.value.find(item => item.itemKey === 'SCRATCH_TICKET'));
+type ScratchTicket = {id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;createdAt:string};
+const scratchTickets = ref<ScratchTicket[]>([]);
+const activeTicket = ref<ScratchTicket|null>(null);
+const scratchCanvas = ref<HTMLCanvasElement|null>(null);
+const scratching = ref(false);
+const revealing = ref(false);
+const scratchedPoints = new Set<number>();
+let scratchContext:CanvasRenderingContext2D|null=null;
 
 async function refresh() {
   if (!playerId || !playerName) { router.replace('/'); return; }
@@ -22,10 +31,13 @@ async function refresh() {
       api.getShop(playerId),
       api.getPlayerSideQuests(playerId),
       api.getPlayerBalance(playerId),
+      api.getScratchTickets(playerId),
     ]);
     items.value = shop;
     quests.value = sideQuests;
     balance.value = wallet.tokenBalance;
+    scratchTickets.value = await api.getScratchTickets(playerId);
+    if(activeTicket.value) activeTicket.value=scratchTickets.value.find(ticket=>ticket.id===activeTicket.value?.id)??null;
     error.value = '';
   } catch (e:any) { error.value = e.message || 'Nem sikerült betölteni a shopot.'; }
 }
@@ -35,12 +47,27 @@ async function buy(itemKey:string) {
   if (!item || balance.value < item.price) return;
   busy.value = true; error.value = ''; notice.value = '';
   try {
-    await api.buyShopItem(playerId,itemKey);
+    const purchase=await api.buyShopItem(playerId,itemKey);
     await refresh();
-    notice.value = 'Sikeres vásárlás. A tárgy bekerült a készletedbe.';
+    if(itemKey==='SCRATCH_TICKET'&&purchase.ticketId){activeTicket.value=scratchTickets.value.find(ticket=>ticket.id===purchase.ticketId)??{id:purchase.ticketId,status:'UNSCRATCHED',createdAt:new Date().toISOString()};notice.value='Sok szerencsét! Kapard le a sorsjegyet!';await nextTick();initializeScratchCard();}
+    else notice.value = 'Sikeres vásárlás. A tárgy bekerült a készletedbe.';
   } catch (e:any) { error.value = e.message || 'A vásárlás nem sikerült.'; }
   finally { busy.value = false; }
 }
+function initializeScratchCard(){
+ const canvas=scratchCanvas.value;if(!canvas||!activeTicket.value||activeTicket.value.status==='REVEALED')return;
+ const rect=canvas.getBoundingClientRect(),ratio=Math.max(1,window.devicePixelRatio||1);canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);
+ const ctx=canvas.getContext('2d');if(!ctx)return;scratchContext=ctx;ctx.scale(ratio,ratio);
+ const gradient=ctx.createLinearGradient(0,0,rect.width,rect.height);gradient.addColorStop(0,'#d8dce0');gradient.addColorStop(.28,'#7e858b');gradient.addColorStop(.52,'#e9edf0');gradient.addColorStop(.75,'#8b9298');gradient.addColorStop(1,'#c4c9ce');
+ ctx.fillStyle=gradient;ctx.fillRect(0,0,rect.width,rect.height);ctx.fillStyle='rgba(20,25,29,.24)';ctx.font='800 17px sans-serif';ctx.textAlign='center';
+ for(let y=25;y<rect.height;y+=34)for(let x=25;x<rect.width;x+=115)ctx.fillText('✦ KAPARD LE ✦',x,y);
+ ctx.fillStyle='#343a40';ctx.font='900 23px sans-serif';ctx.fillText('KAPARD LE!',rect.width/2,rect.height/2);scratchedPoints.clear();
+}
+function scratchStart(event:PointerEvent){if(revealing.value||activeTicket.value?.status==='REVEALED'||!scratchContext)return;scratching.value=true;(event.currentTarget as HTMLCanvasElement).setPointerCapture(event.pointerId);scratchMove(event);}
+function scratchMove(event:PointerEvent){if(!scratching.value||!scratchContext||!scratchCanvas.value)return;const rect=scratchCanvas.value.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;scratchContext.globalCompositeOperation='destination-out';scratchContext.beginPath();scratchContext.arc(x,y,19,0,Math.PI*2);scratchContext.fill();const cols=12,rows=5,c=Math.max(0,Math.min(cols-1,Math.floor(x/rect.width*cols))),r=Math.max(0,Math.min(rows-1,Math.floor(y/rect.height*rows)));scratchedPoints.add(r*cols+c);if(scratchedPoints.size>=24)revealTicket();}
+function scratchEnd(){scratching.value=false;}
+async function revealTicket(){if(revealing.value||!activeTicket.value)return;revealing.value=true;try{const result=await api.revealScratchTicket(playerId,activeTicket.value.id);activeTicket.value={...activeTicket.value,status:'REVEALED',prizeAmount:result.prizeAmount};await refresh();}catch(e:any){error.value=e.message||'A sorsjegy felfedése nem sikerült.';}finally{revealing.value=false;}}
+function openScratchTicket(ticket:ScratchTicket){activeTicket.value=ticket;nextTick(()=>{if(ticket.status==='UNSCRATCHED')initializeScratchCard();});}
 async function skipQuest(questId:number) {
   if (busy.value || !questSkipItem.value?.quantity) return;
   const quest = activeQuests.value.find(entry => entry.id === questId);
@@ -78,12 +105,12 @@ onMounted(refresh);
     <section class="shop-section">
       <div class="shop-section-heading"><div><p class="eyebrow">KÍNÁLAT</p><h2>Elérhető tárgyak</h2></div><span>{{ items.length }} TERMÉK</span></div>
       <article v-for="item in items" :key="item.itemKey" class="shop-item panel">
-        <div class="shop-item-icon">⏭</div>
+        <div class="shop-item-icon"><span v-if="item.itemKey === 'SCRATCH_TICKET'">🎟️</span><span v-else>⏭</span></div>
         <div class="shop-item-copy">
-          <span class="shop-item-tag">HASZNÁLHATÓ TÁRGY</span>
+          <span class="shop-item-tag">{{ item.itemKey === 'SCRATCH_TICKET' ? 'AZONNALI NYEREMÉNY' : 'HASZNÁLHATÓ TÁRGY' }}</span>
           <h3>{{ item.name }}</h3>
           <p class="muted">{{ item.description }}</p>
-          <small>Készleten: <strong>{{ item.quantity }} db</strong></small>
+          <small v-if="item.itemKey !== 'SCRATCH_TICKET'">Készleten: <strong>{{ item.quantity }} db</strong></small><small v-else>Öt lehetséges eredmény · akár 100 CR</small>
         </div>
         <div class="shop-item-buy">
           <strong>{{ item.price }} <small>CR</small></strong>
@@ -105,6 +132,28 @@ onMounted(refresh);
         <div v-if="!activeQuests.length" class="shop-empty panel">Nincs aktív side quested. A tárgyaid megmaradnak, amíg nem használod fel őket.</div>
       </template>
     </section>
+
+    <section v-if="scratchTickets.length" class="shop-section scratch-inventory-section">
+      <div class="shop-section-heading"><div><p class="eyebrow">SORJEGYEK</p><h2>Sorsjegyeid</h2></div><span>{{ scratchTickets.filter(ticket=>ticket.status==='UNSCRATCHED').length }} FELKAPARATLAN</span></div>
+      <div class="scratch-ticket-list"><button v-for="ticket in scratchTickets" :key="ticket.id" class="scratch-ticket-mini" @click="openScratchTicket(ticket)"><span>✦</span><strong>{{ ticket.status==='UNSCRATCHED'?'LEKAPARÁSRA VÁR':'FELFEDVE' }}</strong><small>#{{ ticket.id }}</small></button></div>
+    </section>
+    <div v-if="activeTicket" class="scratch-overlay" @click.self="activeTicket=null">
+      <section class="scratch-modal panel">
+        <button class="ghost scratch-close" @click="activeTicket=null">✕</button>
+        <div class="scratch-modal-heading"><span>PARTY CASINO · INSTANT WIN</span><h2>Kapard és <em>nyerj!</em></h2><p>Találd meg a nyereményedet a lekaparható mező alatt.</p></div>
+        <div class="scratch-card" :class="{'scratch-card-winner':activeTicket.status==='REVEALED' && (activeTicket.prizeAmount??0)>0,'scratch-card-loser':activeTicket.status==='REVEALED' && !activeTicket.prizeAmount}">
+          <div class="scratch-card-top"><span>LUCKY TICKET</span><span>NO. {{ activeTicket.id }}</span></div>
+          <div class="scratch-prize-area">
+            <template v-if="activeTicket.status==='REVEALED'"><span class="scratch-result-icon">{{ activeTicket.prizeAmount ? '🏆' : '🍀' }}</span><strong>{{ activeTicket.prizeAmount ? '+'+activeTicket.prizeAmount+' CR' : 'MOST NEM NYERTÉL' }}</strong><small>{{ activeTicket.prizeAmount ? 'A nyeremény jóváírva az egyenlegeden.' : 'Próbáld újra egy másik sorsjeggyel!' }}</small></template>
+            <template v-else><span class="scratch-question">?</span><strong>A TE NYEREMÉNYED</strong><small>Kapard le a teljes mezőt!</small></template>
+          </div>
+          <canvas v-if="activeTicket.status==='UNSCRATCHED'" ref="scratchCanvas" class="scratch-surface" @pointerdown="scratchStart" @pointermove="scratchMove" @pointerup="scratchEnd" @pointercancel="scratchEnd"></canvas>
+          <div class="scratch-card-bottom"><span>PARTY CASINO</span><span>GOOD LUCK!</span></div>
+        </div>
+        <p v-if="activeTicket.status==='UNSCRATCHED'" class="scratch-instruction">Húzd az ujjad vagy az egeret a mezőn a lekaparáshoz.</p>
+        <button v-else class="primary scratch-done" @click="activeTicket=null">Bezárás</button>
+      </section>
+    </div>
     <footer>PARTY CASINO <span>•</span> A vásárlások és tárgyhasználatok azonnal érvényesülnek</footer>
   </main>
 </template>
