@@ -165,6 +165,11 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
       <div class="welcome-status"><span class="online-dot"></span><span>Csatlakozva</span></div>
     </section>
 
+    <section class="section-heading game-section-heading">
+      <div><p class="eyebrow">JÁTÉKTEREM</p><h2>Válassz játékot</h2></div>
+      <span class="section-hint">3 elérhető játék</span>
+    </section>
+
     <div class="game-grid">
       <button class="game-card panel" @click="router.push('/roulette')">
         <span class="game-icon">🎡</span>
@@ -261,11 +266,6 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
         <h3>Teljesített küldetések</h3>
         <div v-for="quest in sideQuests.filter(q => q.status === 'COMPLETED')" :key="quest.id"><span>{{ quest.title }}</span><small>✓ Teljesítve</small></div>
       </div>
-    </section>
-
-    <section class="section-heading game-section-heading">
-      <div><p class="eyebrow">JÁTÉKTEREM</p><h2>Válassz játékot</h2></div>
-      <span class="section-hint">3 elérhető játék</span>
     </section>
 
 
