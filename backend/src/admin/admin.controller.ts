@@ -35,6 +35,22 @@ export class AdminController {
       online: onlineIds.has(player.id),
     }));
   }
+  @Get('shop')
+  getShopItems(@Headers('authorization') authorization?: string) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.getShopItemsForAdmin();
+  }
+
+  @Post('shop/:itemKey/enabled')
+  setShopItemEnabled(
+    @Param('itemKey') itemKey: string,
+    @Body() body: { enabled: boolean },
+    @Headers('authorization') authorization?: string,
+  ) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.setShopItemEnabled(itemKey, body.enabled);
+  }
+
   @Get('side-quests')
   getSideQuestPool(@Headers('authorization') authorization?: string) {
     this.admin.assertToken(this.token(authorization));
