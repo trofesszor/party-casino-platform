@@ -88,6 +88,15 @@ export class PlayersService {
     } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
   }
 
+  getSideQuestVerificationStatus(playerId:number,questId:number) {
+    const sqlite=this.database.sqlite;
+    const quest=sqlite.prepare("SELECT id FROM player_side_quests WHERE id=? AND player_id=?").get(questId,playerId);
+    if(!quest) throw new BadRequestException('A side quest nem található.');
+    sqlite.prepare("UPDATE side_quest_verification_requests SET status='EXPIRED' WHERE quest_id=? AND status='PENDING' AND datetime(expires_at)<=CURRENT_TIMESTAMP").run(questId);
+    const active=sqlite.prepare("SELECT expires_at AS expiresAt FROM side_quest_verification_requests WHERE quest_id=? AND owner_id=? AND status='PENDING' AND datetime(expires_at)>CURRENT_TIMESTAMP ORDER BY id DESC LIMIT 1").get(questId,playerId) as {expiresAt:string}|undefined;
+    return {active:!!active,expiresAt:active?.expiresAt??null};
+  }
+
   getSideQuestVerification(pinInput: string, verifierId: number) {
     const pin = String(pinInput ?? '').trim();
     if (!/^\d{3}$/.test(pin) || !Number.isSafeInteger(verifierId) || verifierId<=0) throw new BadRequestException('Adj meg egy érvényes háromjegyű PIN-kódot.');
