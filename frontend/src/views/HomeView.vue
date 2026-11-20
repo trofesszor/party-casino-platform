@@ -8,10 +8,11 @@ import { identifyPlayer } from '../services/socket';
 const router = useRouter();
 const player = ref<Player | null>(null);
 const tokenBalance = ref(0);
-type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'|'SKIPPED'; assignedAt:string; completedAt:string|null };
+type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'|'SKIPPED'; assignedAt:string; completedAt:string|null; approvedByName?:string|null; approvedAt?:string|null };
 const sideQuests = ref<SideQuest[]>([]);
 const sideQuestBusy = ref(false);
 const sideQuestError = ref('');
+const verificationQr = ref<{questId:number;title:string;url:string;imageUrl:string;expiresAt:string}|null>(null);
 const activeSideQuests = ref<SideQuest[]>([]);
 async function loadSideQuests() {
   if (!player.value) return;
@@ -28,11 +29,13 @@ async function requestSideQuest() {
 async function finishSideQuest(quest:SideQuest) {
   if (!player.value || sideQuestBusy.value) return;
   sideQuestBusy.value = true; sideQuestError.value = '';
-  try { await api.completeSideQuest(player.value.id, quest.id); await loadSideQuests(); }
-  catch (e:any) { sideQuestError.value = e.message; }
+  try {
+    const response = await api.requestSideQuestVerification(player.value.id,quest.id);
+    const url = `${window.location.origin}/verify-quest?token=${response.token}`;
+    verificationQr.value = {questId:quest.id,title:quest.title,url,imageUrl:`https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=12&data=${encodeURIComponent(url)}`,expiresAt:response.expiresAt};
+  } catch (e:any) { sideQuestError.value = e.message; }
   finally { sideQuestBusy.value = false; }
 }
-
 const onlinePlayers = ref<Player[]>([]);
 const duels = ref<Duel[]>([]);
 const duelOpponentId = ref<number | ''>('');
@@ -253,7 +256,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
           <span class="side-quest-number">SIDE QUEST 0{{ index+1 }}</span>
           <h3>{{ quest.title }}</h3>
           <p v-if="quest.description">{{ quest.description }}</p>
-          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="finishSideQuest(quest)">Küldetés teljesítve</button>
+          <button class="primary side-quest-complete" :disabled="sideQuestBusy" @click="finishSideQuest(quest)">QR-kód a teljesítéshez</button>
         </article>
       </div>
       <div v-else class="side-quest-empty">Még nincs aktív küldetésed. Kérj egy véletlenszerű kihívást!</div>
@@ -264,11 +267,23 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); });
       <p v-if="sideQuestError" class="error">{{ sideQuestError }}</p>
       <div v-if="sideQuests.some(q => q.status !== 'ACTIVE')" class="side-quest-completed">
         <h3>Teljesített küldetések</h3>
-        <div v-for="quest in sideQuests.filter(q => q.status !== 'ACTIVE')" :key="quest.id"><span>{{ quest.title }}</span><small>{{ quest.status === 'SKIPPED' ? '↷ Kihagyva' : '✓ Teljesítve' }}</small></div>
+        <div v-for="quest in sideQuests.filter(q => q.status !== 'ACTIVE')" :key="quest.id"><span>{{ quest.title }}</span><small>{{ quest.status === 'SKIPPED' ? '↷ Kihagyva' : `✓ Jóváhagyta: ${quest.approvedByName || 'ismeretlen'}` }}</small></div>
       </div>
     </section>
 
 
+    </div>
+
+    <div v-if="verificationQr" class="quest-qr-overlay" @click.self="verificationQr=null">
+      <section class="quest-qr-modal panel">
+        <button class="ghost quest-qr-close" @click="verificationQr=null">✕</button>
+        <p class="eyebrow">SIDE QUEST VERIFICATION</p>
+        <h2>{{ verificationQr.title }}</h2>
+        <p class="muted">Mutasd meg a QR-kódot egy másik játékosnak. Ő olvassa be, majd jóváhagyja vagy elutasítja a teljesítést.</p>
+        <img :src="verificationQr.imageUrl" alt="Küldetés-hitelesítő QR-kód">
+        <small class="muted">A QR-kód 90 másodpercig érvényes, és csak egyszer használható.</small>
+        <a :href="verificationQr.url" class="muted quest-qr-link">{{ verificationQr.url }}</a>
+      </section>
     </div>
 
     <footer>PARTY CASINO <span>•</span> Helyi hálózaton futó party platform</footer>
