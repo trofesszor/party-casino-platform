@@ -11,10 +11,11 @@ const selectedPlayer = ref<number | null>(null);
 const actionError = ref('');
 const wheelSegments = ref<{label:string;enabled:boolean}[]>([]);
 const wheelSaving = ref(false);
-type PoolQuest = { id:number; title:string; description:string; enabled:number };
+type PoolQuest = { id:number; title:string; description:string; enabled:number; photoEnabled:number };
 const sideQuestPool = ref<PoolQuest[]>([]);
 const newQuestTitle = ref('');
 const newQuestDescription = ref('');
+const newQuestPhotoEnabled = ref(false);
 const sideQuestSaving = ref(false);
 type AdminShopItem = { itemKey:string; name:string; description:string; price:number; enabled:number };
 const shopItems = ref<AdminShopItem[]>([]);
@@ -104,12 +105,22 @@ async function addSideQuest() {
   sideQuestSaving.value = true;
   actionError.value = '';
   try {
-    await api.adminAddSideQuest(token.value, newQuestTitle.value, newQuestDescription.value);
+    await api.adminAddSideQuest(token.value, newQuestTitle.value, newQuestDescription.value, newQuestPhotoEnabled.value);
     newQuestTitle.value = '';
     newQuestDescription.value = '';
+    newQuestPhotoEnabled.value = false;
     sideQuestPool.value = await api.adminSideQuestPool(token.value);
   } catch (e:any) { actionError.value = e.message; }
   finally { sideQuestSaving.value = false; }
+}
+async function toggleQuestPhoto(quest:PoolQuest) {
+  const enabled=!quest.photoEnabled;
+  sideQuestSaving.value=true; actionError.value='';
+  try {
+    const updated=await api.adminSetSideQuestPhotoEnabled(token.value,quest.id,enabled);
+    quest.photoEnabled=updated.photoEnabled;
+  } catch(e:any) { actionError.value=e.message||'Nem sikerült módosítani a fotós teljesítést.'; }
+  finally { sideQuestSaving.value=false; }
 }
 async function deleteSideQuest(questId:number) {
   if (!confirm('Biztosan törlöd ezt a side questet a poolból?')) return;
@@ -205,11 +216,14 @@ onMounted(loadPlayers);
         <form class="side-quest-admin-form" @submit.prevent="addSideQuest">
           <input v-model="newQuestTitle" maxlength="120" placeholder="Side quest címe" required>
           <textarea v-model="newQuestDescription" maxlength="500" rows="3" placeholder="Rövid leírás / teljesítési feltétel (opcionális)"></textarea>
+          <label class="admin-photo-quest-option"><input v-model="newQuestPhotoEnabled" type="checkbox"> Fotóval teljesíthető (Snappin)</label>
           <button class="primary" :disabled="sideQuestSaving || !newQuestTitle.trim()">{{ sideQuestSaving ? 'Mentés…' : '+ Küldetés hozzáadása' }}</button>
         </form>
         <div v-if="!sideQuestPool.length" class="admin-empty muted">A pool még üres. Adj hozzá néhány side questet.</div>
         <div v-for="quest in sideQuestPool" :key="quest.id" class="side-quest-admin-row">
-          <div><strong>{{ quest.title }}</strong><p v-if="quest.description" class="muted">{{ quest.description }}</p></div>
+          <div><strong>{{ quest.title }}</strong><p v-if="quest.description" class="muted">{{ quest.description }}</p>
+            <label class="admin-photo-quest-option"><input type="checkbox" :checked="!!quest.photoEnabled" :disabled="sideQuestSaving" @change="toggleQuestPhoto(quest)"> Fotóval teljesíthető · {{ quest.photoEnabled ? 'Snappin fotó' : '3 jegyű PIN' }}</label>
+          </div>
           <button class="ghost danger" @click="deleteSideQuest(quest.id)">Törlés</button>
         </div>
       </section>
