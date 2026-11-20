@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 import { DATABASE } from '../database/database.module';
 
 @Injectable()
@@ -70,41 +70,55 @@ export class PlayersService {
       const quest = sqlite.prepare("SELECT id FROM player_side_quests WHERE id=? AND player_id=? AND status='ACTIVE'").get(questId, playerId);
       if (!quest) throw new BadRequestException('Az aktív side quest nem található.');
       sqlite.prepare("UPDATE side_quest_verification_requests SET status='EXPIRED' WHERE quest_id=? AND status='PENDING' AND datetime(expires_at)<=CURRENT_TIMESTAMP").run(questId);
-      if (sqlite.prepare("SELECT id FROM side_quest_verification_requests WHERE quest_id=? AND status='PENDING'").get(questId)) throw new BadRequestException('Ehhez a küldetéshez már van aktív QR-kód.');
-      const token = randomBytes(32).toString('hex');
-      const tokenHash = createHash('sha256').update(token).digest('hex');
+      if (sqlite.prepare("SELECT id FROM side_quest_verification_requests WHERE quest_id=? AND status='PENDING'").get(questId)) throw new BadRequestException('Ehhez a küldetéshez már van aktív PIN-kód.');
+      let pin = '';
+      let pinHash = '';
+      for (let attempt=0; attempt<20; attempt++) {
+        pin = String(randomInt(0,1000)).padStart(3,'0');
+        pinHash = createHash('sha256').update(pin).digest('hex');
+        if (!sqlite.prepare("SELECT id FROM side_quest_verification_requests WHERE token_hash=? AND status='PENDING'").get(pinHash)) break;
+        pin = '';
+      }
+      if (!pin) throw new BadRequestException('Nem sikerült PIN-kódot generálni. Próbáld újra.');
       const expiresAt = new Date(Date.now() + 90_000).toISOString();
-      sqlite.prepare("INSERT INTO side_quest_verification_requests (quest_id,owner_id,token_hash,expires_at) VALUES (?,?,?,?)").run(questId,playerId,tokenHash,expiresAt);
+      sqlite.prepare("INSERT INTO side_quest_verification_requests (quest_id,owner_id,token_hash,expires_at) VALUES (?,?,?,?)").run(questId,playerId,pinHash,expiresAt);
       sqlite.exec('COMMIT');
-      return { token, expiresAt };
+      return { pin, expiresAt };
     } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
   }
 
-  getSideQuestVerification(tokenInput: string) {
-    const token = String(tokenInput ?? '').trim();
-    if (!/^[a-f0-9]{64}$/i.test(token)) throw new BadRequestException('Érvénytelen QR-kód.');
-    const tokenHash = createHash('sha256').update(token).digest('hex');
-    const request = this.database.sqlite.prepare(`
-      SELECT r.quest_id AS questId, r.owner_id AS ownerId, r.expires_at AS expiresAt,
-        q.title, q.description, p.name AS ownerName
+  getSideQuestVerification(pinInput: string, verifierId: number) {
+    const pin = String(pinInput ?? '').trim();
+    if (!/^\\d{3}$/.test(pin) || !Number.isSafeInteger(verifierId) || verifierId<=0) throw new BadRequestException('Adj meg egy érvényes háromjegyű PIN-kódot.');
+    const sqlite = this.database.sqlite;
+    if (!sqlite.prepare('SELECT id FROM players WHERE id=?').get(verifierId)) throw new BadRequestException('A hitelesítő játékos nem található.');
+    sqlite.prepare("DELETE FROM side_quest_pin_attempts WHERE datetime(attempted_at)<datetime('now','-2 minutes')").run();
+    const attempts = sqlite.prepare("SELECT COUNT(*) AS count FROM side_quest_pin_attempts WHERE player_id=? AND datetime(attempted_at)>datetime('now','-90 seconds')").get(verifierId) as {count:number};
+    if (attempts.count>=5) throw new BadRequestException('Túl sok hibás PIN-kód. Várj egy percet, majd próbáld újra.');
+    const pinHash = createHash('sha256').update(pin).digest('hex');
+    const request = sqlite.prepare(`
+      SELECT r.quest_id AS questId, r.owner_id AS ownerId, r.expires_at AS expiresAt, q.title, q.description, p.name AS ownerName
       FROM side_quest_verification_requests r
       JOIN player_side_quests q ON q.id=r.quest_id JOIN players p ON p.id=r.owner_id
       WHERE r.token_hash=? AND r.status='PENDING' AND datetime(r.expires_at)>CURRENT_TIMESTAMP AND q.status='ACTIVE'
-    `).get(tokenHash);
-    if (!request) throw new BadRequestException('A QR-kód lejárt vagy már felhasználták.');
+    `).get(pinHash);
+    if (!request) {
+      sqlite.prepare('INSERT INTO side_quest_pin_attempts (player_id) VALUES (?)').run(verifierId);
+      throw new BadRequestException('A PIN-kód hibás, lejárt vagy már felhasználták.');
+    }
     return request;
   }
 
-  verifySideQuest(tokenInput: string, verifierId: number, approveInput: boolean) {
+  verifySideQuest(pinInput: string, verifierId: number, approveInput: boolean) {
     if (typeof approveInput !== 'boolean') throw new BadRequestException('Érvénytelen döntés.');
-    const token = String(tokenInput ?? '').trim();
-    if (!/^[a-f0-9]{64}$/i.test(token) || !Number.isSafeInteger(verifierId) || verifierId <= 0) throw new BadRequestException('Érvénytelen ellenőrzési kérés.');
+    const pin = String(pinInput ?? '').trim();
+    if (!/^\\d{3}$/.test(pin) || !Number.isSafeInteger(verifierId) || verifierId <= 0) throw new BadRequestException('Érvénytelen ellenőrzési kérés.');
     const sqlite = this.database.sqlite;
-    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const pinHash = createHash('sha256').update(pin).digest('hex');
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      const request = sqlite.prepare(`SELECT r.id, r.quest_id AS questId, r.owner_id AS ownerId, q.title FROM side_quest_verification_requests r JOIN player_side_quests q ON q.id=r.quest_id WHERE r.token_hash=? AND r.status='PENDING' AND datetime(r.expires_at)>CURRENT_TIMESTAMP AND q.status='ACTIVE'`).get(tokenHash) as {id:number;questId:number;ownerId:number;title:string}|undefined;
-      if (!request) throw new BadRequestException('A QR-kód lejárt vagy már felhasználták.');
+      const request = sqlite.prepare(`SELECT r.id, r.quest_id AS questId, r.owner_id AS ownerId, q.title FROM side_quest_verification_requests r JOIN player_side_quests q ON q.id=r.quest_id WHERE r.token_hash=? AND r.status='PENDING' AND datetime(r.expires_at)>CURRENT_TIMESTAMP AND q.status='ACTIVE'`).get(pinHash) as {id:number;questId:number;ownerId:number;title:string}|undefined;
+      if (!request) throw new BadRequestException('A PIN-kód lejárt vagy már felhasználták.');
       if (request.ownerId === verifierId) throw new BadRequestException('A saját küldetésedet nem igazolhatod.');
       if (!sqlite.prepare('SELECT id FROM players WHERE id=?').get(verifierId)) throw new BadRequestException('A hitelesítő játékos nem található.');
       if (sqlite.prepare('SELECT id FROM side_quest_verification_requests WHERE quest_id=? AND verified_by=?').get(request.questId,verifierId)) throw new BadRequestException('Ezt a küldetést már ellenőrizted.');
@@ -116,7 +130,6 @@ export class PlayersService {
       return {success:true,status,questId:request.questId,questTitle:request.title,verifiedByName:verifier.name};
     } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
   }
-
   getSideQuestPool() {
     return this.database.sqlite.prepare('SELECT id, title, description, enabled, created_at AS createdAt FROM side_quest_pool ORDER BY id DESC').all();
   }
