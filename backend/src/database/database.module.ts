@@ -78,9 +78,16 @@ export const DATABASE = Symbol('DATABASE');
           completed_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_player_side_quests_active ON player_side_quests(player_id, status);
+        CREATE TABLE IF NOT EXISTS shop_items (
+          item_key TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          price INTEGER NOT NULL CHECK(price >= 0),
+          enabled INTEGER NOT NULL DEFAULT 1
+        );
         CREATE TABLE IF NOT EXISTS player_inventory (
           player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-          item_key TEXT NOT NULL,
+          item_key TEXT NOT NULL REFERENCES shop_items(item_key),
           quantity INTEGER NOT NULL DEFAULT 0 CHECK(quantity >= 0),
           updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           PRIMARY KEY(player_id, item_key)
@@ -145,6 +152,8 @@ export const DATABASE = Symbol('DATABASE');
       if (!payoutColumns.some(column => column.name === 'payout_amount')) {
         sqlite.exec('ALTER TABLE casino_roulette_bets ADD COLUMN payout_amount INTEGER NOT NULL DEFAULT 0');
       }
+
+      sqlite.prepare("INSERT OR IGNORE INTO shop_items (item_key,name,description,price,enabled) VALUES ('QUEST_SKIP','Küldetés kihagyás','Egy aktív side quest kihagyása. A kihagyott küldetést később újra megkaphatod.',25,1)").run();
 
       const wheelCount = sqlite.prepare('SELECT COUNT(*) AS count FROM lucky_wheel_segments').get() as { count: number };
       if (wheelCount.count === 0) {
