@@ -240,7 +240,7 @@ function logout() {
   name.value = '';
   error.value = '';
 }
-onMounted(() => { loadDuels(); loadSideQuests(); loadTokenPhotoStatus(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(loadSideQuests, 5000); });
+onMounted(() => { loadDuels(); loadSideQuests(); loadTokenPhotoStatus(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(() => { loadSideQuests(); loadTokenPhotoStatus(); }, 5000); });
 onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); if(verificationPinPollTimer)clearInterval(verificationPinPollTimer); if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer); });
 </script>
 
