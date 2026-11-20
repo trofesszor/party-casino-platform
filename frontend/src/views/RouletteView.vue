@@ -8,7 +8,7 @@ import RouletteWheel from '../components/RouletteWheel.vue';
 
 const route = useRoute();
 const isDisplay = computed(() => route.query.display === '1');
-const playerId = Number(localStorage.getItem('party-player-id'));
+const playerId = Number(localStorage.getItem('party-player-id')) || 0;
 const state = ref<RouletteState | null>(null);
 const selectedType = ref<RouletteBetType>('NUMBER');
 const selectedNumbers = ref<number[]>([]);
@@ -54,7 +54,7 @@ const betSpots = computed<BetSpot[]>(() => {
  } else if (selectedType.value === 'SIX_LINE') {
    for (let col = 0; col < 11; col += 2) {
      const n = col * 3 + 1;
-     spots.push({ type:'SIX_LINE', value:Array.from({length:6},(_,i)=>n+i).join(','), left:`${((col+2)/12)*100}%`, top:'50%', label:'6' });
+     spots.push({ type:'SIX_LINE', value:Array.from({length:6},(_,i)=>n+i).join(','), left:`${((col+2)/12)*100}%`, top:'100%', label:'6' });
    }
  }
  return spots;
