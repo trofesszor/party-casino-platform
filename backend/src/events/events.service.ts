@@ -22,7 +22,9 @@ export class EventsService {
     if (!title || title.length > 60) throw new BadRequestException('Az esemény neve 1–60 karakter legyen.');
     const description = String(input.description ?? '').trim().slice(0, 300);
     const maxPlayers = input.maxPlayers ? Math.max(1, Math.min(100, Number(input.maxPlayers))) : null;
-    const result = this.database.sqlite.prepare('INSERT INTO events (title, description, event_type, max_players) VALUES (?, ?, ?, ?)').run(title, description, String(input.eventType ?? 'CUSTOM'), maxPlayers);
+    const eventType = String(input.eventType ?? 'CUSTOM').toUpperCase();
+    if (!['CUSTOM', 'ROULETTE'].includes(eventType)) throw new BadRequestException('Ismeretlen eseménytípus.');
+    const result = this.database.sqlite.prepare('INSERT INTO events (title, description, event_type, max_players) VALUES (?, ?, ?, ?)').run(title, description, eventType, maxPlayers);
     const event = this.getOne(Number(result.lastInsertRowid));
     this.gateway.publish('events:changed', this.list());
     return event;
@@ -36,20 +38,6 @@ export class EventsService {
     if (event.maxPlayers && event.participantCount >= event.maxPlayers && !event.participants.some((p: any) => p.id === playerId)) throw new BadRequestException('Az esemény megtelt.');
     this.database.sqlite.prepare('INSERT OR IGNORE INTO event_participants (event_id, player_id) VALUES (?, ?)').run(eventId, playerId);
     const updated = this.getOne(eventId);
-
-    if (status === 'RUNNING' && updated.eventType === 'ROULETTE') {
-      const existingRound = this.database.sqlite.prepare(
-        "SELECT id FROM roulette_rounds WHERE event_id = ? AND status = 'OPEN'",
-      ).get(eventId);
-      if (!existingRound) {
-        const nextRound = this.database.sqlite.prepare(
-          'SELECT COALESCE(MAX(round_number), 0) + 1 AS roundNumber FROM roulette_rounds WHERE event_id = ?',
-        ).get(eventId) as { roundNumber: number };
-        this.database.sqlite.prepare(
-          "INSERT INTO roulette_rounds (event_id, round_number) VALUES (?, ?)",
-        ).run(eventId, nextRound.roundNumber);
-      }
-    }
 
     this.gateway.publish('events:changed', this.list());
     return updated;
@@ -85,6 +73,21 @@ export class EventsService {
     }
 
     const updated = this.getOne(eventId);
+
+    if (status === 'RUNNING' && updated.eventType === 'ROULETTE') {
+      const existingRound = this.database.sqlite.prepare(
+        "SELECT id FROM roulette_rounds WHERE event_id = ? AND status = 'OPEN'",
+      ).get(eventId);
+      if (!existingRound) {
+        const nextRound = this.database.sqlite.prepare(
+          'SELECT COALESCE(MAX(round_number), 0) + 1 AS roundNumber FROM roulette_rounds WHERE event_id = ?',
+        ).get(eventId) as { roundNumber: number };
+        this.database.sqlite.prepare(
+          "INSERT INTO roulette_rounds (event_id, round_number) VALUES (?, ?)",
+        ).run(eventId, nextRound.roundNumber);
+      }
+    }
+
     this.gateway.publish('events:changed', this.list());
     return updated;
   }
