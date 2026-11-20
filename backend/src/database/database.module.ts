@@ -90,6 +90,8 @@ export const DATABASE = Symbol('DATABASE');
           verified_at TEXT
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_side_quest_verification_pending ON side_quest_verification_requests(quest_id) WHERE status='PENDING';
+        CREATE TABLE IF NOT EXISTS side_quest_pin_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE, attempted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+        CREATE INDEX IF NOT EXISTS idx_side_quest_pin_attempts_player_time ON side_quest_pin_attempts(player_id, attempted_at);
         CREATE TABLE IF NOT EXISTS shop_items (
           item_key TEXT PRIMARY KEY,
           name TEXT NOT NULL,
