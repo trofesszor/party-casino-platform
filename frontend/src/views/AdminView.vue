@@ -22,6 +22,8 @@ const shopItems = ref<AdminShopItem[]>([]);
 const shopSavingKey = ref('');
 const tokenPhotoSettings=ref({enabled:true,balanceThreshold:50,rewardAmount:10,cooldownMinutes:60,dailyLimit:2});
 const tokenPhotoSaving=ref(false);
+const defaultPlayerTokens=ref(100);
+const defaultTokensSaving=ref(false);
 const resetBusy=ref(false);
 const resetMessage=ref('');
 type CasinoStats={sessionId:number;startedAt:string;endedAt:string|null;playerCount:number;transactionCount:number;tokensSpent:number;tokensWon:number;topWinner:{name:string;amount:number}|null;mostActive:{name:string;actions:number}|null;richestPlayer:{name:string;balance:number}|null;biggestWin:{name:string;amount:number;description:string}|null;rouletteRounds:number;rouletteBets:number;rouletteTokens:number;completedDuels:number;duelChampion:{name:string;wins:number}|null;questsAssigned:number;questsCompleted:number;scratchTickets:number;scratchRevealed:number;scratchWins:number;scratchPrizes:number;photoRewards:number};
@@ -85,6 +87,7 @@ async function loadPlayers() {
     sideQuestPool.value = await api.adminSideQuestPool(token.value);
     shopItems.value = await api.adminShopItems(token.value);
     tokenPhotoSettings.value = await api.adminGetTokenPhotoSettings(token.value);
+    defaultPlayerTokens.value = (await api.adminGetDefaultPlayerTokens(token.value)).defaultTokens;
     await loadCasinoStatistics();
     localStorage.setItem('party-admin-token', token.value);
   } catch {
@@ -147,6 +150,13 @@ async function toggleShopItem(item: AdminShopItem) {
   } finally {
     shopSavingKey.value = '';
   }
+}
+
+async function saveDefaultPlayerTokens(){
+  defaultTokensSaving.value=true;actionError.value='';
+  try{defaultPlayerTokens.value=(await api.adminSetDefaultPlayerTokens(token.value,defaultPlayerTokens.value)).defaultTokens;}
+  catch(e:any){actionError.value=e.message||'Az alapértelmezett tokenmennyiség mentése nem sikerült.';}
+  finally{defaultTokensSaving.value=false;}
 }
 
 async function saveTokenPhotoSettings(){
@@ -319,6 +329,13 @@ onMounted(loadPlayers);
           </div>
           <button class="ghost" :disabled="shopSavingKey === item.itemKey" @click="toggleShopItem(item)">{{ shopSavingKey === item.itemKey ? 'Mentés…' : item.enabled ? 'Inaktiválás' : 'Aktiválás' }}</button>
         </div>
+      </section>
+      <section class="panel admin-wheel-editor admin-default-tokens-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">PLAYER ECONOMY</p><h2>Kezdő tokenegyenleg</h2><p class="muted">Ennyi tokent kap minden újonnan regisztráló játékos. A módosítás csak a később csatlakozó játékosokra érvényes, a meglévő egyenlegeket nem változtatja meg.</p></div></div>
+        <div class="token-photo-admin-settings">
+          <label>Alapértelmezett tokenmennyiség (CR)<input v-model.number="defaultPlayerTokens" type="number" min="0" max="2000000000" step="1"></label>
+        </div>
+        <button class="primary" :disabled="defaultTokensSaving || !Number.isSafeInteger(defaultPlayerTokens) || defaultPlayerTokens<0 || defaultPlayerTokens>2000000000" @click="saveDefaultPlayerTokens">{{defaultTokensSaving?'Mentés…':'Kezdő tokenegyenleg mentése'}}</button>
       </section>
       <section class="panel admin-wheel-editor admin-token-photo-editor">
         <div class="admin-section-heading"><div><p class="eyebrow">PLAYER REWARDS</p><h2>Fotófeltöltés tokenekért</h2><p class="muted">Automatikus jutalom Snappin-fotó sikeres feltöltése után. A limitet a szerver ellenőrzi.</p></div></div>
