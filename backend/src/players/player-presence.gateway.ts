@@ -45,6 +45,16 @@ export class PlayerPresenceGateway implements OnGatewayConnection, OnGatewayDisc
     this.publishOnlinePlayers();
   }
 
+  resetPlayerPresence() {
+    for (const client of this.server?.sockets.sockets.values() ?? []) {
+      delete client.data.playerId;
+      client.emit('player:reset');
+    }
+    this.sessions.clear();
+    this.names.clear();
+    this.publishOnlinePlayers();
+  }
+
   getOnlinePlayers() {
     return [...this.sessions.keys()]
       .filter((id) => (this.sessions.get(id)?.size ?? 0) > 0)
