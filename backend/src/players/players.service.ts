@@ -54,7 +54,7 @@ export class PlayersService {
         ORDER BY RANDOM() LIMIT 1
       `).get(playerId) as { id: number; title: string; description: string } | undefined;
       if (!quest) throw new BadRequestException('Nincs több kiosztható side quest a poolban.');
-      const result = sqlite.prepare("undefined").run(playerId, quest.id, quest.title, quest.description, quest.photoEnabled);
+      const result = sqlite.prepare("INSERT INTO player_side_quests (player_id, pool_quest_id, title, description, photo_enabled) VALUES (?, ?, ?, ?, ?)").run(playerId, quest.id, quest.title, quest.description, quest.photoEnabled);
       sqlite.exec('COMMIT');
       return sqlite.prepare("SELECT id, title, description, status, assigned_at AS assignedAt, completed_at AS completedAt, photo_enabled AS photoEnabled FROM player_side_quests WHERE id = ?").get(result.lastInsertRowid);
     } catch (error) {
