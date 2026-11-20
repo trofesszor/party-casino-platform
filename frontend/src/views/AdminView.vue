@@ -20,7 +20,7 @@ const sideQuestSaving = ref(false);
 type AdminShopItem = { itemKey:string; name:string; description:string; price:number; enabled:number };
 const shopItems = ref<AdminShopItem[]>([]);
 const shopSavingKey = ref('');
-const gameSettings=ref({wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:100,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1});
+const gameSettings=ref({wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:100,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1});
 const gameSettingsSaving=ref(false);
 const tokenPhotoSettings=ref({enabled:true,balanceThreshold:50,rewardAmount:10,cooldownMinutes:60,dailyLimit:2});
 const tokenPhotoSaving=ref(false);
@@ -198,6 +198,12 @@ async function addSideQuest() {
   } catch (e:any) { actionError.value = e.message; }
   finally { sideQuestSaving.value = false; }
 }
+async function toggleQuestEnabled(quest:PoolQuest){
+  const enabled=!quest.enabled;sideQuestSaving.value=true;actionError.value='';
+  try{const updated=await api.adminSetSideQuestEnabled(token.value,quest.id,!!enabled);quest.enabled=updated.enabled;}
+  catch(e:any){actionError.value=e.message||'Nem sikerült módosítani a küldetés állapotát.';}
+  finally{sideQuestSaving.value=false;}
+}
 async function toggleQuestPhoto(quest:PoolQuest) {
   const enabled=!quest.photoEnabled;
   sideQuestSaving.value=true; actionError.value='';
@@ -373,6 +379,19 @@ onMounted(loadPlayers);
           <label>100 CR (%)<input v-model.number="gameSettings.scratch100Percent" type="number" min="0" max="100"></label>
         </div>
         <p class="muted">Jelenlegi összesített esély: {{gameSettings.scratchLossPercent+gameSettings.scratch10Percent+gameSettings.scratch25Percent+gameSettings.scratch50Percent+gameSettings.scratch100Percent}}%</p>
+        <div class="admin-subheading"><strong>Rulett nyereményszorzók</strong><span class="muted">A tét visszajár, plusz a megadott szorzó szerinti nyeremény.</span></div>
+        <div class="game-settings-grid scratch-odds-grid">
+          <label>Szám (0–36)<input v-model.number="gameSettings.roulettePayoutNumber" type="number" min="1" max="1000"></label>
+          <label>Split<input v-model.number="gameSettings.roulettePayoutSplit" type="number" min="1" max="1000"></label>
+          <label>Street<input v-model.number="gameSettings.roulettePayoutStreet" type="number" min="1" max="1000"></label>
+          <label>Corner<input v-model.number="gameSettings.roulettePayoutCorner" type="number" min="1" max="1000"></label>
+          <label>Six line<input v-model.number="gameSettings.roulettePayoutSixLine" type="number" min="1" max="1000"></label>
+          <label>Tucat<input v-model.number="gameSettings.roulettePayoutDozen" type="number" min="1" max="1000"></label>
+          <label>Oszlop<input v-model.number="gameSettings.roulettePayoutColumn" type="number" min="1" max="1000"></label>
+          <label>Szín<input v-model.number="gameSettings.roulettePayoutColor" type="number" min="1" max="1000"></label>
+          <label>Páros / páratlan<input v-model.number="gameSettings.roulettePayoutOddEven" type="number" min="1" max="1000"></label>
+          <label>Kicsi / nagy<input v-model.number="gameSettings.roulettePayoutLowHigh" type="number" min="1" max="1000"></label>
+        </div>
         <button class="primary" :disabled="gameSettingsSaving" @click="saveCasinoGameSettings">{{gameSettingsSaving?'Mentés…':'Játékszabályok mentése'}}</button>
       </section>
       <section class="panel admin-wheel-editor admin-default-tokens-editor">
@@ -405,6 +424,7 @@ onMounted(loadPlayers);
         <div v-if="!sideQuestPool.length" class="admin-empty muted">A pool még üres. Adj hozzá néhány side questet.</div>
         <div v-for="quest in sideQuestPool" :key="quest.id" class="side-quest-admin-row">
           <div><strong>{{ quest.title }}</strong><p v-if="quest.description" class="muted">{{ quest.description }}</p>
+            <label class="admin-photo-quest-option"><input type="checkbox" :checked="!!quest.enabled" :disabled="sideQuestSaving" @change="toggleQuestEnabled(quest)"> Küldetés aktív</label>
             <label class="admin-photo-quest-option"><input type="checkbox" :checked="!!quest.photoEnabled" :disabled="sideQuestSaving" @change="toggleQuestPhoto(quest)"> Fotóval teljesíthető · {{ quest.photoEnabled ? 'Snappin fotó' : '3 jegyű PIN' }}</label>
           </div>
           <button class="ghost danger" @click="deleteSideQuest(quest.id)">Törlés</button>
