@@ -71,7 +71,7 @@ function removeWheelSegment(index: number) { wheelSegments.value.splice(index, 1
 function moveWheelSegment(index: number, direction: number) { const target=index+direction; if(target<0||target>=wheelSegments.value.length)return; const [item]=wheelSegments.value.splice(index,1); wheelSegments.value.splice(target,0,item); }
 async function saveWheel() {
   wheelSaving.value=true; actionError.value='';
-  try { const result=await api.saveLuckyWheel(token.value,wheelSegments.value); wheelSegments.value=result.segments.map((segment:any)=>({label:segment.label,enabled:!!segment.enabled})); }
+  try { const result=await api.saveLuckyWheel(token.value,wheelSegments.value); wheelSegments.value=result.map((segment:any)=>({label:segment.label,enabled:!!segment.enabled})); }
   catch(e:any){actionError.value=e.message;}
   finally{wheelSaving.value=false;}
 }
