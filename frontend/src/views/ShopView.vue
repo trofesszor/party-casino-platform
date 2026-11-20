@@ -14,7 +14,6 @@ const error = ref('');
 const notice = ref('');
 const questSkipItem = computed(() => items.value.find(item => item.itemKey === 'QUEST_SKIP'));
 const activeQuests = computed(() => quests.value.filter(quest => quest.status === 'ACTIVE'));
-const scratchItem = computed(() => items.value.find(item => item.itemKey === 'SCRATCH_TICKET'));
 type ScratchTicket = {id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;createdAt:string};
 const scratchTickets = ref<ScratchTicket[]>([]);
 const activeTicket = ref<ScratchTicket|null>(null);
@@ -27,7 +26,7 @@ let scratchContext:CanvasRenderingContext2D|null=null;
 async function refresh() {
   if (!playerId || !playerName) { router.replace('/'); return; }
   try {
-    const [shop, sideQuests, wallet] = await Promise.all([
+    const [shop, sideQuests, wallet, tickets] = await Promise.all([
       api.getShop(playerId),
       api.getPlayerSideQuests(playerId),
       api.getPlayerBalance(playerId),
@@ -36,7 +35,7 @@ async function refresh() {
     items.value = shop;
     quests.value = sideQuests;
     balance.value = wallet.tokenBalance;
-    scratchTickets.value = await api.getScratchTickets(playerId);
+    scratchTickets.value = tickets;
     if(activeTicket.value) activeTicket.value=scratchTickets.value.find(ticket=>ticket.id===activeTicket.value?.id)??null;
     error.value = '';
   } catch (e:any) { error.value = e.message || 'Nem sikerült betölteni a shopot.'; }
