@@ -6,12 +6,14 @@ import DisplayView from './views/DisplayView.vue';
 import RouletteView from './views/RouletteView.vue';
 import SlotsView from './views/SlotsView.vue';
 import AdminView from './views/AdminView.vue';
+import LuckyWheelView from './views/LuckyWheelView.vue';
 import './style.css';
 const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', component: HomeView },
   { path: '/display', component: DisplayView },
   { path: '/roulette', component: RouletteView },
   { path: '/slots', component: SlotsView },
+  { path: '/lucky-wheel', component: LuckyWheelView },
   { path: '/admin', component: AdminView },
 ] });
 createApp(App).use(router).mount('#app');
