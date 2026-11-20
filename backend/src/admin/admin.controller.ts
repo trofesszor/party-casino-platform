@@ -35,6 +35,18 @@ export class AdminController {
       online: onlineIds.has(player.id),
     }));
   }
+  @Get('default-player-tokens')
+  getDefaultPlayerTokens(@Headers('authorization') authorization?: string) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.getDefaultPlayerTokens();
+  }
+
+  @Post('default-player-tokens')
+  setDefaultPlayerTokens(@Body() body:{defaultTokens:number},@Headers('authorization') authorization?: string) {
+    this.admin.assertToken(this.token(authorization));
+    return this.players.setDefaultPlayerTokens(Number(body.defaultTokens));
+  }
+
   @Get('statistics')
   getCasinoStatistics(@Headers('authorization') authorization?: string) {
     this.admin.assertToken(this.token(authorization));
