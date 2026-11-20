@@ -15,7 +15,7 @@ const isOwner = computed(() => quest.value?.ownerId === playerId);
 
 async function lookupPin() {
   if (!loggedIn.value) { error.value = 'Először jelentkezz be a saját játékosoddal.'; return; }
-  if (!/^\\d{3}$/.test(pin.value)) { error.value = 'Pontosan három számjegyet adj meg.'; return; }
+  if (!/^\d{3}$/.test(pin.value)) { error.value = 'Pontosan három számjegyet adj meg.'; return; }
   busy.value = true; error.value = '';
   try { quest.value = await api.getSideQuestVerification(pin.value,playerId); }
   catch (e:any) { quest.value = null; error.value = e.message || 'A PIN-kód hibás vagy lejárt.'; }
