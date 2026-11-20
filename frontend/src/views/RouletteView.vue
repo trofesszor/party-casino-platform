@@ -49,7 +49,7 @@ const betSpots = computed<BetSpot[]>(() => {
  } else if (selectedType.value === 'STREET') {
    for (let col = 0; col < 12; col++) {
      const n = col * 3 + 1;
-     spots.push({ type:'STREET', value:`${n},${n+1},${n+2}`, left:'0%', top:'50%', label:'3' });
+     spots.push({ type:'STREET', value:`${n},${n+1},${n+2}`, left:center(col,1).left, top:'50%', label:'3' });
    }
  } else if (selectedType.value === 'SIX_LINE') {
    for (let col = 0; col < 11; col += 2) {
