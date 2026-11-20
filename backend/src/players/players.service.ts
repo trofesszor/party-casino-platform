@@ -236,6 +236,8 @@ export class PlayersService {
 
   getTokenPhotoStatus(playerId:number) {
     const sqlite=this.database.sqlite;
+    sqlite.prepare("UPDATE token_photo_sessions SET status='EXPIRED' WHERE player_id=? AND status='PENDING' AND datetime(expires_at)<=CURRENT_TIMESTAMP").run(playerId);
+    sqlite.prepare("UPDATE token_photo_sessions SET status='EXPIRED' WHERE player_id=? AND status='CREATING' AND datetime(created_at)<=datetime('now','-2 minutes')").run(playerId);
     const player=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(playerId) as {balance:number}|undefined;
     if(!player) throw new BadRequestException('A játékos nem található.');
     const settings=this.getTokenPhotoSettings();
