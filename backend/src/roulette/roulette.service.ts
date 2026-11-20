@@ -63,9 +63,15 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     if (!Number.isInteger(amount) || amount < 1 || amount > 100) throw new BadRequestException('A zseton értéke 1 és 100 között lehet.');
     this.validateBet(betType, betValue);
 
-    this.database.sqlite.prepare(
-      'INSERT INTO casino_roulette_bets (round_id, player_id, bet_type, bet_value, amount) VALUES (?, ?, ?, ?, ?)',
-    ).run(round.id, playerId, betType, betValue, amount);
+    const sqlite = this.database.sqlite;
+    const place = sqlite.transaction(() => {
+      this.database.sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(amount, playerId, amount);
+      const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
+      if (balance.tokenBalance < 0) throw new BadRequestException('Nincs elegendő token a fogadáshoz.');
+      sqlite.prepare(\"INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'ROULETTE_BET', ?)\").run(playerId, -amount, balance.tokenBalance, 'Rulett tét: ' + betType + ' ' + betValue);
+      sqlite.prepare('INSERT INTO casino_roulette_bets (round_id, player_id, bet_type, bet_value, amount) VALUES (?, ?, ?, ?, ?)').run(round.id, playerId, betType, betValue, amount);
+    });
+    place();
     return this.publishState();
   }
 
@@ -134,6 +140,11 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
   private schedule(delay: number, callback: () => void) {
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(callback, Math.max(0, delay));
+  }
+
+  private payoutOdds(type: string) {
+    const odds: Record<string, number> = { NUMBER: 35, SPLIT: 17, STREET: 11, CORNER: 8, SIX_LINE: 5, DOZEN: 2, COLUMN: 2, COLOR: 1, ODD_EVEN: 1, LOW_HIGH: 1 };
+    return odds[type] ?? 0;
   }
 
   private isWinner(bet: any, result: number) {
