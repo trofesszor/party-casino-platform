@@ -319,9 +319,9 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
       </button>
     </div>
 
-    <section v-if="tokenPhotoStatus?.enabled && (tokenPhotoStatus.eligible || tokenPhotoStatus.pending || tokenPhotoSession)" class="token-photo-reward panel">
+    <section v-if="tokenPhotoStatus?.enabled && (tokenPhotoStatus.eligible || tokenPhotoStatus.pending || tokenPhotoSession || tokenPhotoMessage)" class="token-photo-reward panel">
       <div><p class="eyebrow">SNAPPIN · TOKEN REWARD</p><h2>Fotóért tokeneket?</h2><p class="muted">Ha az egyenleged {{tokenPhotoStatus.balanceThreshold}} CR alatt van, egy fotófeltöltéssel {{tokenPhotoStatus.rewardAmount}} CR-t szerezhetsz.</p><small class="muted">Napi lehetőség: {{tokenPhotoStatus.dailyRemaining}} / {{tokenPhotoStatus.dailyLimit}} · Feltöltések közötti várakozás: {{tokenPhotoStatus.cooldownMinutes}} perc.</small></div>
-      <div class="token-photo-reward-action"><button class="primary" :disabled="tokenPhotoBusy || !tokenPhotoStatus.eligible || !!tokenPhotoSession" @click="startTokenPhotoUpload">{{tokenPhotoBusy?'Indítás…':tokenPhotoSession?'Feltöltés folyamatban…':'📷 Fotó feltöltése · +'+tokenPhotoStatus.rewardAmount+' CR'}}</button><span v-if="tokenPhotoStatus.pending" class="muted">Már van aktív feltöltésed.</span></div>
+      <div class="token-photo-reward-action"><button class="primary" :disabled="tokenPhotoBusy || !tokenPhotoStatus.eligible || !!tokenPhotoSession" @click="startTokenPhotoUpload">{{tokenPhotoBusy?'Indítás…':tokenPhotoSession?'Feltöltés folyamatban…':tokenPhotoStatus.eligible?'📷 Fotó feltöltése · +'+tokenPhotoStatus.rewardAmount+' CR':tokenPhotoStatus.pending?'Feltöltés folyamatban…':tokenPhotoStatus.reason==='COOLDOWN'?'Várakozás a következő feltöltésig':tokenPhotoStatus.reason==='DAILY_LIMIT'?'Napi limit elérve':'Jelenleg nem elérhető'}}</button><span v-if="tokenPhotoStatus.pending" class="muted">Már van aktív feltöltésed.</span></div>
       <p v-if="tokenPhotoMessage" class="token-photo-message">{{tokenPhotoMessage}}</p>
     </section>
     <div class="dashboard-activity-grid">
