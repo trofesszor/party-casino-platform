@@ -6,6 +6,7 @@ const playerId = Number(localStorage.getItem('party-player-id'));
 const reels = ref(['🍒', '7️⃣', '💎']);
 const reelStrips = ref<string[][]>(reels.value.map(symbol => Array(13).fill(symbol)));
 const reelOffsets = ref([6, 6, 6]);
+const reelAnimating = ref(false);
 const reelDurations = [2300, 3150, 4000];
 const reelSymbols = ['🍒','🍋','🍇','🍉','🔔','💎','7️⃣','⭐','🪙'];
 const randomSymbol = () => reelSymbols[Math.floor(Math.random() * reelSymbols.length)];
@@ -25,6 +26,7 @@ async function spin() {
   if (!canPlay.value) { error.value = 'Előbb lépj be a főoldalon a neveddel.'; return; }
   if (busy.value) return;
   busy.value = true;
+  reelAnimating.value = false;
   error.value = '';
   result.value = '';
   spinCount.value++;
@@ -43,6 +45,8 @@ async function spin() {
 
     // Let the browser paint the starting position before applying the target.
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    reelAnimating.value = true;
+    await nextTick();
     reelOffsets.value = reelStrips.value.map(strip => strip.length - 1);
     await sleep(reelDurations[2] + 180);
 
@@ -86,7 +90,7 @@ async function spin() {
           <div class="slot-reel-labels"><span>1</span><span>2</span><span>3</span></div>
           <div class="slot-reels" :class="{ spinning: busy }">
             <div v-for="(strip,index) in reelStrips" :key="index" class="slot-reel-window" :class="{ 'reel-stopped': !busy && spinCount > 0 }">
-              <div class="slot-reel-strip" :style="{ transform: `translate3d(0, -${reelOffsets[index] * 100}%, 0)`, transitionDuration: busy ? `${reelDurations[index]}ms` : '0ms' }">
+              <div class="slot-reel-strip" :style="{ transform: `translate3d(0, -${(reelOffsets[index] / strip.length) * 100}%, 0)`, transitionDuration: reelAnimating ? `${reelDurations[index]}ms` : '0ms' }">
                 <div v-for="(symbol, symbolIndex) in strip" :key="symbolIndex" class="slot-reel-symbol">{{ symbol }}</div>
               </div>
               <div class="slot-reel-reflection"></div>
