@@ -15,6 +15,8 @@ export class PlayersController {
   @Post(':id/duels/:duelId/result') submitDuelWinner(@Param('id') id:string,@Param('duelId') duelId:string,@Body() body:{winnerId:number}) { return this.players.submitDuelWinner(Number(duelId),Number(id),Number(body.winnerId)); }
   @Post('side-quest-verifications/lookup') getSideQuestVerification(@Body() body:{pin:string;verifierId:number}) { return this.players.getSideQuestVerification(body.pin,Number(body.verifierId)); }
   @Post('side-quest-verifications/verify') verifySideQuest(@Body() body:{pin:string;verifierId:number;approve:boolean}) { return this.players.verifySideQuest(body.pin,Number(body.verifierId),body.approve); }
+  @Post(':id/side-quests/:questId/photo-session') createSideQuestPhotoSession(@Param('id') id:string,@Param('questId') questId:string) { return this.players.createSideQuestPhotoSession(Number(id),Number(questId)); }
+  @Post(':id/side-quests/:questId/photo-session/:sessionId/complete') completeSideQuestWithPhoto(@Param('id') id:string,@Param('questId') questId:string,@Param('sessionId') sessionId:string) { return this.players.completeSideQuestWithPhoto(Number(id),Number(questId),sessionId); }
   @Get(':id/side-quests') getSideQuests(@Param('id') id: string) { return this.players.getSideQuests(Number(id)); }
   @Post(':id/side-quests') assignSideQuest(@Param('id') id: string) { return this.players.assignSideQuest(Number(id)); }
   @Post(':id/side-quests/:questId/verification') requestSideQuestVerification(@Param('id') id:string,@Param('questId') questId:string) { return this.players.requestSideQuestVerification(Number(id),Number(questId)); }
