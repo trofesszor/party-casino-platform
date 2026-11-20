@@ -28,6 +28,37 @@ const resultColor = computed(() => {
  return redNumbers.has(n) ? 'red' : 'black';
 });
 const requiredNumbers = computed(() => ({ NUMBER:1, SPLIT:2, STREET:3, CORNER:4, SIX_LINE:6 }[selectedType.value as 'NUMBER'|'SPLIT'|'STREET'|'CORNER'|'SIX_LINE'] ?? 0));
+type BetSpot = { type: RouletteBetType; value: string; left: string; top: string; label: string };
+const betSpots = computed<BetSpot[]>(() => {
+ const spots: BetSpot[] = [];
+ const center = (column: number, row: number) => ({
+   left: `${((column + 0.5) / 12) * 100}%`,
+   top: `${((row + 0.5) / 3) * 100}%`,
+ });
+ if (selectedType.value === 'SPLIT') {
+   for (let col = 0; col < 12; col++) for (let row = 0; row < 3; row++) {
+     const n = col * 3 + row + 1;
+     if (row < 2) spots.push({ type:'SPLIT', value:`${n},${n+1}`, left:center(col,row).left, top:`${((row+1)/3)*100}%`, label:'↕' });
+     if (col < 11) spots.push({ type:'SPLIT', value:`${n},${n+3}`, left:`${((col+1)/12)*100}%`, top:center(col,row).top, label:'↔' });
+   }
+ } else if (selectedType.value === 'CORNER') {
+   for (let col = 0; col < 11; col++) for (let row = 0; row < 2; row++) {
+     const n = col * 3 + row + 1;
+     spots.push({ type:'CORNER', value:[n,n+1,n+3,n+4].join(','), left:`${((col+1)/12)*100}%`, top:`${((row+1)/3)*100}%`, label:'✣' });
+   }
+ } else if (selectedType.value === 'STREET') {
+   for (let col = 0; col < 12; col++) {
+     const n = col * 3 + 1;
+     spots.push({ type:'STREET', value:`${n},${n+1},${n+2}`, left:'0%', top:'50%', label:'3' });
+   }
+ } else if (selectedType.value === 'SIX_LINE') {
+   for (let col = 0; col < 11; col += 2) {
+     const n = col * 3 + 1;
+     spots.push({ type:'SIX_LINE', value:Array.from({length:6},(_,i)=>n+i).join(','), left:`${((col+2)/12)*100}%`, top:'50%', label:'6' });
+   }
+ }
+ return spots;
+});
 const isNumberBet = computed(() => requiredNumbers.value > 0);
 const selectedDescription = computed(() => isNumberBet.value
  ? (selectedNumbers.value.length ? selectedNumbers.value.slice().sort((a,b)=>a-b).join(' / ') : 'Válassz mezőket az asztalon')
@@ -35,12 +66,14 @@ const selectedDescription = computed(() => isNumberBet.value
 
 async function refresh() { state.value = await api.getRouletteState(); }
 function toggleNumber(number: number) {
- if (!isNumberBet.value) return;
- if (selectedNumbers.value.includes(number)) {
-   selectedNumbers.value = selectedNumbers.value.filter(n => n !== number);
- } else if (selectedNumbers.value.length < requiredNumbers.value) {
-   selectedNumbers.value = [...selectedNumbers.value, number];
- }
+ if (selectedType.value !== 'NUMBER') return;
+ selectedNumbers.value = [number];
+ selectedValue.value = '';
+}
+function selectBetSpot(spot: BetSpot) {
+ selectedType.value = spot.type;
+ selectedNumbers.value = spot.value.split(',').map(Number);
+ selectedValue.value = '';
 }
 function chooseType(type: RouletteBetType) {
  selectedType.value = type;
@@ -88,12 +121,15 @@ onUnmounted(() => { socket.off('roulette:changed', onChanged); if (clock) clearI
     <div class="roulette-bet-types">
      <button v-for="item in [{type:'NUMBER',label:'Egy szám'},{type:'SPLIT',label:'Split'},{type:'STREET',label:'Street'},{type:'CORNER',label:'Corner'},{type:'SIX_LINE',label:'Six line'}]" :key="item.type" :class="{active:selectedType===item.type}" @click="chooseType(item.type as RouletteBetType)">{{ item.label }}</button>
     </div>
-    <p class="bet-instruction">{{ isNumberBet ? 'Kattints a megfelelő számmezőkre. A kijelölés sorrendje nem számít.' : 'Válassz egy külső fogadást.' }}</p>
+    <p class="bet-instruction">{{ selectedType === 'NUMBER' ? 'Koppints egy számra.' : ['SPLIT','STREET','CORNER','SIX_LINE'].includes(selectedType) ? 'Koppints egy jelölt pontra az asztalon a teljes kombináció kijelöléséhez.' : 'Válassz egy külső fogadást.' }}</p>
     <div class="roulette-layout">
      <div class="roulette-number-board">
       <button class="roulette-zero" :class="{selected:selectedNumbers.includes(0)}" :disabled="selectedType!=='NUMBER'" @click="toggleNumber(0)">0</button>
-      <div class="roulette-number-grid">
-       <button v-for="n in 36" :key="n" :style="{ gridRow: String((n - 1) % 3 + 1), gridColumn: String(Math.floor((n - 1) / 3) + 1) }" :class="[redNumbers.has(n)?'red':'black',{selected:selectedNumbers.includes(n)}]" @click="toggleNumber(n)">{{ n }}</button>
+      <div class="roulette-number-grid-shell">
+       <div class="roulette-number-grid">
+        <button v-for="n in 36" :key="n" :style="{ gridRow: String((n - 1) % 3 + 1), gridColumn: String(Math.floor((n - 1) / 3) + 1) }" :class="[redNumbers.has(n)?'red':'black',{selected:selectedNumbers.includes(n)}]" :disabled="selectedType!=='NUMBER'" @click="toggleNumber(n)">{{ n }}</button>
+       </div>
+       <button v-for="(spot,index) in betSpots" :key="spot.value+'-'+index" class="roulette-bet-spot" :class="{active:selectedNumbers.length===requiredNumbers&&selectedNumbers.slice().sort((a,b)=>a-b).join(',')===spot.value.split(',').map(Number).sort((a,b)=>a-b).join(',')}" :style="{left:spot.left,top:spot.top}" :aria-label="spot.type+' '+spot.value" @click="selectBetSpot(spot)">{{ spot.label }}</button>
       </div>
      </div>
      <div class="roulette-outside">
