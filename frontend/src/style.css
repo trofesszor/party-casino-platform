@@ -119,8 +119,8 @@
 .roulette-layout{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:14px}
 .roulette-number-board{display:grid;grid-template-columns:48px minmax(0,1fr);gap:7px;min-width:0}
 .roulette-zero{background:#27824c;color:#fff;border:1px solid #ffffff35;border-radius:5px;font-weight:800;font-size:18px}
-.roulette-number-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
-.roulette-number-grid button{min-height:43px;border:1px solid #ffffff30;border-radius:5px;color:#fff;font-weight:800}
+.roulette-number-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:repeat(3,minmax(43px,1fr));gap:5px}
+.roulette-number-grid button{min-height:43px;height:43px;border:1px solid #ffffff30;border-radius:5px;color:#fff;font-weight:800;padding:0;display:grid;place-items:center}
 .roulette-number-grid button.red{background:#a92730}
 .roulette-number-grid button.black{background:#17181d}
 .roulette-number-grid button.selected,.roulette-zero.selected{outline:3px solid var(--accent);outline-offset:1px;filter:brightness(1.3)}
@@ -202,7 +202,7 @@
  .roulette-bet-spot{width:27px;height:27px;font-size:14px}
 }
 @media(min-width:761px){
- .roulette-number-grid-shell{height:143px}
+ .roulette-number-grid-shell{height:139px}
  .roulette-bet-spot{width:23px;height:23px}
 }
 
