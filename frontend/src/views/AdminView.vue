@@ -9,6 +9,8 @@ const balanceInputs = ref<Record<number, number>>({});
 const transactions = ref<TokenTransaction[]>([]);
 const selectedPlayer = ref<number | null>(null);
 const actionError = ref('');
+const wheelSegments = ref<{label:string;enabled:boolean}[]>([]);
+const wheelSaving = ref(false);
 const password = ref('');
 const token = ref(localStorage.getItem('party-admin-token') ?? '');
 const players = ref<AdminPlayer[]>([]);
@@ -22,6 +24,8 @@ async function loadPlayers() {
     players.value = await api.adminPlayers(token.value);
     balanceInputs.value = Object.fromEntries(players.value.map(player => [player.id, player.tokenBalance ?? 0]));
     authenticated.value = true;
+    const wheel = await api.getLuckyWheel();
+    wheelSegments.value = wheel.segments.map(segment => ({ label: segment.label, enabled: !!segment.enabled }));
     localStorage.setItem('party-admin-token', token.value);
   } catch {
     token.value = '';
@@ -60,6 +64,16 @@ async function saveBalance(player: AdminPlayer) {
 async function showTransactions(player: AdminPlayer) {
   selectedPlayer.value = selectedPlayer.value === player.id ? null : player.id;
   transactions.value = selectedPlayer.value ? await api.adminTransactions(token.value, player.id) : [];
+}
+
+function addWheelSegment() { if (wheelSegments.value.length < 24) wheelSegments.value.push({ label: 'Új mező', enabled: true }); }
+function removeWheelSegment(index: number) { wheelSegments.value.splice(index, 1); }
+function moveWheelSegment(index: number, direction: number) { const target=index+direction; if(target<0||target>=wheelSegments.value.length)return; const [item]=wheelSegments.value.splice(index,1); wheelSegments.value.splice(target,0,item); }
+async function saveWheel() {
+  wheelSaving.value=true; actionError.value='';
+  try { const result=await api.saveLuckyWheel(token.value,wheelSegments.value); wheelSegments.value=result.segments.map((segment:any)=>({label:segment.label,enabled:!!segment.enabled})); }
+  catch(e:any){actionError.value=e.message;}
+  finally{wheelSaving.value=false;}
 }
 
 async function logout() {
@@ -124,6 +138,11 @@ onMounted(loadPlayers);
             </tbody>
           </table>
         </div>
+      </section>
+      <section class="panel admin-wheel-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">PARTY GAME</p><h2>Szerencsekerék mezői</h2><p class="muted">A módosítások azonnal megjelennek minden telefonon és a TV-n.</p></div><button class="ghost" @click="addWheelSegment" :disabled="wheelSegments.length>=24">+ Új mező</button></div>
+        <div v-for="(segment,index) in wheelSegments" :key="index" class="admin-wheel-row"><span class="admin-wheel-index">{{ index+1 }}</span><input v-model="segment.label" maxlength="48" placeholder="Mező felirata"><label><input v-model="segment.enabled" type="checkbox"> Aktív</label><button class="ghost" @click="moveWheelSegment(index,-1)" :disabled="index===0">↑</button><button class="ghost" @click="moveWheelSegment(index,1)" :disabled="index===wheelSegments.length-1">↓</button><button class="ghost danger" @click="removeWheelSegment(index)">Törlés</button></div>
+        <button class="primary" :disabled="wheelSaving||wheelSegments.length<2" @click="saveWheel">{{wheelSaving?'Mentés…':'Kerék mentése'}}</button>
       </section>
       <p v-if="actionError" class="error">{{ actionError }}</p>
       <p class="admin-footnote">A játékosadatok jelenleg az azonosítót, nevet, csatlakozás idejét és online állapotot tartalmazzák. További statisztikák később bővíthetők.</p>
