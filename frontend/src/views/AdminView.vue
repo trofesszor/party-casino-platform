@@ -22,6 +22,8 @@ const shopItems = ref<AdminShopItem[]>([]);
 const shopSavingKey = ref('');
 const tokenPhotoSettings=ref({enabled:true,balanceThreshold:50,rewardAmount:10,cooldownMinutes:60,dailyLimit:2});
 const tokenPhotoSaving=ref(false);
+const resetBusy=ref(false);
+const resetMessage=ref('');
 
 const password = ref('');
 const token = ref(localStorage.getItem('party-admin-token') ?? '');
@@ -141,6 +143,24 @@ async function deleteSideQuest(questId:number) {
   } catch (e:any) { actionError.value = e.message; }
 }
 
+async function resetPlayerData(){
+  actionError.value='';
+  resetMessage.value='';
+  const confirmation=window.prompt('Ez véglegesen törli az összes játékost és minden játékoshoz tartozó adatot. A folytatáshoz írd be: RESET');
+  if(confirmation!=='RESET')return;
+  resetBusy.value=true;
+  try{
+    const result=await api.adminResetPlayerData(token.value);
+    selectedPlayer.value=null;
+    transactions.value=[];
+    players.value=[];
+    balanceInputs.value={};
+    resetMessage.value=`Sikeres visszaállítás. Törölt játékosok: ${result.deletedPlayers}.`;
+    await loadPlayers();
+  }catch(e:any){actionError.value=e.message||'A játékosadatok törlése nem sikerült.';}
+  finally{resetBusy.value=false;}
+}
+
 async function logout() {
   try { if (token.value) await api.adminLogout(token.value); } catch { /* local logout still applies */ }
   token.value = '';
@@ -182,6 +202,12 @@ onMounted(loadPlayers);
         <article class="panel admin-stat"><span>ONLINE JÁTÉKOS</span><strong>{{ players.filter(p => p.online).length }}</strong></article>
       </div>
 
+      <section class="panel admin-wheel-editor admin-reset-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">NEW GAME</p><h2>Kaszinó újraindítása</h2><p class="muted">Törli az összes játékost, egyenleget, tranzakciót, fogadást, párbajt, sorsjegyet, készletet és játékoshoz tartozó küldetéselőzményt. A side quest pool, kerékmezők, shop termékek és admin beállítások megmaradnak.</p></div></div>
+        <p class="error">Figyelem: ez a művelet végleges, és minden játékosadatot töröl.</p>
+        <button class="ghost danger" :disabled="resetBusy" @click="resetPlayerData">{{resetBusy?'Visszaállítás…':'Játékosadatok törlése és új játék indítása'}}</button>
+        <p v-if="resetMessage" class="muted">{{resetMessage}}</p>
+      </section>
       <section class="panel admin-players">
         <div class="admin-section-heading"><div><p class="eyebrow">PLAYER DATABASE</p><h2>Játékosok</h2></div><button class="ghost" @click="loadPlayers">Frissítés</button></div>
         <div v-if="!players.length" class="muted admin-empty">Még nincs regisztrált játékos.</div>
