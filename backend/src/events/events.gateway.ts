@@ -42,9 +42,18 @@ export class EventsGateway {
     if (event === 'party:notification' && payload?.message) {
       const category = this.categories.includes(String(payload.type)) ? String(payload.type) : 'system';
       if (!this.getNotificationSettings()[category]) return;
-      this.database.sqlite.prepare(
+      const inserted = this.database.sqlite.prepare(
         'INSERT INTO party_notifications (type,title,message,audience_player_id) VALUES (?,?,?,?)',
       ).run(String(payload.type ?? 'system'), payload.title ? String(payload.title) : null, String(payload.message), payload.audiencePlayerId ?? null);
+      // Attach the persisted notification ID to the socket event. The frontend also
+      // receives this row through polling; both delivery paths must share one identity.
+      payload = {
+        ...payload,
+        id: Number(inserted.lastInsertRowid),
+        createdAt: this.database.sqlite.prepare(
+          'SELECT created_at AS createdAt FROM party_notifications WHERE id = ?',
+        ).get(Number(inserted.lastInsertRowid))?.createdAt,
+      };
     }
     if (event === 'party:notification' && Number.isSafeInteger(payload?.audiencePlayerId) && payload.audiencePlayerId > 0) {
       this.server?.to(`player:${payload.audiencePlayerId}`).emit(event, payload);
