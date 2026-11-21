@@ -10,6 +10,8 @@ import LuckyWheelView from './views/LuckyWheelView.vue';
 import LeaderboardView from './views/LeaderboardView.vue';
 import ShopView from './views/ShopView.vue';
 import VerifyQuestView from './views/VerifyQuestView.vue';
+import CommunityEventsView from './views/CommunityEventsView.vue';
+import AdminCommunityEventsView from './views/AdminCommunityEventsView.vue';
 import './style.css';
 const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', component: HomeView },
@@ -21,5 +23,7 @@ const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/shop', component: ShopView },
   { path: '/verify-quest', component: VerifyQuestView },
   { path: '/admin', component: AdminView },
+  { path: '/community-events', component: CommunityEventsView },
+  { path: '/admin/community-events', component: AdminCommunityEventsView },
 ] });
 createApp(App).use(router).mount('#app');
