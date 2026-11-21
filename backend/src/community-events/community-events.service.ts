@@ -194,7 +194,6 @@ export class CommunityEventsService {
     try {
       const event = this.event(id);
       if (!event.active || event.completed || (event.nextAvailableAt && new Date(event.nextAvailableAt).getTime()>Date.now())) throw new BadRequestException('Ez a közösségi esemény jelenleg nem fogad hozzájárulást.');
-      if (event.isSecret) throw new BadRequestException('A titkos eseményhez jelenleg nem lehet közvetlenül hozzájárulni.');
       const player = this.sqlite.prepare('SELECT id,token_balance AS balance FROM players WHERE id=?').get(playerId) as any;
       if (!player) throw new BadRequestException('A játékos nem található.');
       if (amount < event.minContribution) throw new BadRequestException(`A minimum hozzájárulás ${event.minContribution} token.`);
