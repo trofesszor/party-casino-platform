@@ -13,7 +13,7 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
 };
 export const api = {
 
-  getPartyNotifications: () => request<{id:number;type:'event'|'wheel'|'system';title:string|null;message:string;createdAt:string}[]>('/api/events/notifications'),
+  getPartyNotifications: (playerId?:number) => request<{id:number;type:'event'|'wheel'|'system'|'duel';title:string|null;message:string;createdAt:string}[]>(`/api/events/notifications${playerId ? `?playerId=${playerId}` : ''}`),
   getCommunityEvents: () => request<{events:CommunityEvent[];recentActivations:CommunityActivation[]}>('/api/community-events'),
   contributeCommunityEvent: (eventId:number,playerId:number,amount:number) => request<any>(`/api/community-events/${eventId}/contribute`,{method:'POST',body:JSON.stringify({playerId,amount})}),
   getCommunityEventHistory: (eventId:number) => request<any>(`/api/community-events/${eventId}/history`),
