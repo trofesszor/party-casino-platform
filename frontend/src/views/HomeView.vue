@@ -282,18 +282,18 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
 
     <section class="lobby-shell">
       <aside class="lobby-rail">
-        <div class="rail-label">NAVIGÁCIÓ</div>
-        <a class="rail-item active" href="/"><span>⌂</span><strong>Lobby</strong></a>
-        <button class="rail-item" @click="router.push('/roulette')"><span>◉</span><strong>Rulett</strong></button>
-        <button class="rail-item" @click="router.push('/slots')"><span>✦</span><strong>Slots</strong></button>
-        <button class="rail-item" @click="router.push('/lucky-wheel')"><span>◎</span><strong>Kerék</strong></button>
+        <div class="rail-label">PARTY TOOLS</div>
+        <button class="rail-item active" @click="router.push('/')"><span>⌂</span><strong>Lobby</strong></button>
+        <div class="rail-label rail-label-games">JÁTÉKOK</div>
+        <button class="rail-item" @click="router.push('/roulette')"><span>◉</span><strong>Rulett</strong><small>LIVE</small></button>
+        <button class="rail-item" @click="router.push('/slots')"><span>✦</span><strong>Slots</strong><small>PLAY</small></button>
+        <button class="rail-item" @click="router.push('/lucky-wheel')"><span>◎</span><strong>Szerencsekerék</strong><small>SHARED</small></button>
         <div class="rail-divider"></div>
-        <button class="rail-item" @click="router.push('/community-events')"><span>◌</span><strong>Events</strong></button>
-        <button class="rail-item" @click="router.push('/shop')"><span>◇</span><strong>Shop</strong></button>
-        <button class="rail-item" @click="router.push('/leaderboard')"><span>♛</span><strong>Ranglista</strong></button>
-        <div class="rail-spacer"></div>
-        <a class="rail-item" href="/verify-quest"><span>✓</span><strong>PIN ellenőrzés</strong></a>
+        <div class="rail-label">EXTRÁK</div>
+        <a class="rail-item" href="/verify-quest"><span>✓</span><strong>Quest PIN</strong></a>
         <a class="rail-item" href="/display" target="_blank"><span>▣</span><strong>TV kijelző</strong></a>
+        <div class="rail-spacer"></div>
+        <div class="rail-party-note"><i></i><span><strong>PARTY LIVE</strong><small>A kaszinó minden játékosa szinkronban van.</small></span></div>
       </aside>
 
       <div class="lobby-main">
