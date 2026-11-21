@@ -1753,3 +1753,16 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
 .quest-verify-found{padding:13px;border:1px solid #ffffff10;border-radius:12px;background:#ffffff03}.quest-verify-found h4{margin:6px 0 4px;font-size:14px}.quest-verify-found p{margin:0 0 12px;color:#8b98ab;font-size:11px}.quest-verify-actions{display:flex;gap:8px}.quest-verify-reset{margin-top:8px}
 .quest-verify-result{display:flex;flex-direction:column;gap:6px;padding:13px;border-radius:12px;background:#b9f36a0b;border:1px solid #b9f36a25}.quest-verify-result strong{color:#cfff91}.quest-verify-result span{font-size:11px;color:#9aa7b9}
 @media(max-width:600px){.quest-verify-inline-form{grid-template-columns:1fr}.quest-verify-actions{flex-direction:column}.quest-verify-inline{padding:15px}}
+
+
+/* The lobby uses a hamburger menu on mobile; never show the desktop links
+   or the legacy horizontally-scrollable navigation row at the same time. */
+@media(max-width:800px){
+  .casino-header .casino-nav.desktop-casino-nav{
+    display:none!important;
+    width:0!important;
+    height:0!important;
+    overflow:hidden!important;
+  }
+  .casino-header .mobile-menu-button{display:grid!important;place-items:center;flex:0 0 36px!important}
+}
