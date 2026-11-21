@@ -1,4 +1,9 @@
 import type { Player, RouletteBetType, RouletteState } from '../types';
+
+export type CommunityEvent = {id:number;title:string;description:string;targetAmount:number;currentAmount:number;repeatMode:'ONCE'|'REPEATABLE'|'COOLDOWN';isSecret:number;nextAvailableAt:string|null;contributorCount:number};
+export type CommunityEventAdmin = CommunityEvent & {cooldownMinutes:number;minContribution:number;maxContribution:number|null;active:number;completed:number;activationCount:number};
+export type CommunityActivation = {id:number;title:string;description:string;totalContributions:number;participantCount:number;activatedAt:string;triggerType:string};
+
 export type Duel = { id:number; challengerId:number; challengerName:string; opponentId:number; opponentName:string; status:'PENDING'|'CHOOSE_TYPE'|'IN_PROGRESS'|'AWAITING_CONFIRMATION'|'COMPLETED'|'REFUSED'; duelType:string|null; challengerWinnerId:number|null; opponentWinnerId:number|null; winnerId:number|null; loserId:number|null; rewardAmount:number; createdAt:string; completedAt:string|null };
 const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } });
@@ -7,6 +12,17 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   return data as T;
 };
 export const api = {
+
+  getCommunityEvents: () => request<{events:CommunityEvent[];recentActivations:CommunityActivation[]}>('/api/community-events'),
+  contributeCommunityEvent: (eventId:number,playerId:number,amount:number) => request<any>(`/api/community-events/${eventId}/contribute',{method:'POST',body:JSON.stringify({playerId,amount})}),
+  getCommunityEventHistory: (eventId:number) => request<any>(`/api/community-events/${eventId}/history`),
+  adminCommunityEvents: (token:string) => request<CommunityEventAdmin[]>('/api/community-events/admin/all',{headers:{Authorization:`Bearer ${token}`}}),
+  adminCreateCommunityEvent: (token:string,input:any) => request<any>('/api/community-events/admin',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(input)}),
+  adminUpdateCommunityEvent: (token:string,id:number,input:any) => request<any>(`/api/community-events/admin/${id}`,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(input)}),
+  adminToggleCommunityEvent: (token:string,id:number,active:boolean) => request<any>(`/api/community-events/admin/${id}/toggle`,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:JSON.stringify({active})}),
+  adminActivateCommunityEvent: (token:string,id:number) => request<any>(`/api/community-events/admin/${id}/activate`,{method:'POST',headers:{Authorization:`Bearer ${token}`}}),
+  adminDeleteCommunityEvent: (token:string,id:number) => request<any>(`/api/community-events/admin/${id}/delete`,{method:'POST',headers:{Authorization:`Bearer ${token}`}}),
+
   getLuckyWheel: () => request<{ status: 'IDLE' | 'SPINNING' | 'RESULT'; spinId: string | null; startedAt: number | null; endsAt: number | null; winner: { id: number; label: string; position: number } | null; segments: { id: number; label: string; position: number; enabled: number }[]; durationMs: number; spinCost: number }>('/api/lucky-wheel'),
   spinLuckyWheel: (playerId: number) => request<any>('/api/lucky-wheel/spin', { method: 'POST', body: JSON.stringify({ playerId }) }),
   adminGetLuckyWheelSegments: (token: string) => request<{id:number;label:string;position:number;enabled:number}[]>('/api/lucky-wheel/segments', { headers: { Authorization: `Bearer ${token}` } }),

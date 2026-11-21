@@ -273,7 +273,7 @@ onMounted(loadPlayers);
     <section v-else class="admin-content">
       <div class="admin-heading">
         <div><p class="eyebrow">CONTROL PANEL</p><h1>Admin <span>dashboard</span></h1><p class="muted">Játékosok és aktivitási adatok.</p></div>
-        <button class="ghost" @click="logout">Kilépés</button>
+        <div class="admin-heading-actions"><a class="ghost" href="/admin/community-events">Community Events kezelése →</a><button class="ghost" @click="logout">Kilépés</button></div>
       </div>
 
       <div class="admin-stat-grid">

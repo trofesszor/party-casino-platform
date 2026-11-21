@@ -311,6 +311,13 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         <span class="game-link">Kerék megnyitása →</span>
       </button>
 
+      <button class="game-card panel community-game-card" @click="router.push('/community-events')">
+        <span class="game-icon">🌐</span>
+        <h3>Community Events</h3>
+        <p class="muted">Dolgozzatok össze, járuljatok hozzá tokenekkel, és oldjatok fel közös party eseményeket.</p>
+        <span class="game-link">Események megnyitása →</span>
+      </button>
+
       <button class="game-card panel shop-game-card" @click="router.push('/shop')">
         <span class="game-icon">🛍️</span>
         <h3>Shop</h3>

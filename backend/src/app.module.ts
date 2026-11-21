@@ -5,8 +5,9 @@ import { RouletteModule } from './roulette/roulette.module';
 import { SlotsModule } from './slots/slots.module';
 import { AdminModule } from './admin/admin.module';
 import { LuckyWheelModule } from './lucky-wheel/lucky-wheel.module';
+import { CommunityEventsModule } from './community-events/community-events.module';
 
 @Module({
-  imports: [DatabaseModule, PlayersModule, RouletteModule, SlotsModule, AdminModule, LuckyWheelModule],
+  imports: [DatabaseModule, PlayersModule, RouletteModule, SlotsModule, AdminModule, LuckyWheelModule, CommunityEventsModule],
 })
 export class AppModule {}
