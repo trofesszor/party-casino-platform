@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
 import { DATABASE } from '../database/database.module';
+import { EventsGateway } from '../events/events.gateway';
 
 const SYMBOLS = [
   { symbol: '🍒', weight: 30, payout: 2, name: 'Cherry' },
@@ -31,7 +32,7 @@ const PAYTABLE = [
 
 @Injectable()
 export class SlotsService {
-  constructor(@Inject(DATABASE) private readonly database: any) {}
+  constructor(@Inject(DATABASE) private readonly database: any, private readonly gateway: EventsGateway) {}
 
   spin(playerId: number, betAmount: number) {
     const allowedBets = [1, 5, 10, 25, 50];
@@ -67,6 +68,15 @@ export class SlotsService {
       const remaining = sqlite.prepare('SELECT free_spins AS freeSpins FROM slot_player_state WHERE player_id = ?').get(playerId) as { freeSpins: number };
       const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
       sqlite.exec('COMMIT');
+      if (payoutAmount >= Math.max(50, betAmount * 8)) {
+        const lines = [
+          `${player.name} a slot gépen megütötte a főnyeremény-szagot: +${payoutAmount} CR!`,
+          `${player.name} akkorát szakított a sloton, hogy leesett a fél társaság álla: +${payoutAmount} CR!`,
+          `JACKPOT-RIADÓ! ${player.name} most nem kegyelmezett a slotnak: +${payoutAmount} CR!`,
+          `${player.name} háromszor rányomott a szerencsére, és a szerencse beadta a derekát: +${payoutAmount} CR!`
+        ];
+        this.gateway.publish('party:notification', { type:'wheel', title:'SLOT · NAGY NYEREMÉNY', message:lines[randomInt(lines.length)] });
+      }
       return {
         playerId,
         playerName: player.name,
