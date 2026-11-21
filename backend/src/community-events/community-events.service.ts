@@ -97,10 +97,15 @@ export class CommunityEventsService {
       e.current_amount AS currentAmount,e.repeat_mode AS repeatMode,e.is_secret AS isSecret,
       e.next_available_at AS nextAvailableAt,e.created_at AS createdAt,
       (SELECT COUNT(DISTINCT player_id) FROM community_event_contributions c WHERE c.event_id=e.id) AS contributorCount
+      ,EXISTS(SELECT 1 FROM community_event_activations a WHERE a.event_id=e.id) AS unlocked
       FROM community_events e
-      WHERE e.is_active=1 AND e.is_completed=0 AND (e.next_available_at IS NULL OR datetime(e.next_available_at)<=CURRENT_TIMESTAMP)
-        AND e.is_secret=0
-      ORDER BY e.created_at DESC`).all() as any[];
+      WHERE (
+        (e.is_secret=0 AND e.is_active=1 AND e.is_completed=0
+          AND (e.next_available_at IS NULL OR datetime(e.next_available_at)<=CURRENT_TIMESTAMP))
+        OR
+        (e.is_secret=1 AND EXISTS(SELECT 1 FROM community_event_activations a WHERE a.event_id=e.id))
+      )
+      ORDER BY CASE WHEN e.is_secret=1 THEN 0 ELSE 1 END,e.created_at DESC`).all() as any[];
     const recent = this.sqlite.prepare(`SELECT id,title,description,total_contributions AS totalContributions,
       participant_count AS participantCount,activated_at AS activatedAt,trigger_type AS triggerType
       FROM community_event_activations ORDER BY id DESC LIMIT 20`).all() as any[];
@@ -159,7 +164,11 @@ export class CommunityEventsService {
 
   setActive(id: number, active: boolean) {
     this.event(id);
-    this.sqlite.prepare('UPDATE community_events SET is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(active?1:0,id);
+    if(active) {
+      this.sqlite.prepare("UPDATE community_events SET is_active=1,is_completed=0,current_amount=CASE WHEN repeat_mode='ONCE' THEN 0 ELSE current_amount END,next_available_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(id);
+    } else {
+      this.sqlite.prepare('UPDATE community_events SET is_active=0,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(id);
+    }
     this.publish();
     return this.event(id);
   }
