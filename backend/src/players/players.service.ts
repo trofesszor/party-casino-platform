@@ -615,23 +615,18 @@ export class PlayersService {
         const roll=randomInt(0,10000);let threshold=settings.scratchLossPercent*100,prize=0;
         for(const [chance,value] of [[settings.scratch10Percent,10],[settings.scratch25Percent,25],[settings.scratch50Percent,50],[settings.scratch100Percent,100]] as Array<[number,number]>){threshold+=chance*100;if(roll>=settings.scratchLossPercent*100 && roll<threshold){prize=value;break;}}
         const symbols=['🍒','🍋','🔔','🍀','💎','⭐','7️⃣'];
-        const grid:string[][]=Array.from({length:3},()=>Array.from({length:3},()=>symbols[randomInt(0,symbols.length-1)]));
+        const makeNonWinningRow=():string[]=>{
+          for(let attempt=0;attempt<100;attempt++){
+            const row=Array.from({length:3},()=>symbols[randomInt(0,symbols.length-1)]);
+            if(!(row[0]===row[1]&&row[1]===row[2]))return row;
+          }
+          return ['🍒','🍋','🍒'];
+        };
+        const grid:string[][]=Array.from({length:3},()=>makeNonWinningRow());
         if(prize>0){
           const prizeSymbol=prize===100?'7️⃣':prize===50?'💎':prize===25?'⭐':'🔔';
           const winningRow=randomInt(0,2);
           grid[winningRow]=[prizeSymbol,prizeSymbol,prizeSymbol];
-          for(let attempt=0;attempt<100;attempt++){
-            let accidental=false;
-            for(let row=0;row<3;row++)if(row!==winningRow&&grid[row][0]===grid[row][1]&&grid[row][1]===grid[row][2])accidental=true;
-            if(!accidental)break;
-            for(let col=0;col<3;col++)grid[(winningRow+1)%3][col]=symbols.filter(symbol=>symbol!==prizeSymbol)[randomInt(0,symbols.length-2)];
-          }
-        } else {
-          for(let attempt=0;attempt<100;attempt++){
-            const hasTriple=grid.some(row=>row[0]===row[1]&&row[1]===row[2]);
-            if(!hasTriple)break;
-            for(let row=0;row<3;row++)grid[row]=Array.from({length:3},()=>symbols[randomInt(0,symbols.length-1)]);
-          }
         }
         const result=sqlite.prepare('INSERT INTO scratch_tickets (player_id,prize_amount,outcome_json) VALUES (?,?,?)').run(playerId,prize,JSON.stringify(grid));
         sqlite.exec('COMMIT'); return {success:true,itemKey:item.itemKey,ticketId:Number(result.lastInsertRowid),tokenBalance:balance};
