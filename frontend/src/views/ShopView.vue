@@ -67,6 +67,7 @@ function scratchMove(event:PointerEvent){if(!scratching.value||!scratchContext||
 function scratchEnd(){scratching.value=false;}
 async function revealTicket(){if(revealing.value||!activeTicket.value)return;revealing.value=true;try{const result=await api.revealScratchTicket(playerId,activeTicket.value.id);activeTicket.value={...activeTicket.value,status:'REVEALED',prizeAmount:result.prizeAmount,outcomeJson:JSON.stringify(result.outcome)};await refresh();}catch(e:any){error.value=e.message||'A sorsjegy felfedése nem sikerült.';}finally{revealing.value=false;}}
 function openScratchTicket(ticket:ScratchTicket){activeTicket.value=ticket;nextTick(()=>{if(ticket.status==='UNSCRATCHED')initializeScratchCard();});}
+function scratchGrid(ticket:ScratchTicket):string[][]{try{return ticket.outcomeJson?JSON.parse(ticket.outcomeJson):[['?','?','?'],['?','?','?'],['?','?','?']];}catch{return [['?','?','?'],['?','?','?'],['?','?','?']];}}
 async function skipQuest(questId:number) {
   if (busy.value || !questSkipItem.value?.quantity) return;
   const quest = activeQuests.value.find(entry => entry.id === questId);
@@ -134,16 +135,33 @@ onMounted(refresh);
       <section class="scratch-modal panel">
         <button class="ghost scratch-close" @click="activeTicket=null">✕</button>
         <div class="scratch-modal-heading"><span>PARTY CASINO · INSTANT WIN</span><h2>Kapard és <em>nyerj!</em></h2><p>Találd meg a nyereményedet a lekaparható mező alatt.</p></div>
-        <div class="scratch-card" :class="{'scratch-card-winner':activeTicket.status==='REVEALED' && (activeTicket.prizeAmount??0)>0,'scratch-card-loser':activeTicket.status==='REVEALED' && !activeTicket.prizeAmount}">
-          <div class="scratch-card-top"><span>LUCKY TICKET</span><span>NO. {{ activeTicket.id }}</span></div>
-          <div class="scratch-prize-area">
-            <template v-if="activeTicket.status==='REVEALED'"><span class="scratch-result-icon">{{ activeTicket.prizeAmount ? '🏆' : '🍀' }}</span><strong>{{ activeTicket.prizeAmount ? '+'+activeTicket.prizeAmount+' CR' : 'MOST NEM NYERTÉL' }}</strong><small>{{ activeTicket.prizeAmount ? 'A nyeremény jóváírva az egyenlegeden.' : 'Próbáld újra egy másik sorsjeggyel!' }}</small></template>
-            <template v-else><span class="scratch-question">?</span><strong>A TE NYEREMÉNYED</strong><small>Kapard le a teljes mezőt!</small></template>
+        <div class="scratch-ticket-paper" :class="{'ticket-winner':activeTicket.status==='REVEALED' && (activeTicket.prizeAmount??0)>0,'ticket-loser':activeTicket.status==='REVEALED' && !activeTicket.prizeAmount}">
+          <div class="paper-topline"><span>PARTY CASINO PRESENTS</span><span>NO. {{ String(activeTicket.id).padStart(6,'0') }}</span></div>
+          <div class="paper-masthead"><div class="paper-seal">♛</div><div><small>AZ IGAZI BULIHOZ</small><h3>FŐNYEREMÉNY</h3><b>KAPARÓS SORSJEGY</b></div><div class="paper-badge">EXTRA<br>KIADÁS</div></div>
+          <div class="paper-subtitle"><span>3 EGYFORMA JEL = NYEREMÉNY</span><span>AZONNALI JÁTÉK</span></div>
+          <div class="scratch-play-area">
+            <div class="scratch-symbol-grid">
+              <div v-for="(row,rowIndex) in scratchGrid(activeTicket)" :key="rowIndex" class="scratch-symbol-row">
+                <div v-for="(symbol,colIndex) in row" :key="colIndex" class="scratch-symbol-cell" :class="{'symbol-winning':activeTicket.status==='REVEALED' && row[0]===row[1] && row[1]===row[2]}">
+                  <span>{{ symbol }}</span><small>{{ rowIndex*3+colIndex+1 }}</small>
+                </div>
+              </div>
+            </div>
+            <canvas v-if="activeTicket.status==='UNSCRATCHED'" ref="scratchCanvas" class="scratch-surface" @pointerdown="scratchStart" @pointermove="scratchMove" @pointerup="scratchEnd" @pointercancel="scratchEnd"></canvas>
           </div>
-          <canvas v-if="activeTicket.status==='UNSCRATCHED'" ref="scratchCanvas" class="scratch-surface" @pointerdown="scratchStart" @pointermove="scratchMove" @pointerup="scratchEnd" @pointercancel="scratchEnd"></canvas>
-          <div class="scratch-card-bottom"><span>PARTY CASINO</span><span>GOOD LUCK!</span></div>
+          <div class="paper-rules">
+            <div><strong>HOGYAN NYERHETSZ?</strong><span>Keress 3 egyforma szimbólumot egy vízszintes sorban.</span></div>
+            <div class="paper-prize-table">
+              <span>🔔 <b>10 CR</b></span><span>⭐ <b>25 CR</b></span><span>💎 <b>50 CR</b></span><span>7️⃣ <b>100 CR</b></span>
+            </div>
+          </div>
+          <div v-if="activeTicket.status==='REVEALED'" class="paper-result" :class="{'paper-result-win':(activeTicket.prizeAmount??0)>0}">
+            <strong>{{ activeTicket.prizeAmount ? 'NYERTÉL '+activeTicket.prizeAmount+' CR-T!' : 'EZ MOST NEM NYERT' }}</strong>
+            <span>{{ activeTicket.prizeAmount ? 'A nyereményedet jóváírtuk az egyenlegeden.' : 'Legközelebb talán a szerencse melléd áll.' }}</span>
+          </div>
+          <div class="paper-bottomline"><span>PARTY CASINO · JÁTÉKOS KIADÁS</span><span>★ SOK SZERENCSÉT ★</span></div>
         </div>
-        <p v-if="activeTicket.status==='UNSCRATCHED'" class="scratch-instruction">Húzd az ujjad vagy az egeret a mezőn a lekaparáshoz.</p>
+        <p v-if="activeTicket.status==='UNSCRATCHED'" class="scratch-instruction">Kapard le a mező legalább 58%-át, hogy felfedd mind a 9 mezőt.</p>
         <button v-else class="primary scratch-done" @click="activeTicket=null">Bezárás</button>
       </section>
     </div>
