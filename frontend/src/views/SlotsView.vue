@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CasinoHeader from '../components/CasinoHeader.vue';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { api } from '../services/api';
 
@@ -85,7 +86,7 @@ async function spin() {
 
 <template>
   <main class="game-page slot-page">
-    <header class="roulette-header casino-shared-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><nav class="shared-nav"><a href="/">Lobby</a><a href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a href="/shop">Shop</a></nav><a href="/" class="ghost">Vissza a játékokhoz</a></header>
+    <CasinoHeader />
 
     <section class="slot-machine-content">
       <div class="slot-heading">
