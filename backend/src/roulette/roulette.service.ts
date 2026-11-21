@@ -157,6 +157,17 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
       sqlite.exec('ROLLBACK');
       throw error;
     }
+    const winningBets = sqlite.prepare('SELECT b.player_id AS playerId, p.name AS playerName, b.payout_amount AS payout, b.amount AS amount FROM casino_roulette_bets b JOIN players p ON p.id=b.player_id WHERE b.round_id=? AND b.payout_amount>0 ORDER BY b.payout_amount DESC').all(round.id) as any[];
+    const biggest = winningBets[0];
+    if (biggest && Number(biggest.payout) >= Math.max(50, Number(biggest.amount) * 5)) {
+      const lines = [
+        `${biggest.playerName} óriásit szakított a ruletten: +${biggest.payout} CR!`,
+        `${biggest.playerName} megpörgette a szerencsét... és a szerencse visszafizetett: +${biggest.payout} CR!`,
+        `Rulett-riadó! ${biggest.playerName} most nem aprózta el: +${biggest.payout} CR!`,
+        `${biggest.playerName} úgy eltalálta a rulettet, hogy még a golyó is meglepődött: +${biggest.payout} CR!`
+      ];
+      this.gateway.publish('party:notification', { type:'wheel', title:'RULETT · NAGY NYEREMÉNY', message:lines[randomInt(lines.length)] });
+    }
     this.publishState();
     this.schedule(this.resultSeconds * 1000, () => this.openNextRound());
   }
