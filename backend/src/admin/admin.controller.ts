@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Unaut
 import { PlayersService } from '../players/players.service';
 import { PlayerPresenceGateway } from '../players/player-presence.gateway';
 import { AdminService } from './admin.service';
+import { EventsGateway } from '../events/events.gateway';
 
 @Controller('api/admin')
 export class AdminController {
@@ -9,6 +10,7 @@ export class AdminController {
     private readonly admin: AdminService,
     private readonly players: PlayersService,
     private readonly presence: PlayerPresenceGateway,
+    private readonly events: EventsGateway,
   ) {}
 
   private token(authorization?: string) {
@@ -25,6 +27,9 @@ export class AdminController {
   logout(@Headers('authorization') authorization?: string) {
     return this.admin.logout(this.token(authorization));
   }
+
+  @Get('notification-settings') getNotificationSettings(@Headers('authorization') authorization?:string) { this.admin.assertToken(this.token(authorization)); return this.events.getNotificationSettings(); }
+  @Post('notification-settings') setNotificationSettings(@Body() body:Record<string,boolean>,@Headers('authorization') authorization?:string) { this.admin.assertToken(this.token(authorization)); return this.events.setNotificationSettings(body); }
 
   @Get('players')
   getPlayers(@Headers('authorization') authorization?: string) {
