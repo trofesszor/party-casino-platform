@@ -5,7 +5,7 @@ import { socket } from '../services/socket';
 
 type NotificationItem = {
   id: number;
-  type?: 'event'|'wheel'|'system';
+  type?: 'event'|'wheel'|'system'|'duel';
   title?: string|null;
   message: string;
   createdAt?: string;
@@ -17,6 +17,8 @@ const historyOpen = ref(false);
 const historyLoading = ref(false);
 let nextId = 1;
 let timer: ReturnType<typeof setTimeout> | undefined;
+let poller: ReturnType<typeof setInterval> | undefined;
+let lastServerNotificationId = 0;
 
 function pushNotification(payload: Partial<NotificationItem>) {
   if (!payload.message) return;
@@ -24,6 +26,7 @@ function pushNotification(payload: Partial<NotificationItem>) {
   queue.value = [...queue.value.slice(-2), item];
   history.value = [item, ...history.value].slice(0, 100);
   if (timer) clearTimeout(timer);
+  lastServerNotificationId = Math.max(lastServerNotificationId, item.id);
   timer = setTimeout(() => {
     queue.value.shift();
     timer = undefined;
@@ -33,10 +36,25 @@ function pushNotification(payload: Partial<NotificationItem>) {
   }, 5200);
 }
 
+async function syncNotifications(showNew = true) {
+  const playerId = Number(localStorage.getItem('party-player-id')) || undefined;
+  if (!playerId) return;
+  try {
+    const items = await api.getPartyNotifications(playerId);
+    const newest = items.length ? items[0].id : 0;
+    if (showNew && lastServerNotificationId > 0) {
+      const fresh = items.filter(item => item.id > lastServerNotificationId).reverse();
+      fresh.forEach(item => pushNotification(item));
+    }
+    lastServerNotificationId = Math.max(lastServerNotificationId, newest);
+    history.value = items;
+  } catch {}
+}
+
 async function openHistory() {
   historyOpen.value = true;
   historyLoading.value = true;
-  try { history.value = await api.getPartyNotifications(); }
+  try { await syncNotifications(false); }
   finally { historyLoading.value = false; }
 }
 
@@ -47,10 +65,15 @@ function formatDate(value?: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('hu-HU', { month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' });
 }
 
-onMounted(() => socket.on('party:notification', pushNotification));
+onMounted(async () => {
+  socket.on('party:notification', pushNotification);
+  await syncNotifications(false);
+  poller = setInterval(() => syncNotifications(true), 2500);
+});
 onUnmounted(() => {
   socket.off('party:notification', pushNotification);
   if (timer) clearTimeout(timer);
+  if (poller) clearInterval(poller);
 });
 </script>
 
@@ -64,7 +87,7 @@ onUnmounted(() => {
     <div class="party-notifications" aria-live="polite" aria-atomic="false">
       <TransitionGroup name="party-notification">
         <article v-for="item in queue" :key="item.id" class="party-notification-card" :class="'notification-'+item.type">
-          <div class="party-notification-icon">{{ item.type === 'wheel' ? '◎' : item.type === 'event' ? '✦' : '●' }}</div>
+          <div class="party-notification-icon">{{ item.type === 'wheel' ? '◎' : item.type === 'event' ? '✦' : item.type === 'duel' ? '⚔' : '●' }}</div>
           <div class="party-notification-copy">
             <small>{{ item.title ?? 'PARTY CASINO' }}</small>
             <strong>{{ item.message }}</strong>
