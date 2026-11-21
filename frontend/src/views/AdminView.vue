@@ -24,6 +24,8 @@ const gameSettings=ref({wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBetting
 const gameSettingsSaving=ref(false);
 const tokenPhotoSettings=ref({enabled:true,balanceThreshold:50,rewardAmount:10,cooldownMinutes:60,dailyLimit:2});
 const tokenPhotoSaving=ref(false);
+const notificationSettings=ref<Record<string,boolean>>({wheel:true,event:true,duel:true,roulette:true,slots:true,leaderboard:true,system:true});
+const notificationSaving=ref(false);
 const defaultPlayerTokens=ref(100);
 const defaultTokensSaving=ref(false);
 const resetBusy=ref(false);
@@ -91,6 +93,7 @@ async function loadPlayers() {
     gameSettings.value = await api.adminGetGameSettings(token.value);
     tokenPhotoSettings.value = await api.adminGetTokenPhotoSettings(token.value);
     defaultPlayerTokens.value = (await api.adminGetDefaultPlayerTokens(token.value)).defaultTokens;
+    notificationSettings.value = await api.adminGetNotificationSettings(token.value);
     await loadCasinoStatistics();
     localStorage.setItem('party-admin-token', token.value);
   } catch {
@@ -170,6 +173,8 @@ async function saveShopItem(item:AdminShopItem){
   catch(e:any){actionError.value=e.message||'A shop termék mentése nem sikerült.';}
   finally{shopSavingKey.value='';}
 }
+
+async function saveNotificationSettings(){notificationSaving.value=true;actionError.value='';try{notificationSettings.value=await api.adminSaveNotificationSettings(token.value,notificationSettings.value);}catch(e:any){actionError.value=e.message||'Az értesítési beállítások mentése nem sikerült.';}finally{notificationSaving.value=false;}}
 
 async function saveDefaultPlayerTokens(){
   defaultTokensSaving.value=true;actionError.value='';
@@ -308,6 +313,13 @@ onMounted(loadPlayers);
           </div>
           <button class="primary stats-export-button" :disabled="statsExporting" @click="exportStatisticsImage">{{statsExporting?'Kép készítése…':'Statisztika exportálása PNG-ként'}}</button>
         </template>
+      </section>
+      <section class="panel admin-wheel-editor">
+        <div class="admin-section-heading"><div><p class="eyebrow">PARTY COMMUNICATION</p><h2>Értesítések beállításai</h2><p class="muted">Minden kategória külön kapcsolható. A kikapcsolt értesítések nem jelennek meg felugróként, és az előzményekbe sem kerülnek be.</p></div></div>
+        <div class="notification-settings-grid">
+          <label v-for="item in [{key:'wheel',label:'Szerencsekerék eredmények'},{key:'event',label:'Közösségi események'},{key:'duel',label:'Párbajok és kihívások'},{key:'roulette',label:'Nagy rulettnyeremények'},{key:'slots',label:'Slot jackpotok / nagy nyeremények'},{key:'leaderboard',label:'Leaderboard vezetőváltás'},{key:'system',label:'Egyéb rendszerüzenetek'}]" :key="item.key" class="admin-photo-quest-option"><input type="checkbox" v-model="notificationSettings[item.key]">{{item.label}}</label>
+        </div>
+        <button class="primary" :disabled="notificationSaving" @click="saveNotificationSettings">{{notificationSaving?'Mentés…':'Értesítési beállítások mentése'}}</button>
       </section>
       <section class="panel admin-wheel-editor admin-reset-editor">
         <div class="admin-section-heading"><div><p class="eyebrow">NEW GAME</p><h2>Kaszinó újraindítása</h2><p class="muted">Törli az összes játékost, egyenleget, tranzakciót, fogadást, párbajt, sorsjegyet, készletet és játékoshoz tartozó küldetéselőzményt. A side quest pool, kerékmezők, shop termékek és admin beállítások megmaradnak.</p></div></div>
