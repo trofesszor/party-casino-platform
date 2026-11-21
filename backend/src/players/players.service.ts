@@ -1,10 +1,11 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
+import { EventsGateway } from '../events/events.gateway';
 import { createHash, createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { DATABASE } from '../database/database.module';
 
 @Injectable()
 export class PlayersService {
-  constructor(@Inject(DATABASE) private readonly database: any, private readonly gateway?: any) {}
+  constructor(@Inject(DATABASE) private readonly database: any, @Optional() @Inject(EventsGateway) private readonly gateway?: EventsGateway) {}
 
   private buildCasinoStats(startedAt:string) {
     const sqlite=this.database.sqlite;
