@@ -11,7 +11,13 @@ const state = ref<RouletteState|null>(null);
 const players = ref<{id:number;name:string}[]>([]);
 const notifications = ref<PublicNotification[]>([]);
 const events = ref<CommunityEvent[]>([]);
-const wheel = ref<Awaited<ReturnType<typeof api.getLuckyWheel>>|null>(null);
+type DisplayWheelState = Awaited<ReturnType<typeof api.getLuckyWheel>> & { spinnerPlayerId?: number|null };
+const wheel = ref<DisplayWheelState|null>(null);
+const wheelRotation = ref(0);
+const wheelTransitionMs = ref(0);
+const now = ref(Date.now());
+let animatedWheelSpinId: string|null = null;
+let wheelClock: ReturnType<typeof setInterval>|undefined;
 const activeScreen = ref<ScreenMode>('roulette');
 const loading = ref(true);
 let refreshTimer: ReturnType<typeof setInterval>|undefined;
@@ -26,6 +32,35 @@ const wheelBackground = computed(() => {
   return 'conic-gradient('+segments.map((segment,index)=>`${colors[index%colors.length]} ${index*step}deg ${(index+1)*step}deg`).join(',')+')';
 });
 const screenLabel = computed(()=>activeScreen.value==='roulette'?'KÖZÖS RULETTASZTAL':activeScreen.value==='wheel'?'SZERENCSEKERÉK':'SLOT GÉP');
+const wheelSlices = computed(() => {
+  const segments = wheel.value?.segments ?? []; const count = segments.length || 1;
+  return segments.map((segment,index) => {
+    const start=-90+index*360/count, end=-90+(index+1)*360/count;
+    const point=(angle:number,radius:number):[number,number]=>[200+radius*Math.cos(angle*Math.PI/180),200+radius*Math.sin(angle*Math.PI/180)];
+    const [sx,sy]=point(start,178), [ex,ey]=point(end,178), [tx,ty]=point((start+end)/2,112);
+    const large=360/count>180?1:0;
+    const palette=['#b78b39','#263a30','#8d3b42','#293b55','#72523b','#354b45','#755a82','#9a7135','#3c4652','#914d39','#466a61','#62523b'];
+    return {...segment,path:'M 200 200 L '+sx+' '+sy+' A 178 178 0 '+large+' 1 '+ex+' '+ey+' Z',tx,ty,angle:(start+end)/2,color:palette[index%palette.length]};
+  });
+});
+const currentSpinnerName = computed(() => { const id=wheel.value?.spinnerPlayerId; return id ? players.value.find(player=>player.id===id)?.name ?? 'Egy játékos' : null; });
+const isWheelSpinning = computed(()=>wheel.value?.status==='SPINNING');
+const wheelRemaining = computed(()=>Math.max(0,(wheel.value?.endsAt??0)-now.value));
+function wheelTargetRotation(s:DisplayWheelState){
+  if(!s.winner||!s.segments.length)return null;
+  const index=s.segments.findIndex(item=>item.id===s.winner?.id); if(index<0)return null;
+  const center=-90+(index+.5)*360/s.segments.length; return (((-90-center)%360)+360)%360;
+}
+async function animateDisplayWheel(s:DisplayWheelState){
+  if(s.status!=='SPINNING'||!s.spinId||animatedWheelSpinId===s.spinId)return;
+  const target=wheelTargetRotation(s); if(target===null)return;
+  animatedWheelSpinId=s.spinId; const current=wheelRotation.value; const modulo=((current%360)+360)%360;
+  const delta=(target-modulo+360)%360; wheelTransitionMs.value=Math.max(250,(s.endsAt??Date.now())-Date.now());
+  await nextTick(); const svg=document.querySelector('.tv-wheel-svg'); if(svg)void (svg as SVGElement).getBoundingClientRect();
+  wheelRotation.value=current+360*9+delta;
+}
+function settleDisplayWheel(s:DisplayWheelState){const target=wheelTargetRotation(s);if(target===null)return;wheelTransitionMs.value=0;wheelRotation.value=Math.floor(wheelRotation.value/360)*360+target;}
+async function applyWheelState(next:DisplayWheelState){const newSpin=next.status==='SPINNING'&&next.spinId!==wheel.value?.spinId;wheel.value=next;if(newSpin)await animateDisplayWheel(next);else if(next.status!=='SPINNING')settleDisplayWheel(next);}
 
 async function refreshData(){
   const results=await Promise.allSettled([
@@ -39,11 +74,12 @@ async function refreshData(){
   if(results[1].status==='fulfilled') players.value=results[1].value;
   if(results[2].status==='fulfilled') notifications.value=results[2].value.slice(0,30);
   if(results[3].status==='fulfilled') events.value=results[3].value.events;
-  if(results[4].status==='fulfilled') wheel.value=results[4].value;
+  if(results[4].status==='fulfilled') await applyWheelState(results[4].value as DisplayWheelState);
   loading.value=false;
 }
 function onRouletteChanged(next:RouletteState){state.value=next;}
 function onPlayersChanged(next:{id:number;name:string}[]){players.value=next;}
+function onWheelChanged(next:DisplayWheelState){void applyWheelState(next);}
 function onPublicNotification(next:PublicNotification){
   // The TV is a public surface. Never render targeted/private player messages.
   if((next as any).audiencePlayerId || (next as any).playerId) return;
@@ -57,12 +93,16 @@ onMounted(()=>{
   socket.on('roulette:changed',onRouletteChanged);
   socket.on('players:online',onPlayersChanged);
   socket.on('party:notification',onPublicNotification);
+  socket.on('lucky-wheel:changed',onWheelChanged);
+  wheelClock=setInterval(()=>now.value=Date.now(),250);
 });
 onUnmounted(()=>{
   if(refreshTimer)clearInterval(refreshTimer);
   socket.off('roulette:changed',onRouletteChanged);
   socket.off('players:online',onPlayersChanged);
   socket.off('party:notification',onPublicNotification);
+  socket.off('lucky-wheel:changed',onWheelChanged);
+  if(wheelClock)clearInterval(wheelClock);
 });
 </script>
 
@@ -124,9 +164,17 @@ onUnmounted(()=>{
 
         <section v-else-if="activeScreen==='wheel'" class="tv-game-content tv-wheel-screen">
           <p class="tv-game-eyebrow">PARTY CHALLENGE · KÖZÖS PÖRGETÉS</p><h2>Szerencsekerék</h2>
-          <div class="tv-wheel-stage"><div class="tv-wheel-pointer"></div><div class="tv-wheel-disc" :style="{background:wheelBackground}"><span v-for="(segment,index) in wheel?.segments.filter(s=>s.enabled)??[]" :key="segment.id" :style="{transform:'rotate('+((index+.5)*360/(wheel?.segments.filter(s=>s.enabled).length||1))+'deg) translateY(-145px)'}">{{segment.label}}</span><div class="tv-wheel-hub">✦</div></div></div>
-          <div class="tv-wheel-result" v-if="wheel?.winner"><small>{{wheel.status==='SPINNING'?'FOROG A KERÉK':'LEGUTÓBBI EREDMÉNY'}}</small><strong>{{wheel.winner.label}}</strong></div>
-          <p class="tv-game-caption">{{wheel?.status==='SPINNING'?'A kerék forog…':'A játékosok telefonjukról indíthatják a pörgetést.'}}</p>
+          <div class="tv-wheel-stage">
+            <div class="tv-wheel-pointer"></div>
+            <svg class="tv-wheel-svg" viewBox="0 0 400 400" :style="{transform:'rotate('+wheelRotation+'deg)',transitionDuration:wheelTransitionMs+'ms'}">
+              <circle cx="200" cy="200" r="190" fill="#171a19" stroke="#d7b66c" stroke-width="8"/>
+              <g v-for="slice in wheelSlices" :key="slice.id"><path :d="slice.path" :fill="slice.color" stroke="#f4d99a" stroke-width="2"/><text :x="slice.tx" :y="slice.ty" text-anchor="middle" dominant-baseline="middle" :transform="'rotate('+(slice.angle+90)+' '+slice.tx+' '+slice.ty+')'">{{slice.label}}</text></g>
+              <circle cx="200" cy="200" r="36" fill="#d5ad5e" stroke="#fff0bd" stroke-width="5"/><circle cx="200" cy="200" r="10" fill="#30251a"/>
+            </svg>
+          </div>
+          <div class="tv-wheel-player" v-if="wheel?.status==='SPINNING'"><small>ÉPPEN Ő PÖRGET</small><strong>{{currentSpinnerName||'Játékos betöltése…'}}</strong><span v-if="wheelRemaining>0">{{Math.ceil(wheelRemaining/1000)}} mp van hátra</span></div>
+          <div class="tv-wheel-result" v-if="wheel?.winner&&!isWheelSpinning"><small>LEGUTÓBBI EREDMÉNY</small><strong>{{wheel.winner.label}}</strong></div>
+          <p class="tv-game-caption">{{wheel?.status==='SPINNING'?'A kerék forog…':wheel?.status==='RESULT'?'A pörgetés véget ért.':'A játékosok telefonjukról indíthatják a pörgetést.'}}</p>
         </section>
 
         <section v-else class="tv-game-content tv-slots-screen">
