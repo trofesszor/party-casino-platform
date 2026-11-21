@@ -22,11 +22,18 @@ let lastServerNotificationId = 0;
 
 function pushNotification(payload: Partial<NotificationItem>) {
   if (!payload.message) return;
-  const item: NotificationItem = { id: nextId++, type: payload.type ?? 'system', title: payload.title, message: payload.message, createdAt: new Date().toISOString() };
+  // Socket delivery and the polling fallback can report the same server notification.
+  // Keep the server ID as the identity so the two paths cannot create duplicate toasts.
+  const serverId = typeof payload.id === 'number' ? payload.id : undefined;
+  if (serverId !== undefined && (history.value.some(item => item.id === serverId) || queue.value.some(item => item.id === serverId))) {
+    lastServerNotificationId = Math.max(lastServerNotificationId, serverId);
+    return;
+  }
+  const item: NotificationItem = { id: serverId ?? nextId++, type: payload.type ?? 'system', title: payload.title, message: payload.message, createdAt: payload.createdAt ?? new Date().toISOString() };
   queue.value = [...queue.value.slice(-2), item];
   history.value = [item, ...history.value].slice(0, 100);
   if (timer) clearTimeout(timer);
-  lastServerNotificationId = Math.max(lastServerNotificationId, item.id);
+  if (serverId !== undefined) lastServerNotificationId = Math.max(lastServerNotificationId, serverId);
   timer = setTimeout(() => {
     queue.value.shift();
     timer = undefined;
