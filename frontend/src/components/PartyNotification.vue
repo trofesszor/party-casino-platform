@@ -78,12 +78,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="party-notification-center">
-    <button class="party-history-button" @click="openHistory" aria-label="Értesítések előzményei">
-      <span>♢</span><b>Értesítések</b>
-      <i v-if="history.length">{{ history.length > 99 ? '99+' : history.length }}</i>
-    </button>
+  <button class="party-history-button" @click="openHistory" aria-label="Értesítések előzményei">
+    <span>♢</span><b>Értesítések</b>
+    <i v-if="history.length">{{ history.length > 99 ? '99+' : history.length }}</i>
+  </button>
 
+  <div class="party-notification-center">
     <div class="party-notifications" aria-live="polite" aria-atomic="false">
       <TransitionGroup name="party-notification">
         <article v-for="item in queue" :key="item.id" class="party-notification-card" :class="'notification-'+item.type">
