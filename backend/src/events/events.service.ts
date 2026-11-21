@@ -6,13 +6,25 @@ import { EventsGateway } from './events.gateway';
 export class EventsService {
   constructor(@Inject(DATABASE) private readonly database: any, private readonly gateway: EventsGateway) {}
 
-  notifications() {
+  notifications(playerId: number | null = null) {
     return this.database.sqlite.prepare(`
       SELECT id,type,title,message,created_at AS createdAt
       FROM party_notifications
+      WHERE audience_player_id IS NULL OR audience_player_id = ?
       ORDER BY id DESC
       LIMIT 100
-    `).all();
+    `).all(playerId);
+  }
+
+  privateNotifications(playerId: number) {
+    if (!Number.isSafeInteger(playerId) || playerId <= 0) return [];
+    return this.database.sqlite.prepare(`
+      SELECT id,type,title,message,created_at AS createdAt
+      FROM party_notifications
+      WHERE audience_player_id = ?
+      ORDER BY id ASC
+      LIMIT 50
+    `).all(playerId);
   }
 
   list() {
