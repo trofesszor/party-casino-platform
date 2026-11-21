@@ -73,7 +73,18 @@ async function exportStatisticsImage(){
   const s=displayedStats.value;if(!s)return;
   statsExporting.value=true;
   try{
-    const width=1200,height=1410,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const width=1200;
+    let photo:HTMLImageElement|null=null;
+    if(statsGroupPhoto.value){
+      photo=await new Promise<HTMLImageElement>((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('A csoportkép betöltése nem sikerült.'));image.src=statsGroupPhotoUrl.value;});
+    }
+    const photoHeight=photo?300:0;
+    const headerTop=photo?390:82;
+    const metricsTop=photo?500:290;
+    const awardsTop=metricsTop+460;
+    const footerY=awardsTop+650;
+    const height=footerY+55;
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
     const ctx=canvas.getContext('2d');if(!ctx)throw new Error('A kép exportálása nem támogatott ebben a böngészőben.');
     const gradient=ctx.createLinearGradient(0,0,width,height);gradient.addColorStop(0,'#111827');gradient.addColorStop(.55,'#24143d');gradient.addColorStop(1,'#101114');
     ctx.fillStyle=gradient;ctx.fillRect(0,0,width,height);
@@ -81,15 +92,14 @@ async function exportStatisticsImage(){
     const text=(value:string,x:number,y:number,size:number,color='#f7f4ff',weight='600')=>{ctx.font=`${weight} ${size}px Arial`;ctx.fillStyle=color;ctx.fillText(value,x,y);};
     const card=(x:number,y:number,w:number,h:number)=>{ctx.fillStyle='rgba(255,255,255,.075)';ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x,y,w,h,20);ctx.fill();ctx.stroke();};
     const n=(value:number)=>value.toLocaleString('hu-HU');
-    if(statsGroupPhoto.value){
-      const photo=await new Promise<HTMLImageElement>((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('A csoportkép betöltése nem sikerült.'));image.src=statsGroupPhotoUrl.value;});
-      const x=820,y=54,w=308,h=190,ratio=Math.max(w/photo.width,h/photo.height),sw=w/ratio,sh=h/ratio,sx=(photo.width-sw)/2,sy=(photo.height-sh)/2;
-      ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,18);ctx.clip();ctx.drawImage(photo,sx,sy,sw,sh,x,y,w,h);ctx.restore();
-      ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x,y,w,h,18);ctx.stroke();
+    if(photo){
+      const x=72,y=48,w=1056,h=photoHeight,ratio=Math.max(w/photo.width,h/photo.height),sw=w/ratio,sh=h/ratio,sx=(photo.width-sw)/2,sy=(photo.height-sh)/2;
+      ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.clip();ctx.drawImage(photo,sx,sy,sw,sh,x,y,w,h);ctx.restore();
+      ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x,y,w,h,22);ctx.stroke();
     }
-    text('PARTY CASINO',72,82,26,'#d7a7ff','700');text('THE NIGHT IN NUMBERS',72,158,54);
-    text('A buli statisztikái',74,205,26,'#c7bfd5','400');
-    text(`#${s.sessionId}  ·  ${formatStatDate(s.startedAt)}${s.endedAt?' – '+formatStatDate(s.endedAt):' · FOLYAMATBAN'}`,74,246,17,'#aaa2b8','400');
+    text('PARTY CASINO',72,headerTop,26,'#d7a7ff','700');text('THE NIGHT IN NUMBERS',72,headerTop+76,54);
+    text('A buli statisztikái',74,headerTop+123,26,'#c7bfd5','400');
+    text(`#${s.sessionId}  ·  ${formatStatDate(s.startedAt)}${s.endedAt?' – '+formatStatDate(s.endedAt):' · FOLYAMATBAN'}`,74,headerTop+164,17,'#aaa2b8','400');
     const metrics=[
       ['JÁTÉKOSOK',n(s.playerCount)],['TRANZAKCIÓK',n(s.transactionCount)],['RULETTKÖRÖK',n(s.rouletteRounds)],
       ['RULETTFOGADÁSOK',n(s.rouletteBets)],['RULETT TÉTEK',n(s.rouletteTokens)+' CR'],['PÁRBAJOK',n(s.completedDuels)],
@@ -100,10 +110,9 @@ async function exportStatisticsImage(){
       ['ÁTLAGOS TRANZAKCIÓ / JÁTÉKOS',n(s.playerCount?Math.round(s.transactionCount/s.playerCount):0)],
       ['NETTÓ TOKENFORGALOM',n(s.tokensWon-s.tokensSpent)+' CR']
     ];
-    // Four columns by four rows keeps every metric aligned with no overlap.
-    metrics.forEach((m,i)=>{const col=i%4,row=Math.floor(i/4),x=72+col*267,y=290+row*112;card(x,y,245,88);text(m[0],x+16,y+32,12,'#bcb2cc','600');text(m[1],x+16,y+67,23);});
-    card(72,750,1056,510);
-    text('AZ ÉJSZAKA KIEMELKEDŐI',105,815,19,'#c9a3ff','700');
+    metrics.forEach((m,i)=>{const col=i%4,row=Math.floor(i/4),x=72+col*267,y=metricsTop+row*112;card(x,y,245,88);text(m[0],x+16,y+32,12,'#bcb2cc','600');text(m[1],x+16,y+67,23);});
+    card(72,awardsTop,1056,510);
+    text('AZ ÉJSZAKA KIEMELKEDŐI',105,awardsTop+45,19,'#c9a3ff','700');
     const awards=[
       ['LEGNAGYOBB ÖSSZNYEREMÉNY',s.topWinner?.name??'—',s.topWinner?`+${n(s.topWinner.amount)} CR`:'Nincs adat'],
       ['LEGAKTÍVABB JÁTÉKOS',s.mostActive?.name??'—',s.mostActive?`${n(s.mostActive.actions)} tranzakció`:'Nincs adat'],
@@ -114,9 +123,9 @@ async function exportStatisticsImage(){
       ['FOTÓFELTÖLTÉS KIRÁLYA',s.photoUploadChampion?.name??'—',s.photoUploadChampion?`${n(s.photoUploadChampion.uploads)} feltöltött fotó`:'Nincs adat'],
       ['SIDE QUESTEK MESTERE',s.sideQuestMaster?.name??'—',s.sideQuestMaster?`${n(s.sideQuestMaster.completed)} teljesített küldetés`:'Nincs adat']
     ];
-    awards.forEach((a,i)=>{const col=i%2,row=Math.floor(i/2),x=105+col*510,y=840+row*105;text(a[0],x,y,13,'#bcb2cc','600');text(a[1],x,y+38,25);text(a[2].slice(0,48),x,y+65,15,'#c9a3ff','400');});
-    text('KÖSZI, HOGY JÁTSZOTTATOK!',74,1320,25,'#e4c8ff','700');
-    text('PARTY CASINO  ·  A LEGJOBB PILLANATOK SZÁMOKBAN',74,1360,13,'#aaa2b8','400');
+    awards.forEach((a,i)=>{const col=i%2,row=Math.floor(i/2),x=105+col*510,y=awardsTop+105+row*105;text(a[0],x,y,13,'#bcb2cc','600');text(a[1],x,y+38,25);text(a[2].slice(0,48),x,y+65,15,'#c9a3ff','400');});
+    text('KÖSZI, HOGY JÁTSZOTTATOK!',74,footerY,25,'#e4c8ff','700');
+    text('PARTY CASINO  ·  A LEGJOBB PILLANATOK SZÁMOKBAN',74,footerY+40,13,'#aaa2b8','400');
     const link=document.createElement('a');link.download=`party-casino-stats-${s.sessionId}.png`;link.href=canvas.toDataURL('image/png');link.click();
   }catch(e:any){actionError.value=e.message||'Nem sikerült elkészíteni a statisztikai képet.';}
   finally{statsExporting.value=false;}
@@ -335,7 +344,7 @@ onMounted(loadPlayers);
           <div class="stats-group-photo-copy"><strong>Csoportkép</strong><small>Opcionális fotó, amely a letöltött PNG összefoglaló tetején is megjelenik. JPG, PNG vagy WebP, maximum 10 MB.</small></div>
           <label class="ghost stats-photo-upload"> <span>{{statsGroupPhoto?'Kép cseréje':'Csoportkép feltöltése'}}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/*" @change="handleStatsGroupPhoto"></label>
           <button v-if="statsGroupPhoto" class="ghost" type="button" @click="removeStatsGroupPhoto">Kép eltávolítása</button>
-          <img v-if="statsGroupPhotoUrl" class="stats-group-photo-preview" :src="statsGroupPhotoUrl" alt="Feltöltött csoportkép előnézete">
+          
         </div>
         <div v-if="!displayedStats" class="muted admin-empty">Még nincsenek statisztikák.</div>
         <template v-else>
