@@ -352,6 +352,9 @@ onMounted(loadPlayers);
               <article><small>Kaparós nyeremény (CR)</small><strong>{{displayedStats.scratchPrizes.toLocaleString('hu-HU')}}</strong></article>
               <article><small>Összes elköltött token</small><strong>{{displayedStats.tokensSpent.toLocaleString('hu-HU')}}</strong></article>
               <article><small>Összes megszerzett token</small><strong>{{displayedStats.tokensWon.toLocaleString('hu-HU')}}</strong></article>
+              <article><small>Kaparós nyeremények</small><strong>{{displayedStats.scratchWins}}</strong></article>
+              <article><small>Átlagos tranzakció / játékos</small><strong>{{displayedStats.playerCount ? Math.round(displayedStats.transactionCount / displayedStats.playerCount) : 0}}</strong></article>
+              <article><small>Nettó tokenforgalom</small><strong>{{(displayedStats.tokensWon-displayedStats.tokensSpent).toLocaleString('hu-HU')}} CR</strong></article>
             </div>
             <div class="casino-stats-highlights">
               <div><small>Legnagyobb össznyeremény</small><strong>{{displayedStats.topWinner?.name||'—'}}</strong><span>{{displayedStats.topWinner?'+'+displayedStats.topWinner.amount+' CR':'Nincs adat'}}</span></div>
