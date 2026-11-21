@@ -95,11 +95,15 @@ async function exportStatisticsImage(){
       ['RULETTFOGADÁSOK',n(s.rouletteBets)],['RULETT TÉTEK',n(s.rouletteTokens)+' CR'],['PÁRBAJOK',n(s.completedDuels)],
       ['TELJESÍTETT KÜLDETÉSEK',n(s.questsCompleted)+' / '+n(s.questsAssigned)],['KAPARÓS JEGYEK',n(s.scratchTickets)],
       ['KAPARÓS NYEREMÉNYEK',n(s.scratchWins)],['KAPARÓS NYEREMÉNY CR',n(s.scratchPrizes)],['FELTÖLTÖTT FOTÓK',n(s.uploadedPhotos)],['FOTÓJUTALMAK',n(s.photoRewards)],
-      ['ELKÖLTÖTT / MEGNYERT',n(s.tokensSpent)+' / '+n(s.tokensWon)+' CR']
+      ['ELKÖLTÖTT / MEGNYERT',n(s.tokensSpent)+' / '+n(s.tokensWon)+' CR],
+      ['KAPARÓS NYEREMÉNYEK',n(s.scratchWins)],
+      ['ÁTLAGOS TRANZAKCIÓ / JÁTÉKOS',n(s.playerCount?Math.round(s.transactionCount/s.playerCount):0)],
+      ['NETTÓ TOKENFORGALOM',n(s.tokensWon-s.tokensSpent)+' CR']
     ];
-    metrics.forEach((m,i)=>{const col=i%3,row=Math.floor(i/3),x=72+col*355,y=290+row*125;card(x,y,325,100);text(m[0],x+20,y+36,14,'#bcb2cc','600');text(m[1],x+20,y+76,27);});
-    card(72,825,1056,485);
-    text('AZ ÉJSZAKA KIEMELKEDŐI',105,875,19,'#c9a3ff','700');
+    // Four columns by four rows keeps every metric aligned with no overlap.
+    metrics.forEach((m,i)=>{const col=i%4,row=Math.floor(i/4),x=72+col*267,y=290+row*112;card(x,y,245,88);text(m[0],x+16,y+32,12,'#bcb2cc','600');text(m[1],x+16,y+67,23);});
+    card(72,770,1056,500);
+    text('AZ ÉJSZAKA KIEMELKEDŐI',105,815,19,'#c9a3ff','700');
     const awards=[
       ['LEGNAGYOBB ÖSSZNYEREMÉNY',s.topWinner?.name??'—',s.topWinner?`+${n(s.topWinner.amount)} CR`:'Nincs adat'],
       ['LEGAKTÍVABB JÁTÉKOS',s.mostActive?.name??'—',s.mostActive?`${n(s.mostActive.actions)} tranzakció`:'Nincs adat'],
@@ -107,9 +111,9 @@ async function exportStatisticsImage(){
       ['PÁRBAJBAJNOK',s.duelChampion?.name??'—',s.duelChampion?`${n(s.duelChampion.wins)} győzelem`:'Nincs adat'],
       ['LEGMAGASABB EGYENLEG',s.richestPlayer?.name??'—',s.richestPlayer?`${n(s.richestPlayer.balance)} CR`:'Nincs adat']
     ];
-    awards.forEach((a,i)=>{const col=i%2,row=Math.floor(i/2),x=105+col*510,y=935+row*118;text(a[0],x,y,13,'#bcb2cc','600');text(a[1],x,y+42,27);text(a[2].slice(0,48),x,y+72,16,'#c9a3ff','400');});
-    text('KÖSZI, HOGY JÁTSZOTTATOK!',74,1400,25,'#e4c8ff','700');
-    text('PARTY CASINO  ·  A LEGJOBB PILLANATOK SZÁMOKBAN',74,1440,13,'#aaa2b8','400');
+    awards.forEach((a,i)=>{const col=i%2,row=Math.floor(i/2),x=105+col*510,y=875+row*112;text(a[0],x,y,13,'#bcb2cc','600');text(a[1],x,y+38,25);text(a[2].slice(0,48),x,y+65,15,'#c9a3ff','400');});
+    text('KÖSZI, HOGY JÁTSZOTTATOK!',74,1390,25,'#e4c8ff','700');
+    text('PARTY CASINO  ·  A LEGJOBB PILLANATOK SZÁMOKBAN',74,1430,13,'#aaa2b8','400');
     const link=document.createElement('a');link.download=`party-casino-stats-${s.sessionId}.png`;link.href=canvas.toDataURL('image/png');link.click();
   }catch(e:any){actionError.value=e.message||'Nem sikerült elkészíteni a statisztikai képet.';}
   finally{statsExporting.value=false;}
