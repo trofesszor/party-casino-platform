@@ -18,12 +18,30 @@ export class EventsGateway {
         audience_player_id INTEGER
       );
       CREATE INDEX IF NOT EXISTS idx_party_notifications_created ON party_notifications(id DESC);
+      CREATE TABLE IF NOT EXISTS party_notification_settings (category TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1);
     `);
     try { this.database.sqlite.exec('ALTER TABLE party_notifications ADD COLUMN audience_player_id INTEGER'); } catch { /* already exists */ }
   }
 
+
+  private readonly categories = ['wheel','event','duel','roulette','slots','leaderboard','system'];
+  getNotificationSettings() {
+    const rows = this.database.sqlite.prepare('SELECT category, enabled FROM party_notification_settings').all() as {category:string;enabled:number}[];
+    return Object.fromEntries(this.categories.map(category => [category, rows.find(row => row.category === category)?.enabled !== 0]));
+  }
+  setNotificationSettings(settings: Record<string, boolean>) {
+    const update = this.database.sqlite.prepare('INSERT INTO party_notification_settings(category,enabled) VALUES (?,?) ON CONFLICT(category) DO UPDATE SET enabled=excluded.enabled');
+    const tx = this.database.sqlite.transaction(() => this.categories.forEach(category => {
+      if (typeof settings[category] === 'boolean') update.run(category, settings[category] ? 1 : 0);
+    }));
+    tx();
+    return this.getNotificationSettings();
+  }
+
   publish(event: string, payload: any) {
     if (event === 'party:notification' && payload?.message) {
+      const category = this.categories.includes(String(payload.type)) ? String(payload.type) : 'system';
+      if (!this.getNotificationSettings()[category]) return;
       this.database.sqlite.prepare(
         'INSERT INTO party_notifications (type,title,message,audience_player_id) VALUES (?,?,?,?)',
       ).run(String(payload.type ?? 'system'), payload.title ? String(payload.title) : null, String(payload.message), payload.audiencePlayerId ?? null);
