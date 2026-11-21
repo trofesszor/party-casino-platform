@@ -14,7 +14,7 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
 export const api = {
 
   getCommunityEvents: () => request<{events:CommunityEvent[];recentActivations:CommunityActivation[]}>('/api/community-events'),
-  contributeCommunityEvent: (eventId:number,playerId:number,amount:number) => request<any>(`/api/community-events/${eventId}/contribute',{method:'POST',body:JSON.stringify({playerId,amount})}),
+  contributeCommunityEvent: (eventId:number,playerId:number,amount:number) => request<any>(`/api/community-events/${eventId}/contribute`,{method:'POST',body:JSON.stringify({playerId,amount})}),
   getCommunityEventHistory: (eventId:number) => request<any>(`/api/community-events/${eventId}/history`),
   adminCommunityEvents: (token:string) => request<CommunityEventAdmin[]>('/api/community-events/admin/all',{headers:{Authorization:`Bearer ${token}`}}),
   adminCreateCommunityEvent: (token:string,input:any) => request<any>('/api/community-events/admin',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(input)}),
