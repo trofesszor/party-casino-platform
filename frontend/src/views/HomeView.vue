@@ -306,6 +306,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         <a href="/">Lobby</a><a href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a href="/shop">Shop</a>
         <a href="/verify-quest" class="mobile-quest-link">✓ Quest PIN ellenőrzés</a>
         <a href="/display" target="_blank">▣ TV kijelző</a>
+        <button class="mobile-menu-logout" @click="logout">Kilépés</button>
       </div>
     </header>
 
