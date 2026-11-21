@@ -16,6 +16,7 @@ export class PlayersService {
     const topWinner=all(`SELECT p.name, SUM(t.amount) AS amount FROM token_transactions t JOIN players p ON p.id=t.player_id WHERE t.amount>0 GROUP BY p.id ORDER BY amount DESC LIMIT 1`)[0]??null;
     const mostActive=all(`SELECT p.name, COUNT(*) AS actions FROM token_transactions t JOIN players p ON p.id=t.player_id GROUP BY p.id ORDER BY actions DESC LIMIT 1`)[0]??null;
     const topBalance=all('SELECT name,token_balance AS balance FROM players ORDER BY token_balance DESC,name COLLATE NOCASE LIMIT 1')[0]??null;
+    const lowestBalance=all('SELECT name,token_balance AS balance FROM players ORDER BY token_balance ASC,name COLLATE NOCASE LIMIT 1')[0]??null;
     const roulette=one("SELECT COUNT(*) AS rounds FROM casino_roulette_rounds WHERE status='COMPLETED'");
     const rouletteBets=one('SELECT COUNT(*) AS bets,COALESCE(SUM(amount),0) AS amount FROM casino_roulette_bets');
     const duels=one("SELECT COUNT(*) AS count FROM duels WHERE status='COMPLETED'");
@@ -31,7 +32,8 @@ export class PlayersService {
       startedAt,endedAt:null,playerCount,transactionCount:Number(tx.n),tokensSpent:Number(tx.spent),tokensWon:Number(tx.won),
       topWinner:topWinner?{name:topWinner.name,amount:Number(topWinner.amount)}:null,
       mostActive:mostActive?{name:mostActive.name,actions:Number(mostActive.actions)}:null,
-      richestPlayer:topBalance?{name:topBalance.name,balance:Number(topBalance.balance)}:null,
+      leaderboardLeader:topBalance?{name:topBalance.name,balance:Number(topBalance.balance)}:null,
+      homelessPlayer:lowestBalance?{name:lowestBalance.name,balance:Number(lowestBalance.balance)}:null,
       biggestWin:biggestWin?{name:biggestWin.name,amount:Number(biggestWin.amount),description:biggestWin.description}:null,
       rouletteRounds:Number(roulette.rounds),rouletteBets:Number(rouletteBets.bets),rouletteTokens:Number(rouletteBets.amount),
       completedDuels:Number(duels.count),duelChampion:duelChampion?{name:duelChampion.name,wins:Number(duelChampion.wins)}:null,
