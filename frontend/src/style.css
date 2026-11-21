@@ -1766,3 +1766,60 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
   }
   .casino-header .mobile-menu-button{display:grid!important;place-items:center;flex:0 0 36px!important}
 }
+
+
+/* Consistent global casino header geometry and notification placement. */
+.casino-header,
+.casino-shared-header,
+.roulette-header.casino-shared-header,
+.shop-header.casino-shared-header,
+.community-topbar.casino-shared-header,
+.leaderboard-header.casino-shared-header{
+  min-height:78px!important;
+  height:78px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  border-bottom:1px solid #ffffff12!important;
+  background:linear-gradient(180deg,#0c1322f5,#0b111df0)!important;
+  box-shadow:0 10px 35px #0004!important;
+  backdrop-filter:blur(22px);
+}
+.casino-shared-header{position:relative!important;padding-left:28px!important;padding-right:178px!important}
+.casino-header{position:relative!important;padding-right:178px!important}
+.casino-header .casino-nav,.casino-shared-header .shared-nav{align-items:center!important}
+.casino-header .casino-brand,.casino-shared-header .brand{flex:0 0 auto}
+.casino-header .casino-nav a,.casino-shared-header .shared-nav a{
+  border-radius:9px!important;padding:10px 13px!important;font-size:10px!important;
+  font-weight:800!important;letter-spacing:.06em!important;text-decoration:none!important;
+}
+.party-history-button{
+  top:19px!important;
+  right:22px!important;
+  z-index:10001!important;
+  min-height:40px!important;
+  padding:9px 13px!important;
+  border:1px solid #b9f36a35!important;
+  border-radius:11px!important;
+  background:linear-gradient(145deg,#18243a,#0d1523)!important;
+  color:#e8f4d1!important;
+  box-shadow:0 8px 24px #0006,0 0 20px #b9f36a0a!important;
+  font-size:9px!important;
+}
+.party-history-button span{color:#b9f36a!important;font-size:17px!important}
+.party-history-button i{background:#b9f36a!important;color:#10170c!important}
+@media(max-width:800px){
+  .casino-header,.casino-shared-header,.roulette-header.casino-shared-header,.shop-header.casino-shared-header,.community-topbar.casino-shared-header,.leaderboard-header.casino-shared-header{
+    height:auto!important;min-height:64px!important;padding:9px 12px!important;
+    padding-right:58px!important;gap:8px!important;flex-wrap:wrap!important;
+  }
+  .casino-shared-header .shared-nav{order:3!important;width:100%!important;height:34px!important;flex:0 0 100%!important;margin:0!important;overflow-x:auto!important;overflow-y:hidden!important;justify-content:flex-start!important}
+  .casino-shared-header .shared-nav a{white-space:nowrap!important;padding:8px 10px!important;font-size:9px!important}
+  .casino-header .casino-nav{display:none!important}
+  .casino-header .mobile-menu-button{display:grid!important}
+  .party-history-button{top:11px!important;right:10px!important;width:38px!important;height:38px!important;min-height:38px!important;padding:0!important;justify-content:center!important}
+  .party-history-button b{display:none!important}
+  .party-history-button span{font-size:18px!important}
+  .casino-header .header-player{margin-left:auto!important}
+  .casino-shared-header .live-indicator{margin-left:auto!important}
+}
