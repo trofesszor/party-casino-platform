@@ -30,7 +30,7 @@ const defaultPlayerTokens=ref(100);
 const defaultTokensSaving=ref(false);
 const resetBusy=ref(false);
 const resetMessage=ref('');
-type CasinoStats={sessionId:number;startedAt:string;endedAt:string|null;playerCount:number;transactionCount:number;tokensSpent:number;tokensWon:number;topWinner:{name:string;amount:number}|null;mostActive:{name:string;actions:number}|null;richestPlayer:{name:string;balance:number}|null;biggestWin:{name:string;amount:number;description:string}|null;rouletteRounds:number;rouletteBets:number;rouletteTokens:number;completedDuels:number;duelChampion:{name:string;wins:number}|null;questsAssigned:number;questsCompleted:number;scratchTickets:number;scratchRevealed:number;scratchWins:number;scratchPrizes:number;photoRewards:number};
+type CasinoStats={sessionId:number;startedAt:string;endedAt:string|null;playerCount:number;transactionCount:number;tokensSpent:number;tokensWon:number;topWinner:{name:string;amount:number}|null;mostActive:{name:string;actions:number}|null;richestPlayer:{name:string;balance:number}|null;biggestWin:{name:string;amount:number;description:string}|null;rouletteRounds:number;rouletteBets:number;rouletteTokens:number;completedDuels:number;duelChampion:{name:string;wins:number}|null;questsAssigned:number;questsCompleted:number;scratchTickets:number;scratchRevealed:number;scratchWins:number;scratchPrizes:number;photoRewards:number;uploadedPhotos:number};
 const casinoStats=ref<{current:CasinoStats|null;lastCompleted:CasinoStats|null}>({current:null,lastCompleted:null});
 const statsLoading=ref(false);
 const statsExporting=ref(false);
@@ -71,7 +71,7 @@ async function exportStatisticsImage(){
       ['JÁTÉKOSOK',n(s.playerCount)],['TRANZAKCIÓK',n(s.transactionCount)],['RULETTKÖRÖK',n(s.rouletteRounds)],
       ['RULETTFOGADÁSOK',n(s.rouletteBets)],['RULETT TÉTEK',n(s.rouletteTokens)+' CR'],['PÁRBAJOK',n(s.completedDuels)],
       ['TELJESÍTETT KÜLDETÉSEK',n(s.questsCompleted)+' / '+n(s.questsAssigned)],['KAPARÓS JEGYEK',n(s.scratchTickets)],
-      ['KAPARÓS NYEREMÉNYEK',n(s.scratchWins)],['KAPARÓS NYEREMÉNY CR',n(s.scratchPrizes)],['FOTÓJUTALMAK',n(s.photoRewards)],
+      ['KAPARÓS NYEREMÉNYEK',n(s.scratchWins)],['KAPARÓS NYEREMÉNY CR',n(s.scratchPrizes)],['FELTÖLTÖTT FOTÓK',n(s.uploadedPhotos)],['FOTÓJUTALMAK',n(s.photoRewards)],
       ['ELKÖLTÖTT / MEGNYERT',n(s.tokensSpent)+' / '+n(s.tokensWon)+' CR']
     ];
     metrics.forEach((m,i)=>{const col=i%3,row=Math.floor(i/3),x=72+col*355,y=290+row*125;card(x,y,325,100);text(m[0],x+20,y+36,14,'#bcb2cc','600');text(m[1],x+20,y+76,27);});
@@ -313,9 +313,9 @@ onMounted(loadPlayers);
               <article><small>Párbajok</small><strong>{{displayedStats.completedDuels}}</strong></article>
               <article><small>Teljesített küldetések</small><strong>{{displayedStats.questsCompleted}}</strong></article>
               <article><small>Kapart sorsjegyek</small><strong>{{displayedStats.scratchTickets}}</strong></article>
+              <article><small>Feltöltött fotók</small><strong>{{displayedStats.uploadedPhotos}}</strong></article>
               <article><small>Fotójutalmak</small><strong>{{displayedStats.photoRewards}}</strong></article>
               <article><small>Rulett tétek (CR)</small><strong>{{displayedStats.rouletteTokens.toLocaleString('hu-HU')}}</strong></article>
-              <article><small>Felfedett kaparósok</small><strong>{{displayedStats.scratchRevealed}}</strong></article>
               <article><small>Kaparós nyeremény (CR)</small><strong>{{displayedStats.scratchPrizes.toLocaleString('hu-HU')}}</strong></article>
               <article><small>Összes elköltött token</small><strong>{{displayedStats.tokensSpent.toLocaleString('hu-HU')}}</strong></article>
               <article><small>Összes megszerzett token</small><strong>{{displayedStats.tokensWon.toLocaleString('hu-HU')}}</strong></article>
