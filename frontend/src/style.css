@@ -1823,3 +1823,26 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
   .casino-header .header-player{margin-left:auto!important}
   .casino-shared-header .live-indicator{margin-left:auto!important}
 }
+
+
+/* Notification history is a floating utility, anchored bottom-left on every screen. */
+.party-history-button{
+  position:fixed!important;
+  top:auto!important;
+  right:auto!important;
+  bottom:22px!important;
+  left:22px!important;
+  z-index:10001!important;
+}
+@media(max-width:800px){
+  .party-history-button{
+    top:auto!important;
+    right:auto!important;
+    bottom:14px!important;
+    left:14px!important;
+    width:42px!important;
+    height:42px!important;
+    min-height:42px!important;
+    border-radius:50%!important;
+  }
+}
