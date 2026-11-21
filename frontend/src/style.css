@@ -1508,3 +1508,97 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
   .player-wallet{right:10px!important;bottom:10px!important}
   .wallet-summary{min-width:145px!important}
 }
+
+/* Mobile navigation: intentionally scrollable, never squeezed into the viewport. */
+@media(max-width:800px){
+  .casino-header{
+    min-height:64px!important;
+    padding:9px 12px!important;
+    display:flex!important;
+    flex-wrap:nowrap!important;
+    gap:9px!important;
+    overflow:visible!important;
+  }
+  .casino-header .casino-brand{flex:0 0 auto!important;min-width:auto!important}
+  .casino-header .casino-nav{
+    order:initial!important;
+    flex:1 1 auto!important;
+    min-width:0!important;
+    width:auto!important;
+    height:40px!important;
+    display:flex!important;
+    flex-wrap:nowrap!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    scrollbar-width:none!important;
+    -webkit-overflow-scrolling:touch;
+    justify-content:flex-start!important;
+  }
+  .casino-header .casino-nav::-webkit-scrollbar,
+  .casino-shared-header .shared-nav::-webkit-scrollbar{display:none}
+  .casino-header .casino-nav a{
+    flex:0 0 auto!important;
+    white-space:nowrap!important;
+    padding:9px 12px!important;
+    font-size:9px!important;
+  }
+  .casino-header .header-player{flex:0 0 auto!important;margin-left:0!important}
+  .casino-header .header-player-copy,
+  .casino-header .header-exit{display:none!important}
+  .casino-header .header-balance{white-space:nowrap!important;font-size:9px!important;padding:8px 9px!important}
+
+  /* Other pages use the same deliberate horizontal-scroll navigation. */
+  .casino-shared-header{
+    min-height:64px!important;
+    padding:9px 12px!important;
+    display:flex!important;
+    flex-wrap:nowrap!important;
+    gap:8px!important;
+    overflow:visible!important;
+  }
+  .casino-shared-header .brand{flex:0 0 auto!important}
+  .casino-shared-header .shared-nav{
+    order:initial!important;
+    flex:1 1 auto!important;
+    min-width:0!important;
+    width:auto!important;
+    margin:0!important;
+    height:40px!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    flex-wrap:nowrap!important;
+    scrollbar-width:none!important;
+    -webkit-overflow-scrolling:touch;
+  }
+  .casino-shared-header .shared-nav a{
+    flex:0 0 auto!important;
+    white-space:nowrap!important;
+    padding:9px 11px!important;
+    font-size:8px!important;
+  }
+}
+
+/* Quest actions stay reachable on narrow screens. */
+@media(max-width:520px){
+  .quest-mini{
+    grid-template-columns:32px minmax(0,1fr)!important;
+    align-items:start!important;
+  }
+  .quest-mini-copy p{white-space:normal!important;line-height:1.35!important}
+  .quest-mini-button{
+    grid-column:1 / -1!important;
+    width:100%!important;
+    min-height:40px!important;
+    margin-top:3px!important;
+    font-size:10px!important;
+    font-weight:800!important;
+  }
+  .quest-pin-bubble{
+    grid-column:1 / -1!important;
+    width:100%!important;
+    text-align:center!important;
+    margin-top:2px!important;
+  }
+  .quest-footer{flex-direction:column!important;align-items:stretch!important}
+  .quest-footer button{width:100%!important;min-height:40px!important}
+}
