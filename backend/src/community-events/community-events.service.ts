@@ -125,7 +125,10 @@ export class CommunityEventsService {
     const contributions = this.sqlite.prepare(`SELECT c.id,c.amount,c.created_at AS createdAt,p.name AS playerName
       FROM community_event_contributions c JOIN players p ON p.id=c.player_id
       WHERE c.event_id=? ORDER BY c.id DESC LIMIT 50`).all(id);
-    return { activations, contributions };
+    const leaderboard = this.sqlite.prepare(`SELECT p.name AS playerName,SUM(c.amount) AS totalAmount,COUNT(*) AS contributions
+      FROM community_event_contributions c JOIN players p ON p.id=c.player_id
+      WHERE c.event_id=? GROUP BY p.id ORDER BY totalAmount DESC,contributions DESC LIMIT 10`).all(id);
+    return { activations, contributions, leaderboard };
   }
 
   create(input: EventInput) {
