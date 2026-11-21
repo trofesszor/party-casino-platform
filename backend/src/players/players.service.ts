@@ -614,7 +614,26 @@ export class PlayersService {
         const settings=this.getCasinoGameSettings();
         const roll=randomInt(0,10000);let threshold=settings.scratchLossPercent*100,prize=0;
         for(const [chance,value] of [[settings.scratch10Percent,10],[settings.scratch25Percent,25],[settings.scratch50Percent,50],[settings.scratch100Percent,100]] as Array<[number,number]>){threshold+=chance*100;if(roll>=settings.scratchLossPercent*100 && roll<threshold){prize=value;break;}}
-        const result=sqlite.prepare('INSERT INTO scratch_tickets (player_id,prize_amount) VALUES (?,?)').run(playerId,prize);
+        const symbols=['🍒','🍋','🔔','🍀','💎','⭐','7️⃣'];
+        const grid:string[][]=Array.from({length:3},()=>Array.from({length:3},()=>symbols[randomInt(0,symbols.length-1)]));
+        if(prize>0){
+          const prizeSymbol=prize===100?'7️⃣':prize===50?'💎':prize===25?'⭐':'🔔';
+          const winningRow=randomInt(0,2);
+          grid[winningRow]=[prizeSymbol,prizeSymbol,prizeSymbol];
+          for(let attempt=0;attempt<100;attempt++){
+            let accidental=false;
+            for(let row=0;row<3;row++)if(row!==winningRow&&grid[row][0]===grid[row][1]&&grid[row][1]===grid[row][2])accidental=true;
+            if(!accidental)break;
+            for(let col=0;col<3;col++)grid[(winningRow+1)%3][col]=symbols.filter(symbol=>symbol!==prizeSymbol)[randomInt(0,symbols.length-2)];
+          }
+        } else {
+          for(let attempt=0;attempt<100;attempt++){
+            const hasTriple=grid.some(row=>row[0]===row[1]&&row[1]===row[2]);
+            if(!hasTriple)break;
+            for(let row=0;row<3;row++)grid[row]=Array.from({length:3},()=>symbols[randomInt(0,symbols.length-1)]);
+          }
+        }
+        const result=sqlite.prepare('INSERT INTO scratch_tickets (player_id,prize_amount,outcome_json) VALUES (?,?,?)').run(playerId,prize,JSON.stringify(grid));
         sqlite.exec('COMMIT'); return {success:true,itemKey:item.itemKey,ticketId:Number(result.lastInsertRowid),tokenBalance:balance};
       }
       sqlite.prepare('INSERT INTO player_inventory (player_id,item_key,quantity) VALUES (?,?,1) ON CONFLICT(player_id,item_key) DO UPDATE SET quantity=quantity+1,updated_at=CURRENT_TIMESTAMP').run(playerId,item.itemKey);
@@ -625,23 +644,23 @@ export class PlayersService {
 
   getScratchTickets(playerId:number) {
     if(!this.database.sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId)) throw new BadRequestException('A játékos nem található.');
-    return this.database.sqlite.prepare("SELECT id,status,CASE WHEN status='REVEALED' THEN prize_amount ELSE NULL END AS prizeAmount,created_at AS createdAt,revealed_at AS revealedAt FROM scratch_tickets WHERE player_id=? ORDER BY id DESC LIMIT 20").all(playerId);
+    return this.database.sqlite.prepare("SELECT id,status,CASE WHEN status='REVEALED' THEN prize_amount ELSE NULL END AS prizeAmount,CASE WHEN status='REVEALED' THEN outcome_json ELSE NULL END AS outcomeJson,created_at AS createdAt,revealed_at AS revealedAt FROM scratch_tickets WHERE player_id=? ORDER BY id DESC LIMIT 20").all(playerId);
   }
 
   revealScratchTicket(playerId:number,ticketId:number) {
     if(!Number.isSafeInteger(ticketId)||ticketId<=0) throw new BadRequestException('Érvénytelen sorsjegy.');
     const sqlite=this.database.sqlite; sqlite.exec('BEGIN IMMEDIATE');
     try {
-      const ticket=sqlite.prepare('SELECT id,status,prize_amount AS prizeAmount FROM scratch_tickets WHERE id=? AND player_id=?').get(ticketId,playerId) as {id:number;status:string;prizeAmount:number}|undefined;
+      const ticket=sqlite.prepare('SELECT id,status,prize_amount AS prizeAmount,outcome_json AS outcomeJson FROM scratch_tickets WHERE id=? AND player_id=?').get(ticketId,playerId) as {id:number;status:string;prizeAmount:number;outcomeJson:string}|undefined;
       if(!ticket) throw new BadRequestException('A sorsjegy nem található.');
-      if(ticket.status==='REVEALED'){sqlite.exec('COMMIT');return {success:true,ticketId,prizeAmount:ticket.prizeAmount,alreadyRevealed:true};}
+      if(ticket.status==='REVEALED'){sqlite.exec('COMMIT');return {success:true,ticketId,prizeAmount:ticket.prizeAmount,outcome:JSON.parse(ticket.outcomeJson),alreadyRevealed:true};}
       sqlite.prepare("UPDATE scratch_tickets SET status='REVEALED',revealed_at=CURRENT_TIMESTAMP WHERE id=? AND status='UNSCRATCHED'").run(ticketId);
       if(ticket.prizeAmount>0){
         sqlite.prepare('UPDATE players SET token_balance=token_balance+? WHERE id=?').run(ticket.prizeAmount,playerId);
         const balance=sqlite.prepare('SELECT token_balance AS balance FROM players WHERE id=?').get(playerId) as {balance:number};
         sqlite.prepare("INSERT INTO token_transactions (player_id,amount,balance_after,type,description) VALUES (?,?,?,'SCRATCH_WIN',?)").run(playerId,ticket.prizeAmount,balance.balance,'Kapart sorsjegy nyeremény · +'+ticket.prizeAmount+' CR');
       }
-      sqlite.exec('COMMIT'); return {success:true,ticketId,prizeAmount:ticket.prizeAmount,alreadyRevealed:false};
+      sqlite.exec('COMMIT'); return {success:true,ticketId,prizeAmount:ticket.prizeAmount,outcome:JSON.parse(ticket.outcomeJson),alreadyRevealed:false};
     } catch(error){sqlite.exec('ROLLBACK');throw error;}
   }
 
