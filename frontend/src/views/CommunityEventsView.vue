@@ -48,16 +48,19 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
     <section class="community-section"><div class="community-section-heading"><div><p class="eyebrow">LIVE FUNDRAISERS</p><h2>Aktív események</h2></div><span>{{events.length}} AKTÍV</span></div>
       <div v-if="!events.length" class="panel community-empty">Jelenleg nincs aktív közösségi esemény. Nézz vissza később!</div>
       <article v-for="event in events" :key="event.id" class="panel community-event-card">
-        <div class="community-event-top"><div><span class="community-event-tag">{{event.isSecret?'✦ FELOLDVA':event.repeatMode==='ONCE'?'EGYSZERI':event.repeatMode==='COOLDOWN'?'COOLDOWN':'ISMÉTELHETŐ'}}</span><h3>{{event.title}}</h3></div><strong>{{percent(event)}}%</strong></div>
-        <p class="muted">{{event.description}}</p>
-        <template v-if="!event.isSecret">
+        <template v-if="event.isSecret">
+          <div class="community-event-top"><div><span class="community-event-tag">✦ TITKOS ESEMÉNY</span><h3>Rejtett esemény</h3></div></div>
+          <p class="muted">A részletek egyelőre titkosak. A meglepetés hamarosan kiderül!</p>
+        </template>
+        <template v-else>
+          <div class="community-event-top"><div><span class="community-event-tag">{{event.repeatMode==='ONCE'?'EGYSZERI':event.repeatMode==='COOLDOWN'?'COOLDOWN':'ISMÉTELHETŐ'}}</span><h3>{{event.title}}</h3></div><strong>{{percent(event)}}%</strong></div>
+          <p class="muted">{{event.description}}</p>
           <div class="community-progress"><span :style="{width:percent(event)+'%'}"></span></div>
           <div class="community-progress-meta"><strong>{{fmt(event.currentAmount)}} <small>/ {{fmt(event.targetAmount)}} CR</small></strong><span>{{event.contributorCount}} támogató</span></div>
+          <div class="community-contribute" v-if="canJoin"><input v-model.number="amounts[event.id]" type="number" min="1" :max="balance" placeholder="Token mennyiség"><button class="primary" :disabled="busyId===event.id||balance<1" @click="contribute(event)">{{busyId===event.id?'Küldés…':'Hozzájárulás →'}}</button></div>
+          <p v-else class="muted">A hozzájáruláshoz lépj be játékosként.</p>
+          <button class="community-history-link" @click="showHistory(event)">Hozzájárulások és előzmények →</button>
         </template>
-        <div v-if="event.isSecret" class="community-unlocked-note">✦ Ez a titkos esemény feloldódott – nézzétek meg a részleteket alább!</div>
-        <div class="community-contribute" v-else-if="canJoin"><input v-model.number="amounts[event.id]" type="number" min="1" :max="balance" placeholder="Token mennyiség"><button class="primary" :disabled="busyId===event.id||balance<1" @click="contribute(event)">{{busyId===event.id?'Küldés…':'Hozzájárulás →'}}</button></div>
-        <p v-else-if="!event.isSecret" class="muted">A hozzájáruláshoz lépj be játékosként.</p>
-        <button class="community-history-link" @click="showHistory(event)">Hozzájárulások és előzmények →</button>
       </article>
     </section>
     <section class="community-section"><div class="community-section-heading"><div><p class="eyebrow">UNLOCKED</p><h2>Legutóbb feloldva</h2></div></div>
