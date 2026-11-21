@@ -1341,3 +1341,170 @@ input:focus,textarea:focus,select:focus{
   .feature-tile{padding:14px}.activity-card{padding:14px}
   .compact-duel{align-items:flex-start;flex-direction:column}.compact-actions{justify-content:flex-start}
 }
+
+/* === SHARED PREMIUM CASINO SYSTEM === */
+.casino-shared-header{
+  max-width:1360px!important;margin:0 auto!important;padding:0 28px!important;
+  background:linear-gradient(180deg,#0c1322f2,#0b111de8)!important;
+  border-bottom:1px solid #ffffff10!important;
+  box-shadow:0 10px 35px #0005;
+  backdrop-filter:blur(22px);
+}
+.shared-nav{display:flex;align-items:center;gap:4px;flex:1;margin-left:24px}
+.shared-nav a{
+  color:#78869b;text-decoration:none;font-size:10px;font-weight:800;
+  letter-spacing:.06em;padding:10px 13px;border-radius:9px;transition:.18s;
+}
+.shared-nav a:hover{background:#ffffff08;color:#f4f7ff}
+.shared-nav a.active{color:#dfffaa;background:#b9f36a0c;box-shadow:inset 0 -2px #b9f36a}
+.casino-shared-header .live-indicator{font-size:9px;white-space:nowrap}
+.casino-shared-header .live-indicator:first-letter{color:#b9f36a}
+.casino-shared-header .ghost{font-size:9px}
+
+.rail-label-games{margin-top:12px}
+.rail-item{position:relative}
+.rail-item small{margin-left:auto;font-size:6px;color:#526077;letter-spacing:.1em}
+.rail-party-note{padding:11px;border:1px solid #ffffff0b;border-radius:11px;background:#ffffff04;display:flex;gap:8px;align-items:flex-start}
+.rail-party-note i{width:6px;height:6px;border-radius:50%;background:#b9f36a;box-shadow:0 0 10px #b9f36a;flex:none;margin-top:4px}
+.rail-party-note span{display:flex;flex-direction:column;gap:3px}
+.rail-party-note strong{font-size:7px;letter-spacing:.14em;color:#b9f36a}
+.rail-party-note small{font-size:7px;line-height:1.4;color:#56647a}
+
+.player-wallet{
+  position:fixed!important;right:22px!important;bottom:20px!important;z-index:50;
+}
+.wallet-summary{
+  min-width:170px;padding:9px 11px!important;border:1px solid #ffffff16!important;
+  border-radius:13px!important;background:linear-gradient(145deg,#151f31ee,#0d1523ee)!important;
+  box-shadow:0 15px 40px #0009!important;backdrop-filter:blur(18px);
+}
+.wallet-summary:hover{border-color:#b9f36a35!important}
+.wallet-coin{background:linear-gradient(145deg,#b9f36a,#68b970)!important;color:#081008!important}
+.wallet-copy small{font-size:7px!important;letter-spacing:.13em;color:#718097!important}
+.wallet-copy strong{font:700 16px 'Space Grotesk'!important}
+.wallet-copy em{color:#b9f36a;font-size:8px;font-style:normal}
+.wallet-history{
+  background:linear-gradient(145deg,#131c2bf8,#0b111cf8)!important;
+  border:1px solid #ffffff12!important;box-shadow:0 25px 70px #000b!important;
+  border-radius:16px!important;
+}
+
+.roulette-page,.game-page,.lucky-wheel-page,.shop-page,.community-page,.leaderboard-page{
+  background:
+    radial-gradient(circle at 50% -8%,#384b7628,transparent 35%),
+    radial-gradient(circle at 100% 55%,#6f3bc714,transparent 28%),
+    #070c16!important;
+}
+.roulette-header,.shop-header,.community-topbar,.leaderboard-header{
+  background:linear-gradient(180deg,#0c1322f2,#0b111de8)!important;
+  border-color:#ffffff10!important;backdrop-filter:blur(22px);
+}
+.roulette-content,.slot-machine-content,.lucky-wheel-content,.shop-intro,.community-hero,.leaderboard-content{
+  position:relative;
+}
+.roulette-content>h1,.slot-heading h1,.lucky-wheel-content>h1,.shop-intro h1,.community-hero h1,.leaderboard-intro h1{
+  font:600 clamp(38px,5.5vw,62px)/1 'Space Grotesk'!important;
+  letter-spacing:-.055em!important;
+}
+.roulette-content>h1 span,.slot-heading h1 span,.lucky-wheel-content>h1 span,.shop-intro h1 span,.community-hero h1 span,.leaderboard-intro h1 span{color:#b9f36a}
+.panel{
+  background:linear-gradient(145deg,#141e2ff5,#0f1725f5)!important;
+  border:1px solid #ffffff12!important;
+  border-radius:18px!important;
+  box-shadow:0 18px 50px #0005;
+}
+.roulette-round,.roulette-bet,.roulette-participants,.wheel-stage,.shop-item,.shop-quest-row,.community-event-card,.leaderboard-panel{
+  box-shadow:0 18px 55px #0006!important;
+}
+.roulette-round h2,.roulette-bet h2,.roulette-participants h2,.shop-section-heading h2,.community-section-heading h2,.leaderboard-panel-heading h2{
+  font-family:'Space Grotesk'!important;letter-spacing:-.025em;
+}
+.roulette-token-balance,.shop-balance,.community-balance{
+  border:1px solid #b9f36a24!important;background:#b9f36a09!important;
+  border-radius:10px;padding:8px 11px!important;color:#dfffad!important;
+}
+.primary{
+  background:linear-gradient(135deg,#b9f36a,#8fda67)!important;
+  box-shadow:0 8px 24px #b9f36a20;
+}
+.primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.ghost{
+  background:#ffffff05!important;border-color:#ffffff17!important;
+}
+.ghost:hover{background:#ffffff0a!important}
+input,textarea,select{
+  background:#090f1b!important;border-color:#ffffff17!important;color:#eef3fb!important;
+}
+input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-shadow:0 0 0 3px #b9f36a0c}
+.bet-tabs button,.roulette-bet-types button,.outside-group button{
+  background:#0b1320!important;border-color:#ffffff13!important;
+}
+.bet-tabs button.active,.roulette-bet-types button.active,.outside-group button.active{
+  background:#b9f36a0d!important;border-color:#b9f36a66!important;color:#b9f36a!important;
+}
+
+/* Slots: make the machine feel like the platform's featured game, not a separate site. */
+.slot-machine-content{max-width:940px!important}
+.slot-cabinet{
+  background:linear-gradient(145deg,#17243b,#0d1422)!important;
+  border:1px solid #ffffff18!important;border-radius:25px!important;
+  box-shadow:0 30px 80px #000a,0 0 80px #7c5cff10!important;
+}
+.slot-marquee{background:linear-gradient(135deg,#291f4b,#111b2d)!important;border-color:#ffffff18!important}
+.slot-reel-window{background:#060b13!important;border-color:#ffffff1c!important}
+.slot-spin-button{background:linear-gradient(145deg,#b9f36a,#6fc36b)!important;box-shadow:0 12px 35px #b9f36a25!important;color:#071008!important}
+.slot-bet-options button.active{border-color:#b9f36a!important;background:#b9f36a12!important;color:#dfffad!important}
+
+/* Wheel: integrate its gold game surface into the dark dashboard. */
+.wheel-stage{background:linear-gradient(145deg,#121f31,#0c1421)!important}
+.wheel-segment-list span{background:#ffffff07!important;border-color:#ffffff10!important;border-radius:8px!important}
+
+/* Shop and event cards get the same hierarchy as the lobby. */
+.shop-item,.community-event-card,.leaderboard-row{
+  transition:transform .18s,border-color .18s,box-shadow .18s;
+}
+.shop-item:hover,.community-event-card:hover,.leaderboard-row:hover{
+  transform:translateY(-2px);border-color:#ffffff22!important;
+}
+.shop-item-icon{background:linear-gradient(145deg,#252e46,#141d2d)!important;border:1px solid #ffffff12}
+.shop-item-buy>strong{font-family:'Space Grotesk';font-size:22px;color:#dfffad}
+.community-event-card{background:linear-gradient(145deg,#141f30,#0f1724)!important}
+.community-event-tag{color:#b9f36a!important}
+.leaderboard-row{background:#101927!important;border-color:#ffffff0b!important}
+.leaderboard-row.is-current-player{background:#b9f36a0b!important;border-color:#b9f36a35!important}
+.leaderboard-rank.rank-1{color:#dfffad!important}
+.leaderboard-balance{font-family:'Space Grotesk'!important;color:#e9f4d2!important}
+
+/* Admin gets the same product language while retaining its management structure. */
+.admin-page{
+  min-height:100vh!important;
+  background:
+    radial-gradient(circle at 50% -10%,#384b7625,transparent 35%),
+    #070c16!important;
+}
+.admin-topbar{
+  background:#0b1120e8!important;border-color:#ffffff10!important;
+  box-shadow:0 10px 35px #0005!important;backdrop-filter:blur(20px);
+}
+.admin-content{max-width:1280px!important}
+.admin-stat,.admin-wheel-editor,.admin-players,.admin-login{
+  background:linear-gradient(145deg,#141e2ff5,#0f1725f5)!important;
+  border-color:#ffffff12!important;border-radius:18px!important;
+  box-shadow:0 18px 50px #0005!important;
+}
+.admin-stat strong{font-family:'Space Grotesk'!important;color:#eaffc9!important}
+.admin-table-wrap{border-color:#ffffff0e!important}
+.admin-table th{color:#65748a!important}
+.admin-table td{border-color:#ffffff08!important}
+.admin-section-heading h2,.admin-heading h1{font-family:'Space Grotesk'!important;letter-spacing:-.035em}
+.admin-actions button,.stats-mode-row button{border-radius:9px!important}
+
+/* Mobile header: one horizontal primary navigation, never two competing bars. */
+@media(max-width:800px){
+  .casino-shared-header{padding:10px 14px!important;height:auto!important;min-height:70px;flex-wrap:wrap}
+  .casino-shared-header .shared-nav{order:3;width:100%;margin:0;overflow:auto;flex:none;height:34px}
+  .casino-shared-header .shared-nav a{white-space:nowrap;padding:8px 10px;font-size:8px}
+  .casino-shared-header .live-indicator{font-size:8px}
+  .player-wallet{right:10px!important;bottom:10px!important}
+  .wallet-summary{min-width:145px!important}
+}
