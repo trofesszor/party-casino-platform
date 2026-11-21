@@ -23,6 +23,7 @@ export class PlayersService {
     const quests=one("SELECT COUNT(*) AS assigned, SUM(CASE WHEN status='COMPLETED' THEN 1 ELSE 0 END) AS completed FROM player_side_quests");
     const scratch=one("SELECT COUNT(*) AS tickets,SUM(CASE WHEN status='REVEALED' THEN 1 ELSE 0 END) AS revealed,SUM(CASE WHEN status='REVEALED' AND prize_amount>0 THEN 1 ELSE 0 END) AS wins,COALESCE(SUM(CASE WHEN status='REVEALED' THEN prize_amount ELSE 0 END),0) AS prizes FROM scratch_tickets");
     const photo=one("SELECT COUNT(*) AS count FROM token_photo_sessions WHERE status='COMPLETED'");
+    const uploadedPhotos=one("SELECT COUNT(*) AS count FROM side_quest_photo_sessions WHERE status='COMPLETED'");
     const biggestWin=all("SELECT p.name,t.amount,t.description FROM token_transactions t JOIN players p ON p.id=t.player_id WHERE t.amount>0 ORDER BY t.amount DESC,t.id LIMIT 1")[0]??null;
     return {
       startedAt,endedAt:null,playerCount,transactionCount:Number(tx.n),tokensSpent:Number(tx.spent),tokensWon:Number(tx.won),
@@ -34,7 +35,7 @@ export class PlayersService {
       completedDuels:Number(duels.count),duelChampion:duelChampion?{name:duelChampion.name,wins:Number(duelChampion.wins)}:null,
       questsAssigned:Number(quests.assigned??0),questsCompleted:Number(quests.completed??0),
       scratchTickets:Number(scratch.tickets??0),scratchRevealed:Number(scratch.revealed??0),scratchWins:Number(scratch.wins??0),scratchPrizes:Number(scratch.prizes??0),
-      photoRewards:Number(photo.count),
+      photoRewards:Number(photo.count),uploadedPhotos:Number(uploadedPhotos.count),
     };
   }
 
