@@ -30,7 +30,7 @@ const defaultPlayerTokens=ref(100);
 const defaultTokensSaving=ref(false);
 const resetBusy=ref(false);
 const resetMessage=ref('');
-type CasinoStats={sessionId:number;startedAt:string;endedAt:string|null;playerCount:number;transactionCount:number;tokensSpent:number;tokensWon:number;topWinner:{name:string;amount:number}|null;mostActive:{name:string;actions:number}|null;richestPlayer:{name:string;balance:number}|null;biggestWin:{name:string;amount:number;description:string}|null;rouletteRounds:number;rouletteBets:number;rouletteTokens:number;completedDuels:number;duelChampion:{name:string;wins:number}|null;questsAssigned:number;questsCompleted:number;scratchTickets:number;scratchRevealed:number;scratchWins:number;scratchPrizes:number;photoRewards:number;uploadedPhotos:number};
+type CasinoStats={sessionId:number;startedAt:string;endedAt:string|null;playerCount:number;transactionCount:number;tokensSpent:number;tokensWon:number;topWinner:{name:string;amount:number}|null;mostActive:{name:string;actions:number}|null;richestPlayer:{name:string;balance:number}|null;biggestWin:{name:string;amount:number;description:string}|null;rouletteRounds:number;rouletteBets:number;rouletteTokens:number;completedDuels:number;duelChampion:{name:string;wins:number}|null;questsAssigned:number;questsCompleted:number;scratchTickets:number;scratchRevealed:number;scratchWins:number;scratchPrizes:number;photoRewards:number;uploadedPhotos:number;photoUploadChampion:{name:string;uploads:number}|null;sideQuestMaster:{name:string;completed:number}|null};
 const casinoStats=ref<{current:CasinoStats|null;lastCompleted:CasinoStats|null}>({current:null,lastCompleted:null});
 const statsLoading=ref(false);
 const statsExporting=ref(false);
@@ -109,7 +109,9 @@ async function exportStatisticsImage(){
       ['LEGAKTÍVABB JÁTÉKOS',s.mostActive?.name??'—',s.mostActive?`${n(s.mostActive.actions)} tranzakció`:'Nincs adat'],
       ['LEGNAGYOBB EGYEDI NYEREMÉNY',s.biggestWin?.name??'—',s.biggestWin?`+${n(s.biggestWin.amount)} CR · ${s.biggestWin.description??''}`:'Nincs adat'],
       ['PÁRBAJBAJNOK',s.duelChampion?.name??'—',s.duelChampion?`${n(s.duelChampion.wins)} győzelem`:'Nincs adat'],
-      ['LEGMAGASABB EGYENLEG',s.richestPlayer?.name??'—',s.richestPlayer?`${n(s.richestPlayer.balance)} CR`:'Nincs adat']
+      ['LEGMAGASABB EGYENLEG',s.richestPlayer?.name??'—',s.richestPlayer?`${n(s.richestPlayer.balance)} CR`:'Nincs adat'],
+      ['FOTÓFELTÖLTÉS KIRÁLYA',s.photoUploadChampion?.name??'—',s.photoUploadChampion?`${n(s.photoUploadChampion.uploads)} feltöltött fotó`:'Nincs adat'],
+      ['SIDE QUESTEK MESTERE',s.sideQuestMaster?.name??'—',s.sideQuestMaster?`${n(s.sideQuestMaster.completed)} teljesített küldetés`:'Nincs adat']
     ];
     awards.forEach((a,i)=>{const col=i%2,row=Math.floor(i/2),x=105+col*510,y=875+row*112;text(a[0],x,y,13,'#bcb2cc','600');text(a[1],x,y+38,25);text(a[2].slice(0,48),x,y+65,15,'#c9a3ff','400');});
     text('KÖSZI, HOGY JÁTSZOTTATOK!',74,1390,25,'#e4c8ff','700');
@@ -361,6 +363,8 @@ onMounted(loadPlayers);
               <div><small>Legaktívabb játékos</small><strong>{{displayedStats.mostActive?.name||'—'}}</strong><span>{{displayedStats.mostActive?.actions||0}} tranzakció</span></div>
               <div><small>Legnagyobb egyedi nyeremény</small><strong>{{displayedStats.biggestWin?.name||'—'}}</strong><span>{{displayedStats.biggestWin?.amount||0}} CR</span></div>
               <div><small>Párbajbajnok</small><strong>{{displayedStats.duelChampion?.name||'—'}}</strong><span>{{displayedStats.duelChampion?.wins||0}} győzelem</span></div>
+              <div><small>Fotófeltöltés királya</small><strong>{{displayedStats.photoUploadChampion?.name||'—'}}</strong><span>{{displayedStats.photoUploadChampion?.uploads||0}} feltöltött fotó</span></div>
+              <div><small>Side questek mestere</small><strong>{{displayedStats.sideQuestMaster?.name||'—'}}</strong><span>{{displayedStats.sideQuestMaster?.completed||0}} teljesített küldetés</span></div>
             </div>
             <div class="casino-stats-footer"><span>{{displayedStats.tokensSpent.toLocaleString('hu-HU')}} CR tét</span><span>{{displayedStats.tokensWon.toLocaleString('hu-HU')}} CR nyeremény</span><span>{{displayedStats.scratchWins}} kaparós nyeremény</span></div>
           </div>
