@@ -197,7 +197,9 @@ export const DATABASE = Symbol('DATABASE');
 
       sqlite.prepare("INSERT OR IGNORE INTO shop_items (item_key,name,description,price,enabled) VALUES ('QUEST_SKIP','Küldetés kihagyás','Egy aktív side quest kihagyása. A kihagyott küldetést később újra megkaphatod.',25,1)").run();
       sqlite.prepare("INSERT OR IGNORE INTO shop_items (item_key,name,description,price,enabled) VALUES ('SCRATCH_TICKET','Kapard és nyerj!','Kapard le a mezőt, és derítsd ki, nyertél-e akár 100 CR-t!',20,1)").run();
-      sqlite.exec("CREATE TABLE IF NOT EXISTS scratch_tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE, prize_amount INTEGER NOT NULL CHECK(prize_amount IN (0,10,25,50,100)), status TEXT NOT NULL DEFAULT 'UNSCRATCHED' CHECK(status IN ('UNSCRATCHED','REVEALED')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, revealed_at TEXT)");
+      sqlite.exec("CREATE TABLE IF NOT EXISTS scratch_tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE, prize_amount INTEGER NOT NULL CHECK(prize_amount IN (0,10,25,50,100)), outcome_json TEXT NOT NULL DEFAULT '[[\"🍒\",\"🍋\",\"🔔\"],[\"🍀\",\"💎\",\"⭐\"],[\"🍋\",\"🍒\",\"🍀\"]]', status TEXT NOT NULL DEFAULT 'UNSCRATCHED' CHECK(status IN ('UNSCRATCHED','REVEALED')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, revealed_at TEXT)");
+      const scratchColumns=sqlite.prepare('PRAGMA table_info(scratch_tickets)').all() as Array<{name:string}>;
+      if(!scratchColumns.some(column=>column.name==='outcome_json'))sqlite.exec("ALTER TABLE scratch_tickets ADD COLUMN outcome_json TEXT NOT NULL DEFAULT '[[\"🍒\",\"🍋\",\"🔔\"],[\"🍀\",\"💎\",\"⭐\"],[\"🍋\",\"🍒\",\"🍀\"]]' ");
       sqlite.exec('CREATE INDEX IF NOT EXISTS idx_scratch_tickets_player ON scratch_tickets(player_id,status)');
 
       sqlite.exec(`
