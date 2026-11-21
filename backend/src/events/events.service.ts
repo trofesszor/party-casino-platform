@@ -6,6 +6,15 @@ import { EventsGateway } from './events.gateway';
 export class EventsService {
   constructor(@Inject(DATABASE) private readonly database: any, private readonly gateway: EventsGateway) {}
 
+  notifications() {
+    return this.database.sqlite.prepare(`
+      SELECT id,type,title,message,created_at AS createdAt
+      FROM party_notifications
+      ORDER BY id DESC
+      LIMIT 100
+    `).all();
+  }
+
   list() {
     return this.database.sqlite.prepare(`
       SELECT e.id, e.title, e.description, e.event_type AS eventType, e.status,
