@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { socket } from '../services/socket';
 import { api, type CommunityEvent } from '../services/api';
 import type { RouletteState } from '../types';
@@ -24,13 +24,6 @@ let refreshTimer: ReturnType<typeof setInterval>|undefined;
 
 const fmt = (value:number) => value.toLocaleString('hu-HU');
 const eventPercent = (event:CommunityEvent) => Math.min(100,Math.round(event.currentAmount/Math.max(1,event.targetAmount)*100));
-const wheelBackground = computed(() => {
-  const segments = wheel.value?.segments.filter(segment=>segment.enabled) ?? [];
-  if (!segments.length) return 'conic-gradient(#252a25 0deg 360deg)';
-  const colors = ['#b78b39','#263a30','#8d3b42','#293b55','#72523b','#354b45','#755a82','#9a7135','#3c4652','#914d39','#466a61','#62523b'];
-  const step=360/segments.length;
-  return 'conic-gradient('+segments.map((segment,index)=>`${colors[index%colors.length]} ${index*step}deg ${(index+1)*step}deg`).join(',')+')';
-});
 const screenLabel = computed(()=>activeScreen.value==='roulette'?'KÖZÖS RULETTASZTAL':activeScreen.value==='wheel'?'SZERENCSEKERÉK':'SLOT GÉP');
 const wheelSlices = computed(() => {
   const segments = wheel.value?.segments ?? []; const count = segments.length || 1;
