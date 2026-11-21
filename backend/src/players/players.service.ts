@@ -540,8 +540,16 @@ export class PlayersService {
       if (busy) throw new BadRequestException('Az egyik játékosnak már van folyamatban lévő párbaja.');
       const result=sqlite.prepare("INSERT INTO duels (challenger_id,opponent_id,status,reward_amount) VALUES (?,?,'PENDING',?)").run(challengerId,opponentId,this.getCasinoGameSettings().duelReward);
       const challenger=sqlite.prepare('SELECT name FROM players WHERE id=?').get(challengerId) as {name:string};
+      const opponent=sqlite.prepare('SELECT name FROM players WHERE id=?').get(opponentId) as {name:string};
+      // Keep the actionable challenge notification private to the opponent.
       sqlite.prepare("INSERT INTO party_notifications (type,title,message,audience_player_id) VALUES ('duel','Párbajkihívás',?,?)").run(challenger.name+' kihívott egy párbajra.',opponentId);
       sqlite.exec('COMMIT');
+      // Publish a separate public announcement for the TV notification feed.
+      this.gateway?.publish('party:notification', {
+        type: 'duel',
+        title: 'PÁRBAJ KIHÍVÁS',
+        message: challenger.name + ' kihívta ' + opponent.name + '-et egy párbajra.',
+      });
       return this.duelView(Number(result.lastInsertRowid));
     } catch(e) { sqlite.exec('ROLLBACK'); throw e; }
   }
