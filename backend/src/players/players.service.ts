@@ -4,7 +4,7 @@ import { DATABASE } from '../database/database.module';
 
 @Injectable()
 export class PlayersService {
-  constructor(@Inject(DATABASE) private readonly database: any) {}
+  constructor(@Inject(DATABASE) private readonly database: any, private readonly gateway?: any) {}
 
   private buildCasinoStats(startedAt:string) {
     const sqlite=this.database.sqlite;
@@ -124,7 +124,22 @@ export class PlayersService {
   }
 
   getLeaderboard() {
-    return this.database.sqlite.prepare('SELECT id, name, token_balance AS tokenBalance FROM players ORDER BY token_balance DESC, name COLLATE NOCASE ASC').all();
+    const rows = this.database.sqlite.prepare('SELECT id, name, token_balance AS tokenBalance FROM players ORDER BY token_balance DESC, name COLLATE NOCASE ASC').all() as any[];
+    const previous = this.database.sqlite.prepare("SELECT setting_value AS value FROM casino_settings WHERE setting_key='leaderboard_top_player_id'").get() as {value:string}|undefined;
+    const topId = rows[0]?.id ? Number(rows[0].id) : null;
+    const previousId = previous ? Number(previous.value) : null;
+    if (topId && topId !== previousId && this.gateway) {
+      const name = rows[0].name;
+      const lines = [
+        `${name} éppen a csúcsra tört! 👑`,
+        `Trónfosztás! ${name} mostantól a leaderboard királya.`,
+        `${name} felért a hegy tetejére. Ki akarja lelökni?`,
+        `Új vezér a fedélzeten: ${name} vezeti a tokenranglistát!`
+      ];
+      this.gateway.publish('party:notification', { type:'system', title:'LEADERBOARD · ÚJ VEZETŐ', message:lines[randomInt(lines.length)] });
+      this.database.sqlite.prepare("INSERT INTO casino_settings (setting_key,setting_value) VALUES ('leaderboard_top_player_id',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value").run(String(topId));
+    }
+    return rows;
   }
 
   getSideQuests(playerId: number) {
