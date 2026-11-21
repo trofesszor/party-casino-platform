@@ -262,11 +262,8 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
 
   <main v-else class="casino-lobby">
     <header class="casino-header">
-      <a class="casino-brand" href="/">
-        <span class="brand-symbol">♣</span>
-        <span><strong>PARTY</strong><em>CASINO</em></span>
-      </a>
-      <nav class="casino-nav">
+      <a class="casino-brand" href="/"><span class="brand-mark">♣</span><span><strong>PARTY CASINO</strong><em>PRIVATE PARTY GAMING</em></span></a>
+      <nav class="casino-nav desktop-casino-nav">
         <a class="active" href="/">Lobby</a>
         <a href="/community-events">Events</a>
         <a href="/leaderboard">Leaderboard</a>
@@ -276,7 +273,13 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         <div class="header-avatar">{{ player.name.slice(0,1).toUpperCase() }}</div>
         <div class="header-player-copy"><strong>{{ player.name }}</strong><small>ONLINE</small></div>
         <button class="header-balance" @click="router.push('/leaderboard')"><span>◈</span>{{ tokenBalance.toLocaleString('hu-HU') }} <small>CR</small></button>
+        <button class="mobile-menu-button" aria-label="Menü" @click="mobileMenuOpen=!mobileMenuOpen">☰</button>
         <button class="header-exit" @click="logout">Kilépés</button>
+      </div>
+      <div v-if="mobileMenuOpen" class="mobile-casino-menu">
+        <a href="/">Lobby</a><a href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a href="/shop">Shop</a>
+        <a href="/verify-quest" class="mobile-quest-link">✓ Quest PIN ellenőrzés</a>
+        <a href="/display" target="_blank">▣ TV kijelző</a>
       </div>
     </header>
 
@@ -386,7 +389,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
               <details v-if="duels.some(d=>['COMPLETED','REFUSED'].includes(d.status))" class="compact-history"><summary>Korábbi párbajok · {{duels.filter(d=>['COMPLETED','REFUSED'].includes(d.status)).length}}</summary><div v-for="duel in duels.filter(d=>['COMPLETED','REFUSED'].includes(d.status))" :key="duel.id"><strong>{{duel.challengerName}} vs {{duel.opponentName}}</strong><span>{{duel.status==='COMPLETED' ? '🏆 '+(duel.winnerId===duel.challengerId?duel.challengerName:duel.opponentName)+' · +'+duel.rewardAmount+' CR' : 'Visszautasítva'}}</span></div></details>
             </section>
 
-            <section class="activity-card panel quest-activity-card">
+            <button class="quest-verify-shortcut" @click="router.push('/verify-quest')"><span>✓</span><div><strong>Másik játékos küldetésének ellenőrzése</strong><small>Írd be a 3 jegyű PIN-kódot a teljesítés jóváhagyásához.</small></div><b>→</b></button><section class="activity-card panel quest-activity-card">
               <header class="activity-card-head"><div><span class="section-overline">EXTRA CHALLENGES</span><h3>Side quests</h3></div><span class="quest-counter">{{activeSideQuests.length}} / 2</span></header>
               <div v-if="activeSideQuests.length" class="quest-mini-list">
                 <article v-for="(quest,index) in activeSideQuests" :key="quest.id" class="quest-mini">
