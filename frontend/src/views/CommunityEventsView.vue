@@ -58,7 +58,7 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
         </template>
         <div class="community-progress"><span :style="{width:percent(event)+'%'}"></span></div>
         <div class="community-progress-meta"><strong>{{fmt(event.currentAmount)}} <small>/ {{fmt(event.targetAmount)}} CR</small></strong><span>{{event.contributorCount}} támogató</span></div>
-        <div class="community-contribute" v-if="canJoin"><input v-model.number="amounts[event.id]" type="number" min="1" :max="Math.min(balance,event.maxContribution??balance)" placeholder="Token mennyiség"><button class="primary" :disabled="busyId===event.id||balance<1" @click="contribute(event)">{{busyId===event.id?'Küldés…':'Hozzájárulás →'}}</button></div>
+        <div class="community-contribute" v-if="canJoin"><input v-model.number="amounts[event.id]" type="number" min="1" :max="balance" placeholder="Token mennyiség"><button class="primary" :disabled="busyId===event.id||balance<1" @click="contribute(event)">{{busyId===event.id?'Küldés…':'Hozzájárulás →'}}</button></div>
         <p v-else class="muted">A hozzájáruláshoz lépj be játékosként.</p>
         <button v-if="!event.isSecret" class="community-history-link" @click="showHistory(event)">Hozzájárulások és előzmények →</button>
       </article>
