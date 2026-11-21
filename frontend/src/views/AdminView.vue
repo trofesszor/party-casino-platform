@@ -73,7 +73,7 @@ async function exportStatisticsImage(){
   const s=displayedStats.value;if(!s)return;
   statsExporting.value=true;
   try{
-    const width=1200,height=1660,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    const width=1200,height=1410,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
     const ctx=canvas.getContext('2d');if(!ctx)throw new Error('A kép exportálása nem támogatott ebben a böngészőben.');
     const gradient=ctx.createLinearGradient(0,0,width,height);gradient.addColorStop(0,'#111827');gradient.addColorStop(.55,'#24143d');gradient.addColorStop(1,'#101114');
     ctx.fillStyle=gradient;ctx.fillRect(0,0,width,height);
@@ -102,7 +102,7 @@ async function exportStatisticsImage(){
     ];
     // Four columns by four rows keeps every metric aligned with no overlap.
     metrics.forEach((m,i)=>{const col=i%4,row=Math.floor(i/4),x=72+col*267,y=290+row*112;card(x,y,245,88);text(m[0],x+16,y+32,12,'#bcb2cc','600');text(m[1],x+16,y+67,23);});
-    card(72,770,1056,500);
+    card(72,750,1056,510);
     text('AZ ÉJSZAKA KIEMELKEDŐI',105,815,19,'#c9a3ff','700');
     const awards=[
       ['LEGNAGYOBB ÖSSZNYEREMÉNY',s.topWinner?.name??'—',s.topWinner?`+${n(s.topWinner.amount)} CR`:'Nincs adat'],
@@ -114,9 +114,9 @@ async function exportStatisticsImage(){
       ['FOTÓFELTÖLTÉS KIRÁLYA',s.photoUploadChampion?.name??'—',s.photoUploadChampion?`${n(s.photoUploadChampion.uploads)} feltöltött fotó`:'Nincs adat'],
       ['SIDE QUESTEK MESTERE',s.sideQuestMaster?.name??'—',s.sideQuestMaster?`${n(s.sideQuestMaster.completed)} teljesített küldetés`:'Nincs adat']
     ];
-    awards.forEach((a,i)=>{const col=i%2,row=Math.floor(i/2),x=105+col*510,y=875+row*112;text(a[0],x,y,13,'#bcb2cc','600');text(a[1],x,y+38,25);text(a[2].slice(0,48),x,y+65,15,'#c9a3ff','400');});
-    text('KÖSZI, HOGY JÁTSZOTTATOK!',74,1390,25,'#e4c8ff','700');
-    text('PARTY CASINO  ·  A LEGJOBB PILLANATOK SZÁMOKBAN',74,1430,13,'#aaa2b8','400');
+    awards.forEach((a,i)=>{const col=i%2,row=Math.floor(i/2),x=105+col*510,y=840+row*105;text(a[0],x,y,13,'#bcb2cc','600');text(a[1],x,y+38,25);text(a[2].slice(0,48),x,y+65,15,'#c9a3ff','400');});
+    text('KÖSZI, HOGY JÁTSZOTTATOK!',74,1320,25,'#e4c8ff','700');
+    text('PARTY CASINO  ·  A LEGJOBB PILLANATOK SZÁMOKBAN',74,1360,13,'#aaa2b8','400');
     const link=document.createElement('a');link.download=`party-casino-stats-${s.sessionId}.png`;link.href=canvas.toDataURL('image/png');link.click();
   }catch(e:any){actionError.value=e.message||'Nem sikerült elkészíteni a statisztikai képet.';}
   finally{statsExporting.value=false;}
