@@ -1,5 +1,4 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
 import { DATABASE } from '../database/database.module';
 import { PlayerPresenceGateway } from '../players/player-presence.gateway';
 
@@ -50,6 +49,16 @@ export class CommunityEventsService {
       CREATE INDEX IF NOT EXISTS idx_community_contributions_event ON community_event_contributions(event_id,id DESC);
       CREATE INDEX IF NOT EXISTS idx_community_activations_event ON community_event_activations(event_id,id DESC);
     `);
+    const existing = sqlite.prepare('SELECT COUNT(*) AS count FROM community_events').get() as {count:number};
+    if (Number(existing.count) === 0) {
+      const insert = sqlite.prepare(`INSERT INTO community_events
+        (title,description,target_amount,repeat_mode,cooldown_minutes,min_contribution,is_secret,is_active)
+        VALUES (?,?,?,?,?,?,?,?)`);
+      insert.run('Everybody Drinks','Közös koccintás: mindenki választhat egy italt, alkoholmenteset is.',500,'REPEATABLE',0,1,0,1);
+      insert.run('Random Victim','A közösség felold egy véletlenszerű, önkéntes party kihívást.',750,'COOLDOWN',30,1,0,1);
+      insert.run('Forbidden Word','Válasszatok egy tiltott szót, amit 10 percig senki nem mondhat ki.',1000,'ONCE',0,1,0,1);
+      insert.run('??? Secret Afterparty','Egy rejtett meglepetés esemény. Az admin bármikor aktiválhatja.',1500,'ONCE',0,1,1,0);
+    }
   }
 
   private get sqlite() { return this.database.sqlite; }
