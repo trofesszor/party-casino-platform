@@ -5,7 +5,7 @@ import { socket } from '../services/socket';
 
 type NotificationItem = {
   id: number;
-  type?: 'event'|'wheel'|'system'|'duel';
+  type?: 'event'|'wheel'|'system'|'duel'|'roulette'|'slots'|'leaderboard';
   title?: string|null;
   message: string;
   createdAt?: string;
