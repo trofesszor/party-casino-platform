@@ -84,13 +84,7 @@ onMounted(refresh);
 
 <template>
   <main class="shop-page">
-    <header class="shop-header">
-      <a class="brand" href="/">PARTY<span>CASINO</span></a>
-      <div class="shop-header-actions">
-        <span class="shop-balance">◈ {{ balance }} CR</span>
-        <button class="ghost" @click="router.push('/')">← Vissza</button>
-      </div>
-    </header>
+    <header class="shop-header casino-shared-header"><a class="brand" href="/">PARTY<span>CASINO</span></a><nav class="shared-nav"><a href="/">Lobby</a><a href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a class="active" href="/shop">Shop</a></nav><div class="shop-header-actions"><span class="shop-balance">◈ {{ balance }} CR</span><button class="ghost" @click="router.push('/')">← Vissza</button></div></header>
 
     <section class="shop-intro">
       <p class="eyebrow">PARTY CASINO · EXTRÁK</p>
