@@ -1630,3 +1630,58 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
   .mobile-casino-menu a:hover{background:#ffffff08;color:#fff}
   .mobile-casino-menu .mobile-quest-link{grid-column:1/-1;color:#dfffad;background:#b9f36a08}
 }
+
+/* Illustrated paper-style multi-symbol scratch ticket */
+.scratch-modal{width:min(100%,560px)!important;padding:22px!important;background:radial-gradient(ellipse at 50% 0%,#26344a,#101722 72%)!important;border:1px solid #d8b66b66!important}
+.scratch-modal-heading{margin:0 0 15px!important}
+.scratch-modal-heading>span{color:#c9a45b!important}
+.scratch-modal-heading h2{color:#f8e8bd!important}
+.scratch-modal-heading h2 em{color:#e8c36e!important}
+.scratch-modal-heading p{color:#9eabbc!important}
+.scratch-ticket-paper{
+  position:relative;padding:15px 16px 12px;color:#2b2418;overflow:hidden;
+  border:5px double #785526;border-radius:3px;
+  background:
+    radial-gradient(ellipse at 12% 15%,#ffffff70,transparent 25%),
+    repeating-linear-gradient(0deg,#e5d5ad 0,#e5d5ad 2px,#e0cea2 3px,#eadbb8 5px);
+  box-shadow:inset 0 0 0 2px #fff8df,0 16px 35px #0008;
+}
+.scratch-ticket-paper:before{content:"";position:absolute;inset:6px;border:1px solid #8b6a3a77;pointer-events:none}
+.paper-topline,.paper-bottomline{display:flex;justify-content:space-between;gap:8px;font:800 7px 'Space Grotesk';letter-spacing:.14em;color:#71562e}
+.paper-masthead{display:grid;grid-template-columns:48px 1fr 55px;align-items:center;gap:10px;padding:11px 0 9px;border-bottom:2px solid #76572d}
+.paper-seal{width:44px;height:44px;border:2px solid #9c753c;border-radius:50%;display:grid;place-items:center;font-size:26px;color:#735126;background:#f4e5c2;box-shadow:inset 0 0 0 3px #d0b47c}
+.paper-masthead small{font:800 7px 'Space Grotesk';letter-spacing:.2em;color:#866538}
+.paper-masthead h3{margin:1px 0;font:900 clamp(22px,5vw,31px)/.95 Georgia,serif;letter-spacing:-.04em;color:#392b1a;text-shadow:1px 1px #fff8d9}
+.paper-masthead b{font:900 9px 'Space Grotesk';letter-spacing:.12em;color:#a34c2f}
+.paper-badge{padding:6px 3px;border:1px solid #a34c2f;color:#a34c2f;text-align:center;font:900 8px/1.3 'Space Grotesk';transform:rotate(5deg)}
+.paper-subtitle{display:flex;justify-content:space-between;gap:6px;padding:8px 0;font:900 7px 'Space Grotesk';letter-spacing:.1em;color:#71512b}
+.scratch-play-area{height:190px;position:relative;padding:7px;border:2px solid #79582e;background:linear-gradient(145deg,#bda477,#e8d7b1 45%,#b69a69);box-shadow:inset 0 0 0 3px #f7e9c9}
+.scratch-symbol-grid{height:100%;display:grid;grid-template-rows:repeat(3,1fr);gap:5px}
+.scratch-symbol-row{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.scratch-symbol-cell{position:relative;display:grid;place-items:center;background:radial-gradient(circle at 35% 25%,#fffdf0,#d8c59d 75%);border:1px solid #967442;box-shadow:inset 0 0 0 2px #fff8e2;color:#3b2b19}
+.scratch-symbol-cell>span{font-size:clamp(25px,6vw,36px);filter:drop-shadow(0 2px 1px #6b4a242b)}
+.scratch-symbol-cell>small{position:absolute;right:5px;bottom:3px;font:700 6px 'Space Grotesk';color:#9a825b}
+.scratch-symbol-cell.symbol-winning{background:radial-gradient(circle,#fff5b2,#e9bd53 72%);border:2px solid #b47c25;animation:scratchWinPop .5s ease-out}
+.scratch-surface{position:absolute!important;inset:7px!important;width:calc(100% - 14px)!important;height:calc(100% - 14px)!important;border-radius:0!important;box-shadow:0 2px 8px #0005!important}
+.paper-rules{display:grid;grid-template-columns:1fr 1.1fr;gap:10px;padding:10px 2px 8px;border-bottom:1px dashed #9b7949}
+.paper-rules>div:first-child{display:flex;flex-direction:column;gap:4px}
+.paper-rules strong{font:900 8px 'Space Grotesk';color:#64451f}
+.paper-rules span{font:600 7px/1.35 'Space Grotesk';color:#705a38}
+.paper-prize-table{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.paper-prize-table span{display:flex;align-items:center;gap:4px;padding:4px 5px;background:#75572b12;border:1px solid #8d6b3c55}
+.paper-prize-table b{font:900 8px 'Space Grotesk';color:#4c3518}
+.paper-result{display:flex;flex-direction:column;gap:3px;margin:9px 0 2px;padding:9px;text-align:center;background:#6f49301a;border:1px solid #976f3c;color:#603b23}
+.paper-result strong{font:900 15px 'Space Grotesk';letter-spacing:.03em}
+.paper-result span{font:600 8px 'Space Grotesk'}
+.paper-result-win{background:#e2bd4b66;border-color:#a77a25;color:#4c3514;animation:scratchWinGlow 1s infinite alternate}
+.paper-bottomline{padding-top:8px;font-size:6px}
+.scratch-card-winner,.scratch-card-loser{display:none}
+.scratch-instruction{color:#d9c995!important}
+@media(max-width:520px){
+ .scratch-modal{padding:16px 10px!important}
+ .scratch-ticket-paper{padding:12px 10px 9px}
+ .scratch-play-area{height:172px}
+ .paper-rules{grid-template-columns:1fr;gap:7px}
+ .paper-prize-table{grid-template-columns:repeat(4,1fr)}
+ .paper-prize-table span{justify-content:center;flex-wrap:wrap}
+}
