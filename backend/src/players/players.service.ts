@@ -504,6 +504,8 @@ export class PlayersService {
       const busy=sqlite.prepare("SELECT id FROM duels WHERE status IN ('PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION') AND (challenger_id IN (?,?) OR opponent_id IN (?,?)) LIMIT 1").get(challengerId,opponentId,challengerId,opponentId);
       if (busy) throw new BadRequestException('Az egyik játékosnak már van folyamatban lévő párbaja.');
       const result=sqlite.prepare("INSERT INTO duels (challenger_id,opponent_id,status,reward_amount) VALUES (?,?,'PENDING',?)").run(challengerId,opponentId,this.getCasinoGameSettings().duelReward);
+      const challenger=sqlite.prepare('SELECT name FROM players WHERE id=?').get(challengerId) as {name:string};
+      sqlite.prepare("INSERT INTO party_notifications (type,title,message,audience_player_id) VALUES ('duel','Párbajkihívás',?,?)").run(challenger.name+' kihívott egy párbajra.',opponentId);
       sqlite.exec('COMMIT');
       return this.duelView(Number(result.lastInsertRowid));
     } catch(e) { sqlite.exec('ROLLBACK'); throw e; }
