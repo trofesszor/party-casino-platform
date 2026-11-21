@@ -54,8 +54,8 @@ export class LuckyWheelService implements OnModuleInit {
       const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
       sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'LUCKY_WHEEL_SPIN', ?)").run(playerId, -this.spinCost, balance.tokenBalance, 'Szerencsekerék: ' + winningSegment.label);
       spinId = randomUUID();
-      sqlite.prepare("UPDATE lucky_wheel_state SET status = 'SPINNING', spin_id = ?, winning_segment_id = ?, started_at = ?, ends_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1")
-        .run(spinId, winningSegment.id, startedAt, endsAt);
+      sqlite.prepare("UPDATE lucky_wheel_state SET status = 'SPINNING', spin_id = ?, winning_segment_id = ?, spinner_player_id = ?, started_at = ?, ends_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1")
+        .run(spinId, winningSegment.id, playerId, startedAt, endsAt);
       sqlite.exec('COMMIT');
     } catch (error) {
       sqlite.exec('ROLLBACK');
@@ -103,14 +103,14 @@ export class LuckyWheelService implements OnModuleInit {
   private readState() {
     const row = this.database.sqlite.prepare(`
       SELECT status, spin_id AS spinId, winning_segment_id AS winningSegmentId,
-        started_at AS startedAt, ends_at AS endsAt
+        spinner_player_id AS spinnerPlayerId, started_at AS startedAt, ends_at AS endsAt
       FROM lucky_wheel_state WHERE id = 1
     `).get() as any;
     const winner = row?.winningSegmentId
       ? this.database.sqlite.prepare('SELECT id, label, position FROM lucky_wheel_segments WHERE id = ?').get(row.winningSegmentId)
       : null;
     return { status: row?.status ?? 'IDLE', spinId: row?.spinId ?? null, winningSegmentId: row?.winningSegmentId ?? null,
-      startedAt: row?.startedAt ?? null, endsAt: row?.endsAt ?? null, winner: winner ?? null };
+      spinnerPlayerId: row?.spinnerPlayerId ?? null, startedAt: row?.startedAt ?? null, endsAt: row?.endsAt ?? null, winner: winner ?? null };
   }
 
   private finishSpin(spinId: string | null) {
@@ -118,7 +118,20 @@ export class LuckyWheelService implements OnModuleInit {
     const result = this.database.sqlite.prepare(
       "UPDATE lucky_wheel_state SET status = 'RESULT', updated_at = CURRENT_TIMESTAMP WHERE id = 1 AND status = 'SPINNING' AND spin_id = ?",
     ).run(spinId);
-    if (Number(result.changes) > 0) this.events.publish('lucky-wheel:changed', this.getState());
+    if (Number(result.changes) > 0) {
+      const state = this.getState();
+      this.events.publish('lucky-wheel:changed', state);
+      const player = state.spinnerPlayerId
+        ? this.database.sqlite.prepare('SELECT name FROM players WHERE id=?').get(state.spinnerPlayerId) as {name:string}|undefined
+        : undefined;
+      if (player && state.winner) {
+        this.events.publish('party:notification', {
+          type: 'wheel',
+          title: 'Szerencsekerék',
+          message: player.name + ' pörgetett: ' + state.winner.label,
+        });
+      }
+    }
     this.timer = null;
   }
 }
