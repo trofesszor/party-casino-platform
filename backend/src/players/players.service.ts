@@ -130,14 +130,24 @@ export class PlayersService {
     if (topId && this.gateway) {
       // Compare-and-update in one synchronous SQLite transaction so simultaneous
       // leaderboard requests cannot publish the same takeover more than once.
-      const shouldNotify = this.database.sqlite.transaction(() => {
-        const previous = this.database.sqlite.prepare("SELECT setting_value AS value FROM casino_settings WHERE setting_key='leaderboard_top_player_id'").get() as {value:string}|undefined;
+      const sqlite = this.database.sqlite;
+      let shouldNotify = false;
+      // The database adapter exposes exec/prepare, not better-sqlite3's
+      // transaction() helper. Use an explicit transaction supported by it.
+      sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        const previous = sqlite.prepare("SELECT setting_value AS value FROM casino_settings WHERE setting_key='leaderboard_top_player_id'").get() as {value:string}|undefined;
         const previousId = previous ? Number(previous.value) : null;
-        if (topId === previousId) return false;
-        this.database.sqlite.prepare("INSERT INTO casino_settings (setting_key,setting_value) VALUES ('leaderboard_top_player_id',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value").run(String(topId));
-        // The first read establishes the baseline; it is not a leaderboard takeover.
-        return previousId !== null;
-      })();
+        if (topId !== previousId) {
+          sqlite.prepare("INSERT INTO casino_settings (setting_key,setting_value) VALUES ('leaderboard_top_player_id',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value").run(String(topId));
+          // The first read establishes the baseline; it is not a leaderboard takeover.
+          shouldNotify = previousId !== null;
+        }
+        sqlite.exec('COMMIT');
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
       if (shouldNotify) {
         const name = rows[0].name;
         const lines = [
