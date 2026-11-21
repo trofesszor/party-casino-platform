@@ -136,7 +136,7 @@ export class PlayersService {
         `${name} felért a hegy tetejére. Ki akarja lelökni?`,
         `Új vezér a fedélzeten: ${name} vezeti a tokenranglistát!`
       ];
-      this.gateway.publish('party:notification', { type:'system', title:'LEADERBOARD · ÚJ VEZETŐ', message:lines[randomInt(lines.length)] });
+      this.gateway.publish('party:notification', { type:'leaderboard', title:'LEADERBOARD · ÚJ VEZETŐ', message:lines[randomInt(lines.length)] });
       this.database.sqlite.prepare("INSERT INTO casino_settings (setting_key,setting_value) VALUES ('leaderboard_top_player_id',?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value").run(String(topId));
     }
     return rows;
