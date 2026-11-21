@@ -1602,3 +1602,31 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
   .quest-footer{flex-direction:column!important;align-items:stretch!important}
   .quest-footer button{width:100%!important;min-height:40px!important}
 }
+
+.mobile-menu-button{display:none;border:1px solid #ffffff16;background:#ffffff06;color:#dfe6f2;border-radius:9px;width:36px;height:36px;font-size:17px}
+.mobile-casino-menu{display:none}
+.quest-verify-shortcut{
+  width:100%;display:flex;align-items:center;gap:13px;margin-bottom:12px;padding:13px 15px;
+  text-align:left;border:1px solid #7c5cff25;border-radius:13px;
+  background:linear-gradient(135deg,#7c5cff0d,#ffffff03);color:#eef2fa;cursor:pointer;
+}
+.quest-verify-shortcut>span{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#7c5cff18;color:#bdaeff;font-weight:800}
+.quest-verify-shortcut>div{display:flex;flex-direction:column;gap:3px;flex:1}
+.quest-verify-shortcut strong{font-size:10px}.quest-verify-shortcut small{font-size:8px;color:#707e93}.quest-verify-shortcut>b{color:#a997ff}
+.quest-verify-shortcut:hover{border-color:#7c5cff55;transform:translateY(-1px)}
+@media(max-width:800px){
+  .desktop-casino-nav{display:none!important}
+  .casino-header{position:relative!important}
+  .mobile-menu-button{display:block}
+  .mobile-casino-menu{
+    position:absolute;right:10px;top:58px;display:grid;grid-template-columns:1fr 1fr;
+    min-width:250px;padding:8px;border:1px solid #ffffff16;border-radius:14px;
+    background:linear-gradient(145deg,#151f31f8,#0b121ff8);box-shadow:0 25px 60px #000b;
+    backdrop-filter:blur(20px);z-index:100
+  }
+  .mobile-casino-menu a{
+    padding:12px 11px;color:#aeb9ca;text-decoration:none;font-size:9px;font-weight:800;border-radius:8px
+  }
+  .mobile-casino-menu a:hover{background:#ffffff08;color:#fff}
+  .mobile-casino-menu .mobile-quest-link{grid-column:1/-1;color:#dfffad;background:#b9f36a08}
+}
