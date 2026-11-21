@@ -118,7 +118,11 @@ export class CommunityEventsService {
   }
 
   getHistory(id: number) {
-    this.event(id);
+    const event = this.event(id);
+    if (event.isSecret) {
+      const unlocked = this.sqlite.prepare('SELECT id FROM community_event_activations WHERE event_id=? LIMIT 1').get(id);
+      if (!unlocked) throw new NotFoundException('A közösségi esemény nem található.');
+    }
     const activations = this.sqlite.prepare(`SELECT id,title,description,total_contributions AS totalContributions,
       participant_count AS participantCount,activated_at AS activatedAt,trigger_type AS triggerType
       FROM community_event_activations WHERE event_id=? ORDER BY id DESC LIMIT 30`).all(id);
