@@ -79,7 +79,7 @@ export class CommunityEventsService {
     const description = input.description === undefined && partial ? undefined : String(input.description ?? '').trim();
     const target = input.targetAmount === undefined && partial ? undefined : Number(input.targetAmount);
     const min = input.minContribution === undefined && partial ? undefined : Number(input.minContribution ?? 1);
-    const max = input.maxContribution === undefined && partial ? undefined : input.maxContribution === null || input.maxContribution === '' || input.maxContribution === undefined ? null : Number(input.maxContribution);
+    const max = input.maxContribution === undefined && partial ? undefined : input.maxContribution === null || input.maxContribution === undefined ? null : Number(input.maxContribution);
     const mode = input.repeatMode;
     const cooldown = input.cooldownMinutes === undefined && partial ? undefined : Number(input.cooldownMinutes ?? 0);
     if (title !== undefined && (!title || title.length > 80)) throw new BadRequestException('Az esemény neve 1–80 karakter legyen.');
