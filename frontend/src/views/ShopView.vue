@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CasinoHeader from '../components/CasinoHeader.vue';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api } from '../services/api';
@@ -85,7 +86,7 @@ onMounted(refresh);
 
 <template>
   <main class="shop-page">
-    <header class="shop-header casino-shared-header"><a class="brand" href="/">PARTY<span>CASINO</span></a><nav class="shared-nav"><a href="/">Lobby</a><a href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a class="active" href="/shop">Shop</a></nav><div class="shop-header-actions"><span class="shop-balance">◈ {{ balance }} CR</span><button class="ghost" @click="router.push('/')">← Vissza</button></div></header>
+    <CasinoHeader />
 
     <section class="shop-intro">
       <p class="eyebrow">PARTY CASINO · EXTRÁK</p>
