@@ -14,13 +14,13 @@ const error = ref('');
 const notice = ref('');
 const questSkipItem = computed(() => items.value.find(item => item.itemKey === 'QUEST_SKIP'));
 const activeQuests = computed(() => quests.value.filter(quest => quest.status === 'ACTIVE'));
-type ScratchTicket = {id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;createdAt:string};
+type ScratchTicket = {id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;outcomeJson?:string|null;createdAt:string};
 const scratchTickets = ref<ScratchTicket[]>([]);
 const activeTicket = ref<ScratchTicket|null>(null);
 const scratchCanvas = ref<HTMLCanvasElement|null>(null);
 const scratching = ref(false);
 const revealing = ref(false);
-const scratchedPoints = new Set<number>();
+const scratchProgress = ref(0);
 let scratchContext:CanvasRenderingContext2D|null=null;
 
 async function refresh() {
@@ -60,12 +60,12 @@ function initializeScratchCard(){
  const gradient=ctx.createLinearGradient(0,0,rect.width,rect.height);gradient.addColorStop(0,'#d8dce0');gradient.addColorStop(.28,'#7e858b');gradient.addColorStop(.52,'#e9edf0');gradient.addColorStop(.75,'#8b9298');gradient.addColorStop(1,'#c4c9ce');
  ctx.fillStyle=gradient;ctx.fillRect(0,0,rect.width,rect.height);ctx.fillStyle='rgba(20,25,29,.24)';ctx.font='800 17px sans-serif';ctx.textAlign='center';
  for(let y=25;y<rect.height;y+=34)for(let x=25;x<rect.width;x+=115)ctx.fillText('✦ KAPARD LE ✦',x,y);
- ctx.fillStyle='#343a40';ctx.font='900 23px sans-serif';ctx.fillText('KAPARD LE!',rect.width/2,rect.height/2);scratchedPoints.clear();
+ ctx.fillStyle='#343a40';ctx.font='900 23px sans-serif';ctx.fillText('KAPARD LE!',rect.width/2,rect.height/2);scratchProgress.value=0;
 }
 function scratchStart(event:PointerEvent){if(revealing.value||activeTicket.value?.status==='REVEALED'||!scratchContext)return;scratching.value=true;(event.currentTarget as HTMLCanvasElement).setPointerCapture(event.pointerId);scratchMove(event);}
-function scratchMove(event:PointerEvent){if(!scratching.value||!scratchContext||!scratchCanvas.value)return;const rect=scratchCanvas.value.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;scratchContext.globalCompositeOperation='destination-out';scratchContext.beginPath();scratchContext.arc(x,y,19,0,Math.PI*2);scratchContext.fill();const cols=12,rows=5,c=Math.max(0,Math.min(cols-1,Math.floor(x/rect.width*cols))),r=Math.max(0,Math.min(rows-1,Math.floor(y/rect.height*rows)));scratchedPoints.add(r*cols+c);if(scratchedPoints.size>=24)revealTicket();}
+function scratchMove(event:PointerEvent){if(!scratching.value||!scratchContext||!scratchCanvas.value)return;const rect=scratchCanvas.value.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;scratchContext.globalCompositeOperation='destination-out';scratchContext.beginPath();scratchContext.arc(x,y,21,0,Math.PI*2);scratchContext.fill();const pixels=scratchContext.getImageData(0,0,scratchCanvas.value.width,scratchCanvas.value.height).data;let cleared=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i]<32)cleared++;scratchProgress.value=cleared/(pixels.length/4);if(scratchProgress.value>=0.58)revealTicket();}
 function scratchEnd(){scratching.value=false;}
-async function revealTicket(){if(revealing.value||!activeTicket.value)return;revealing.value=true;try{const result=await api.revealScratchTicket(playerId,activeTicket.value.id);activeTicket.value={...activeTicket.value,status:'REVEALED',prizeAmount:result.prizeAmount};await refresh();}catch(e:any){error.value=e.message||'A sorsjegy felfedése nem sikerült.';}finally{revealing.value=false;}}
+async function revealTicket(){if(revealing.value||!activeTicket.value)return;revealing.value=true;try{const result=await api.revealScratchTicket(playerId,activeTicket.value.id);activeTicket.value={...activeTicket.value,status:'REVEALED',prizeAmount:result.prizeAmount,outcomeJson:JSON.stringify(result.outcome)};await refresh();}catch(e:any){error.value=e.message||'A sorsjegy felfedése nem sikerült.';}finally{revealing.value=false;}}
 function openScratchTicket(ticket:ScratchTicket){activeTicket.value=ticket;nextTick(()=>{if(ticket.status==='UNSCRATCHED')initializeScratchCard();});}
 async function skipQuest(questId:number) {
   if (busy.value || !questSkipItem.value?.quantity) return;
