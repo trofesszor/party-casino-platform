@@ -78,11 +78,11 @@ async function exportStatisticsImage(){
     if(statsGroupPhoto.value){
       photo=await new Promise<HTMLImageElement>((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('A csoportkép betöltése nem sikerült.'));image.src=statsGroupPhotoUrl.value;});
     }
-    const photoHeight=photo?300:0;
-    const headerTop=photo?390:82;
-    const metricsTop=photo?500:290;
-    const awardsTop=metricsTop+460;
-    const footerY=awardsTop+650;
+    const photoHeight=photo?594:0;
+    const headerTop=photo?680:82;
+    const metricsTop=photo?875:290;
+    const awardsTop=metricsTop+4*112+7;
+    const footerY=awardsTop+560;
     const height=footerY+55;
     const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
     const ctx=canvas.getContext('2d');if(!ctx)throw new Error('A kép exportálása nem támogatott ebben a böngészőben.');
@@ -349,6 +349,7 @@ onMounted(loadPlayers);
         <div v-if="!displayedStats" class="muted admin-empty">Még nincsenek statisztikák.</div>
         <template v-else>
           <div class="casino-stats-preview">
+            <img v-if="statsGroupPhotoUrl" class="casino-stats-photo-banner" :src="statsGroupPhotoUrl" alt="Feltöltött csoportkép">
             <div class="casino-stats-cover"><span>PARTY CASINO</span><strong>THE NIGHT<br>IN NUMBERS</strong><small>#{{displayedStats.sessionId}} · {{formatStatDate(displayedStats.startedAt)}}</small></div>
             <div class="casino-stats-grid">
               <article><small>Játékosok</small><strong>{{displayedStats.playerCount}}</strong></article>
