@@ -112,7 +112,7 @@ onUnmounted(() => { socket.off('roulette:changed', onChanged); if (clock) clearI
 
 <template>
  <main class="roulette-page">
-  <header class="roulette-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><span class="live-indicator">● {{ isDisplay ? 'TV KIJELZŐ' : 'KÖZÖS RULETTASZTAL' }}</span></header>
+  <header class="roulette-header casino-shared-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><nav class="shared-nav"><a class="active" href="/">Lobby</a><a href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a href="/shop">Shop</a></nav><span class="live-indicator">● {{ isDisplay ? 'TV KIJELZŐ' : 'KÖZÖS RULETTASZTAL' }}</span></header>
   <section v-if="state?.currentRound" class="roulette-content">
    <p class="eyebrow">EURÓPAI RULETT · 0–36</p><h1>Rulettasztal</h1><p v-if="!isDisplay" class="roulette-token-balance">Egyenleg: <strong>{{ tokenBalance }} CR</strong></p>
    <div class="roulette-round panel"><span class="eyebrow">KÖR #{{ state.currentRound.roundNumber }}</span><h2>{{ state.currentRound.status === 'BETTING' ? secondsLeft + ' mp' : 'Eredmény' }}</h2><p class="muted">{{ state.currentRound.status === 'BETTING' ? 'Helyezd el a zsetonjaidat az asztalon.' : 'A következő kör automatikusan indul.' }}</p></div>
