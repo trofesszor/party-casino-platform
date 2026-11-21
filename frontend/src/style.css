@@ -2107,3 +2107,33 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
 .tv-wheel-player span{font-size:9px;color:#a8ad9f}
 .tv-wheel-result{display:flex;flex-direction:column;align-items:center;gap:5px}
 @media(max-width:650px){.tv-wheel-stage{width:min(62vw,330px,34vh)}.tv-wheel-svg text{font-size:11px}.tv-wheel-player{padding:8px 15px}}
+
+
+/* Keep the TV display locked to the viewport; feeds scroll internally. */
+.tv-dashboard{height:100vh;height:100dvh;min-height:0;overflow:hidden;box-sizing:border-box}
+.tv-topbar{flex:0 0 76px}
+.tv-layout{height:calc(100% - 76px);flex:1 1 0;min-height:0;overflow:hidden}
+.tv-sidebar{min-height:0;overflow:hidden;grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
+.tv-panel{height:100%;min-height:0}
+.tv-notification-list,.tv-event-list{flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.tv-main-screen{height:100%;min-height:0;min-width:0}
+.tv-game-content{min-height:0;overscroll-behavior:contain}
+@media(max-width:900px) and (min-width:651px){
+  .tv-topbar{flex-basis:64px}
+  .tv-layout{height:calc(100% - 64px)}
+}
+@media(max-width:650px){
+  .tv-dashboard{padding:0 12px 10px}
+  .tv-topbar{flex:0 0 58px}
+  .tv-layout{height:calc(100% - 58px);grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(190px,34%) minmax(0,1fr);gap:8px;padding-top:8px}
+  .tv-sidebar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);height:100%;min-height:0}
+  .tv-panel-heading{flex:0 0 auto}
+  .tv-notification-list,.tv-event-list{min-height:0;overflow-y:auto}
+  .tv-main-screen{height:100%;min-height:0;padding:10px}
+  .tv-game-content{overflow-y:auto}
+}
+@media(max-width:390px){
+  .tv-dashboard{padding-left:7px;padding-right:7px}
+  .tv-layout{grid-template-rows:minmax(180px,36%) minmax(0,1fr)}
+  .tv-sidebar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+}
