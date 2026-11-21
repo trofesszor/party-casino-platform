@@ -1,6 +1,6 @@
 import type { Player, RouletteBetType, RouletteState } from '../types';
 
-export type CommunityEvent = {id:number;title:string;description:string;targetAmount:number;currentAmount:number;repeatMode:'ONCE'|'REPEATABLE'|'COOLDOWN';isSecret:number;nextAvailableAt:string|null;contributorCount:number};
+export type CommunityEvent = {id:number;title:string;description:string;targetAmount:number;currentAmount:number;repeatMode:'ONCE'|'REPEATABLE'|'COOLDOWN';isSecret:number;unlocked?:number;nextAvailableAt:string|null;contributorCount:number};
 export type CommunityEventAdmin = CommunityEvent & {cooldownMinutes:number;minContribution:number;maxContribution:number|null;active:number;completed:number;activationCount:number};
 export type CommunityActivation = {id:number;title:string;description:string;totalContributions:number;participantCount:number;activatedAt:string;triggerType:string};
 
