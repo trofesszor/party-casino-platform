@@ -42,7 +42,7 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
 
 <template>
   <main class="community-page">
-    <header class="community-topbar"><a class="brand" href="/">PARTY<span>CASINO</span></a><div><span v-if="playerName" class="community-balance">{{fmt(balance)}} CR</span><a class="ghost" href="/">Vissza</a></div></header>
+    <header class="community-topbar casino-shared-header"><a class="brand" href="/">PARTY<span>CASINO</span></a><nav class="shared-nav"><a href="/">Lobby</a><a class="active" href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a href="/shop">Shop</a></nav><div><span v-if="playerName" class="community-balance">{{fmt(balance)}} CR</span><a class="ghost" href="/">Vissza</a></div></header>
     <section class="community-hero"><p class="eyebrow">WORK TOGETHER · UNLOCK TOGETHER</p><h1>Community <span>Events</span></h1><p class="muted">A közösség együtt gyűjti össze a tokeneket, hogy feloldja a következő közös élményt.</p></section>
     <p v-if="message" class="community-message success">{{message}}</p><p v-if="error" class="community-message error">{{error}}</p>
     <section class="community-section"><div class="community-section-heading"><div><p class="eyebrow">LIVE FUNDRAISERS</p><h2>Aktív események</h2></div><span>{{events.length}} AKTÍV</span></div>
