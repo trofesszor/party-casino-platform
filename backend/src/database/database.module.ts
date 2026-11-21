@@ -60,7 +60,6 @@ export const DATABASE = Symbol('DATABASE');
           ends_at INTEGER,
           updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
-        ALTER TABLE lucky_wheel_state ADD COLUMN spinner_player_id INTEGER REFERENCES players(id) ON DELETE SET NULL;
         CREATE TABLE IF NOT EXISTS side_quest_pool (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           title TEXT NOT NULL,
@@ -286,6 +285,10 @@ export const DATABASE = Symbol('DATABASE');
             SELECT id, round_id, player_id, bet_type, bet_value, 1, created_at FROM casino_roulette_bets_old;
           DROP TABLE casino_roulette_bets_old;
         `);
+      }
+      const wheelColumns = sqlite.prepare("PRAGMA table_info(lucky_wheel_state)").all() as Array<{name:string}>;
+      if (!wheelColumns.some(column => column.name === 'spinner_player_id')) {
+        sqlite.exec("ALTER TABLE lucky_wheel_state ADD COLUMN spinner_player_id INTEGER REFERENCES players(id) ON DELETE SET NULL");
       }
       return { sqlite, db: drizzle({ client: sqlite }) };
     },
