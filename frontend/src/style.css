@@ -1873,3 +1873,166 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
   }
   .party-history-button b{display:none!important}
 }
+
+
+/* Final navbar layout: one aligned row on mobile and right-aligned account
+   controls on desktop. Overrides legacy responsive rules above. */
+.casino-header{
+  width:100%!important;
+  min-width:0!important;
+  padding:0 28px!important;
+  flex-wrap:nowrap!important;
+  gap:22px!important;
+}
+.casino-header .casino-brand{
+  flex:0 0 auto!important;
+  min-width:180px!important;
+}
+.casino-header .desktop-casino-nav{
+  display:flex!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  width:auto!important;
+  order:initial!important;
+  overflow:visible!important;
+  justify-content:center!important;
+}
+.casino-header .header-player{
+  flex:0 0 auto!important;
+  min-width:0!important;
+  margin-left:auto!important;
+  display:flex!important;
+  flex-flow:row nowrap!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:10px!important;
+}
+.casino-header .header-avatar,
+.casino-header .header-player-copy,
+.casino-header .header-balance,
+.casino-header .header-exit,
+.casino-header .mobile-menu-button{
+  flex:0 0 auto!important;
+  align-self:center!important;
+  margin:0!important;
+}
+.casino-header .mobile-menu-button{display:none!important}
+.casino-shared-header{
+  padding-left:28px!important;
+  padding-right:28px!important;
+  flex-wrap:nowrap!important;
+  gap:20px!important;
+}
+.casino-shared-header .shared-nav{
+  flex:1 1 auto!important;
+  min-width:0!important;
+  justify-content:center!important;
+}
+@media(max-width:800px){
+  .casino-header{
+    height:64px!important;
+    min-height:64px!important;
+    padding:0 12px!important;
+    gap:8px!important;
+    flex-flow:row nowrap!important;
+    justify-content:space-between!important;
+    overflow:visible!important;
+  }
+  .casino-header .casino-brand{
+    min-width:0!important;
+    flex:0 1 auto!important;
+    gap:7px!important;
+  }
+  .casino-header .casino-brand strong{font-size:10px!important;letter-spacing:.1em!important}
+  .casino-header .casino-brand em{font-size:6px!important;letter-spacing:.16em!important}
+  .casino-header .header-player{
+    flex:0 0 auto!important;
+    width:auto!important;
+    margin:0 0 0 auto!important;
+    gap:7px!important;
+    flex-flow:row nowrap!important;
+    align-items:center!important;
+  }
+  .casino-header .header-avatar,
+  .casino-header .header-player-copy,
+  .casino-header .header-exit{display:none!important}
+  .casino-header .header-balance{
+    display:flex!important;
+    min-height:36px!important;
+    padding:7px 9px!important;
+    font-size:9px!important;
+    white-space:nowrap!important;
+    line-height:1!important;
+  }
+  .casino-header .mobile-menu-button{
+    display:grid!important;
+    flex:0 0 36px!important;
+    width:36px!important;
+    height:36px!important;
+    min-width:36px!important;
+    padding:0!important;
+    place-items:center!important;
+    align-self:center!important;
+    line-height:1!important;
+  }
+  .casino-header .mobile-casino-menu{
+    top:calc(100% + 7px)!important;
+    right:10px!important;
+    z-index:1000!important;
+  }
+  .mobile-casino-menu .mobile-menu-logout{
+    grid-column:1/-1;
+    padding:12px 11px;
+    border:0;
+    border-top:1px solid #ffffff12;
+    border-radius:8px;
+    background:transparent;
+    color:#ffaaa8;
+    text-align:left;
+    font-size:9px;
+    font-weight:800;
+  }
+  .casino-shared-header{
+    min-height:64px!important;
+    height:64px!important;
+    padding:0 12px!important;
+    gap:8px!important;
+    flex-flow:row nowrap!important;
+    overflow:hidden!important;
+  }
+  .casino-shared-header .brand{
+    flex:0 0 auto!important;
+    white-space:nowrap!important;
+    font-size:13px!important;
+  }
+  .casino-shared-header .shared-nav{
+    flex:1 1 auto!important;
+    min-width:0!important;
+    width:auto!important;
+    height:40px!important;
+    order:initial!important;
+    margin:0!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    flex-wrap:nowrap!important;
+    justify-content:flex-start!important;
+  }
+  .casino-shared-header .shared-nav a{
+    flex:0 0 auto!important;
+    white-space:nowrap!important;
+    padding:8px 9px!important;
+    font-size:8px!important;
+  }
+  .casino-shared-header .community-balance,
+  .casino-shared-header .shop-balance,
+  .casino-shared-header .live-indicator{display:none!important}
+}
+@media(max-width:380px){
+  .casino-header{padding:0 8px!important;gap:5px!important}
+  .casino-header .casino-brand strong{font-size:9px!important}
+  .casino-header .header-balance{padding:6px 7px!important;font-size:8px!important}
+  .casino-header .mobile-menu-button{width:34px!important;height:34px!important;flex-basis:34px!important}
+  .casino-shared-header{padding:0 8px!important;gap:5px!important}
+  .casino-shared-header .brand{font-size:11px!important}
+  .casino-shared-header .shared-nav a{padding:7px!important;font-size:7px!important}
+}
