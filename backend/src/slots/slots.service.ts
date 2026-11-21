@@ -75,7 +75,7 @@ export class SlotsService {
           `JACKPOT-RIADÓ! ${player.name} most nem kegyelmezett a slotnak: +${payoutAmount} CR!`,
           `${player.name} háromszor rányomott a szerencsére, és a szerencse beadta a derekát: +${payoutAmount} CR!`
         ];
-        this.gateway.publish('party:notification', { type:'wheel', title:'SLOT · NAGY NYEREMÉNY', message:lines[randomInt(lines.length)] });
+        this.gateway.publish('party:notification', { type:'slots', title:'SLOT · NAGY NYEREMÉNY', message:lines[randomInt(lines.length)] });
       }
       return {
         playerId,
