@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { EventsService } from './events.service';
 @Controller('api/events')
 export class EventsController {
   constructor(private readonly events: EventsService) {}
   @Get() list() { return this.events.list(); }
-  @Get('notifications') notifications() { return this.events.notifications(); }
+  @Get('notifications') notifications(@Query('playerId') playerId?: string) { return this.events.notifications(playerId ? Number(playerId) : null); }
+  @Get('notifications/private') privateNotifications(@Query('playerId') playerId?: string) { return this.events.privateNotifications(Number(playerId)); }
   @Post() create(@Body() body: any) { return this.events.create(body); }
   @Post(':id/join') join(@Param('id', ParseIntPipe) id: number, @Body() body: { playerId: number }) { return this.events.join(id, Number(body.playerId)); }
   @Patch(':id/start') start(@Param('id', ParseIntPipe) id: number) { return this.events.setStatus(id, 'RUNNING'); }
