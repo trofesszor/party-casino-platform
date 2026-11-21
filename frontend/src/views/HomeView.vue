@@ -6,6 +6,7 @@ import type { Player } from '../types';
 import { identifyPlayer } from '../services/socket';
 
 const router = useRouter();
+const mobileMenuOpen = ref(false);
 const player = ref<Player | null>(null);
 const tokenBalance = ref(0);
 type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'|'SKIPPED'; assignedAt:string; completedAt:string|null; photoEnabled?:number; completionMethod?:string|null; approvedByName?:string|null; approvedAt?:string|null };
