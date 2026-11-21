@@ -166,7 +166,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
         `Rulett-riadó! ${biggest.playerName} most nem aprózta el: +${biggest.payout} CR!`,
         `${biggest.playerName} úgy eltalálta a rulettet, hogy még a golyó is meglepődött: +${biggest.payout} CR!`
       ];
-      this.gateway.publish('party:notification', { type:'wheel', title:'RULETT · NAGY NYEREMÉNY', message:lines[randomInt(lines.length)] });
+      this.gateway.publish('party:notification', { type:'roulette', title:'RULETT · NAGY NYEREMÉNY', message:lines[randomInt(lines.length)] });
     }
     this.publishState();
     this.schedule(this.resultSeconds * 1000, () => this.openNextRound());
