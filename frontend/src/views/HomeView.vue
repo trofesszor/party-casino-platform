@@ -3,10 +3,10 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, type Duel } from '../services/api';
 import type { Player } from '../types';
+import CasinoHeader from '../components/CasinoHeader.vue';
 import { identifyPlayer } from '../services/socket';
 
 const router = useRouter();
-const mobileMenuOpen = ref(false);
 const player = ref<Player | null>(null);
 const tokenBalance = ref(0);
 type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'|'SKIPPED'; assignedAt:string; completedAt:string|null; photoEnabled?:number; completionMethod?:string|null; approvedByName?:string|null; approvedAt?:string|null };
@@ -253,19 +253,7 @@ async function enter() {
     busy.value = false;
   }
 }
-function logout() {
-  identifyPlayer(null);
-  localStorage.removeItem('party-player-id');
-  localStorage.removeItem('party-player-name');
-  window.dispatchEvent(new Event('party-player-changed'));
-  sideQuests.value = [];
-  if(verificationPinPollTimer)clearInterval(verificationPinPollTimer);
-  verificationPinPollTimer=undefined;verificationPin.value=null;verificationPinVisible.value=false;
-  player.value = null;
-  tokenBalance.value = 0;
-  name.value = '';
-  error.value = '';
-}
+
 onMounted(() => { loadDuels(); loadSideQuests(); loadTokenPhotoStatus(); duelRefreshTimer = setInterval(loadDuels, 3000); sideQuestRefreshTimer = setInterval(() => { loadSideQuests(); loadTokenPhotoStatus(); }, 5000); });
 onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (sideQuestRefreshTimer) clearInterval(sideQuestRefreshTimer); if (photoPollTimer) clearInterval(photoPollTimer); if(verificationPinPollTimer)clearInterval(verificationPinPollTimer); if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer); });
 </script>
@@ -287,28 +275,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
   </main>
 
   <main v-else class="casino-lobby">
-    <header class="casino-header">
-      <a class="casino-brand" href="/"><span class="brand-mark">♣</span><span><strong>PARTY CASINO</strong><em>PRIVATE PARTY GAMING</em></span></a>
-      <nav class="casino-nav desktop-casino-nav">
-        <a class="active" href="/">Lobby</a>
-        <a href="/community-events">Events</a>
-        <a href="/leaderboard">Leaderboard</a>
-        <a href="/shop">Shop</a>
-      </nav>
-      <div class="header-player">
-        <div class="header-avatar">{{ player.name.slice(0,1).toUpperCase() }}</div>
-        <div class="header-player-copy"><strong>{{ player.name }}</strong><small>ONLINE</small></div>
-        <button class="header-balance" @click="router.push('/leaderboard')"><span>◈</span>{{ tokenBalance.toLocaleString('hu-HU') }} <small>CR</small></button>
-        <button class="mobile-menu-button" aria-label="Menü" @click="mobileMenuOpen=!mobileMenuOpen">☰</button>
-        <button class="header-exit" @click="logout">Kilépés</button>
-      </div>
-      <div v-if="mobileMenuOpen" class="mobile-casino-menu">
-        <a href="/">Lobby</a><a href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a href="/shop">Shop</a>
-        <a href="/verify-quest" class="mobile-quest-link">✓ Quest PIN ellenőrzés</a>
-        <a href="/display" target="_blank">▣ TV kijelző</a>
-        <button class="mobile-menu-logout" @click="logout">Kilépés</button>
-      </div>
-    </header>
+    <CasinoHeader />
 
     <section class="lobby-shell">
       <aside class="lobby-rail">
