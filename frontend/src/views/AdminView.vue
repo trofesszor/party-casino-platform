@@ -36,6 +36,23 @@ const statsLoading=ref(false);
 const statsExporting=ref(false);
 const statsMode=ref<'current'|'last'>('current');
 const displayedStats=computed(()=>statsMode.value==='last'?(casinoStats.value.lastCompleted??casinoStats.value.current):casinoStats.value.current);
+const statsGroupPhoto=ref<File|null>(null);
+const statsGroupPhotoUrl=ref('');
+function handleStatsGroupPhoto(event:Event){
+  const input=event.target as HTMLInputElement;
+  const file=input.files?.[0]??null;
+  if(!file)return;
+  if(!file.type.startsWith('image/')){actionError.value='Csak képfájl tölthető fel.';input.value='';return;}
+  if(file.size>10*1024*1024){actionError.value='A csoportkép legfeljebb 10 MB lehet.';input.value='';return;}
+  if(statsGroupPhotoUrl.value)URL.revokeObjectURL(statsGroupPhotoUrl.value);
+  statsGroupPhoto.value=file;
+  statsGroupPhotoUrl.value=URL.createObjectURL(file);
+  actionError.value='';
+}
+function removeStatsGroupPhoto(){
+  if(statsGroupPhotoUrl.value)URL.revokeObjectURL(statsGroupPhotoUrl.value);
+  statsGroupPhoto.value=null;statsGroupPhotoUrl.value='';
+}
 
 
 const password = ref('');
@@ -64,6 +81,12 @@ async function exportStatisticsImage(){
     const text=(value:string,x:number,y:number,size:number,color='#f7f4ff',weight='600')=>{ctx.font=`${weight} ${size}px Arial`;ctx.fillStyle=color;ctx.fillText(value,x,y);};
     const card=(x:number,y:number,w:number,h:number)=>{ctx.fillStyle='rgba(255,255,255,.075)';ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x,y,w,h,20);ctx.fill();ctx.stroke();};
     const n=(value:number)=>value.toLocaleString('hu-HU');
+    if(statsGroupPhoto.value){
+      const photo=await new Promise<HTMLImageElement>((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('A csoportkép betöltése nem sikerült.'));image.src=statsGroupPhotoUrl.value;});
+      const x=820,y=54,w=308,h=190,ratio=Math.max(w/photo.width,h/photo.height),sw=w/ratio,sh=h/ratio,sx=(photo.width-sw)/2,sy=(photo.height-sh)/2;
+      ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,18);ctx.clip();ctx.drawImage(photo,sx,sy,sw,sh,x,y,w,h);ctx.restore();
+      ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x,y,w,h,18);ctx.stroke();
+    }
     text('PARTY CASINO',72,82,26,'#d7a7ff','700');text('THE NIGHT IN NUMBERS',72,158,54);
     text('A buli statisztikái',74,205,26,'#c7bfd5','400');
     text(`#${s.sessionId}  ·  ${formatStatDate(s.startedAt)}${s.endedAt?' – '+formatStatDate(s.endedAt):' · FOLYAMATBAN'}`,74,246,17,'#aaa2b8','400');
@@ -301,6 +324,12 @@ onMounted(loadPlayers);
       <section class="panel admin-wheel-editor admin-statistics-editor">
         <div class="admin-section-heading"><div><p class="eyebrow">THE NIGHT IN NUMBERS</p><h2>Kaszinó statisztikák</h2><p class="muted">A legutóbbi újraindítás óta gyűjtött adatok. A lezárt buli statisztikái újraindítás után is megmaradnak.</p></div><button class="ghost" :disabled="statsLoading" @click="loadCasinoStatistics">{{statsLoading?'Frissítés…':'Frissítés'}}</button></div>
         <div class="stats-mode-row"><button class="ghost" :class="{active:statsMode==='current'}" @click="statsMode='current'">Jelenlegi buli</button><button class="ghost" :class="{active:statsMode==='last'}" :disabled="!casinoStats.lastCompleted" @click="statsMode='last'">Előző buli</button></div>
+        <div class="stats-group-photo-editor">
+          <div class="stats-group-photo-copy"><strong>Csoportkép</strong><small>Opcionális fotó, amely a letöltött PNG összefoglaló tetején is megjelenik. JPG, PNG vagy WebP, maximum 10 MB.</small></div>
+          <label class="ghost stats-photo-upload"> <span>{{statsGroupPhoto?'Kép cseréje':'Csoportkép feltöltése'}}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/*" @change="handleStatsGroupPhoto"></label>
+          <button v-if="statsGroupPhoto" class="ghost" type="button" @click="removeStatsGroupPhoto">Kép eltávolítása</button>
+          <img v-if="statsGroupPhotoUrl" class="stats-group-photo-preview" :src="statsGroupPhotoUrl" alt="Feltöltött csoportkép előnézete">
+        </div>
         <div v-if="!displayedStats" class="muted admin-empty">Még nincsenek statisztikák.</div>
         <template v-else>
           <div class="casino-stats-preview">
