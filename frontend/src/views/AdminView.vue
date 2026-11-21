@@ -95,7 +95,7 @@ async function exportStatisticsImage(){
       ['RULETTFOGADÁSOK',n(s.rouletteBets)],['RULETT TÉTEK',n(s.rouletteTokens)+' CR'],['PÁRBAJOK',n(s.completedDuels)],
       ['TELJESÍTETT KÜLDETÉSEK',n(s.questsCompleted)+' / '+n(s.questsAssigned)],['KAPARÓS JEGYEK',n(s.scratchTickets)],
       ['KAPARÓS NYEREMÉNYEK',n(s.scratchWins)],['KAPARÓS NYEREMÉNY CR',n(s.scratchPrizes)],['FELTÖLTÖTT FOTÓK',n(s.uploadedPhotos)],['FOTÓJUTALMAK',n(s.photoRewards)],
-      ['ELKÖLTÖTT / MEGNYERT',n(s.tokensSpent)+' / '+n(s.tokensWon)+' CR],
+      ['ELKÖLTÖTT / MEGNYERT',n(s.tokensSpent)+' / '+n(s.tokensWon)+' CR'],
       ['KAPARÓS NYEREMÉNYEK',n(s.scratchWins)],
       ['ÁTLAGOS TRANZAKCIÓ / JÁTÉKOS',n(s.playerCount?Math.round(s.transactionCount/s.playerCount):0)],
       ['NETTÓ TOKENFORGALOM',n(s.tokensWon-s.tokensSpent)+' CR']
