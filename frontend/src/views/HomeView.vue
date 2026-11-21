@@ -15,6 +15,11 @@ const sideQuestBusy = ref(false);
 const sideQuestError = ref('');
 const verificationPin = ref<{questId:number;title:string;pin:string;expiresAt:string}|null>(null);
 const verificationPinVisible = ref(false);
+const verifierPin = ref('');
+const verifierQuest = ref<{questId:number;ownerId:number;ownerName:string;title:string;description:string;expiresAt:string}|null>(null);
+const verifierBusy = ref(false);
+const verifierError = ref('');
+const verifierResult = ref('');
 let verificationPinPollTimer: ReturnType<typeof setInterval> | undefined;
 const photoSession = ref<{questId:number;title:string;sessionId:string;cameraUrl:string;expiresAt:string}|null>(null);
 let photoPollTimer: ReturnType<typeof setInterval> | undefined;
@@ -107,6 +112,26 @@ async function checkVerificationPinStatus() {
     // Keep the displayed PIN during temporary network failures; the server remains authoritative.
   }
 }
+async function lookupVerifierPin() {
+  if(!player.value || verifierBusy.value) return;
+  if(!/^\\d{3}$/.test(verifierPin.value)) { verifierError.value='Pontosan három számjegyet adj meg.'; return; }
+  verifierBusy.value=true;verifierError.value='';verifierResult.value='';
+  try { verifierQuest.value=await api.getSideQuestVerification(verifierPin.value,player.value.id); }
+  catch(e:any) { verifierQuest.value=null; verifierError.value=e.message||'A PIN-kód hibás vagy lejárt.'; }
+  finally { verifierBusy.value=false; }
+}
+async function decideVerifierPin(approve:boolean) {
+  if(!player.value||!verifierQuest.value||verifierBusy.value) return;
+  verifierBusy.value=true;verifierError.value='';
+  try {
+    const response=await api.verifySideQuest(verifierPin.value,player.value.id,approve);
+    verifierResult.value=response.status==='APPROVED' ? `Jóváhagytad: ${response.questTitle}. A hitelesítő neve: ${response.verifiedByName}.` : 'Elutasítottad a küldetés teljesítését. A küldetés aktív marad.';
+    verifierQuest.value=null;verifierPin.value='';
+    await loadSideQuests();
+  } catch(e:any) { verifierError.value=e.message||'Nem sikerült rögzíteni a döntést.'; }
+  finally { verifierBusy.value=false; }
+}
+function resetVerifierPin() { verifierPin.value='';verifierQuest.value=null;verifierError.value='';verifierResult.value='';}
 async function startPhotoQuest(quest:SideQuest) {
   if(!player.value||sideQuestBusy.value)return;
   sideQuestBusy.value=true;sideQuestError.value='';
@@ -390,7 +415,16 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
               <details v-if="duels.some(d=>['COMPLETED','REFUSED'].includes(d.status))" class="compact-history"><summary>Korábbi párbajok · {{duels.filter(d=>['COMPLETED','REFUSED'].includes(d.status)).length}}</summary><div v-for="duel in duels.filter(d=>['COMPLETED','REFUSED'].includes(d.status))" :key="duel.id"><strong>{{duel.challengerName}} vs {{duel.opponentName}}</strong><span>{{duel.status==='COMPLETED' ? '🏆 '+(duel.winnerId===duel.challengerId?duel.challengerName:duel.opponentName)+' · +'+duel.rewardAmount+' CR' : 'Visszautasítva'}}</span></div></details>
             </section>
 
-            <button class="quest-verify-shortcut" @click="router.push('/verify-quest')"><span>✓</span><div><strong>Másik játékos küldetésének ellenőrzése</strong><small>Írd be a 3 jegyű PIN-kódot a teljesítés jóváhagyásához.</small></div><b>→</b></button><section class="activity-card panel quest-activity-card">
+            <section class="quest-verify-inline panel">
+              <div class="quest-verify-inline-head"><span class="quest-verify-icon">✓</span><div><span class="section-overline">VERIFICATION</span><h3>Másik játékos küldetésének ellenőrzése</h3><p>Írd be a 3 jegyű PIN-kódot a teljesítés jóváhagyásához.</p></div></div>
+              <form v-if="!verifierQuest && !verifierResult" class="quest-verify-inline-form" @submit.prevent="lookupVerifierPin">
+                <input v-model="verifierPin" inputmode="numeric" autocomplete="one-time-code" maxlength="3" pattern="[0-9]{3}" placeholder="000" aria-label="Háromjegyű PIN-kód">
+                <button class="primary" :disabled="verifierBusy || verifierPin.length!==3">{{verifierBusy?'Ellenőrzés…':'PIN ellenőrzése'}}</button>
+              </form>
+              <div v-if="verifierQuest" class="quest-verify-found"><div><strong>{{verifierQuest.ownerName}}</strong> küldetése</div><h4>{{verifierQuest.title}}</h4><p v-if="verifierQuest.description">{{verifierQuest.description}}</p><div class="quest-verify-actions"><button class="primary" :disabled="verifierBusy" @click="decideVerifierPin(true)">{{verifierBusy?'…':'Teljesítés jóváhagyása'}}</button><button class="ghost" :disabled="verifierBusy" @click="decideVerifierPin(false)">Elutasítás</button></div><button class="ghost quest-verify-reset" @click="resetVerifierPin">Másik PIN</button></div>
+              <div v-if="verifierResult" class="quest-verify-result"><strong>✓ Visszaigazolás rögzítve</strong><span>{{verifierResult}}</span><button class="ghost" @click="resetVerifierPin">Új PIN</button></div>
+              <p v-if="verifierError" class="error">{{verifierError}}</p>
+            </section><section class="activity-card panel quest-activity-card">
               <header class="activity-card-head"><div><span class="section-overline">EXTRA CHALLENGES</span><h3>Side quests</h3></div><span class="quest-counter">{{activeSideQuests.length}} / 2</span></header>
               <div v-if="activeSideQuests.length" class="quest-mini-list">
                 <article v-for="(quest,index) in activeSideQuests" :key="quest.id" class="quest-mini">
