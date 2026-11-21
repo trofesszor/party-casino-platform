@@ -142,10 +142,10 @@ export class CommunityEventsService {
     const current = this.event(id);
     const v = this.validate(input, true);
     this.sqlite.prepare(`UPDATE community_events SET title=?,description=?,target_amount=?,repeat_mode=?,cooldown_minutes=?,
-      min_contribution=?,max_contribution=?,is_secret=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(
+      min_contribution=?,max_contribution=?,is_secret=?,is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).run(
       v.title??current.title,v.description??current.description,v.target??current.targetAmount,
       v.mode??current.repeatMode,v.cooldown??current.cooldownMinutes,v.min??current.minContribution,
-      v.max===undefined?current.maxContribution:v.max,input.isSecret===undefined?current.isSecret:(input.isSecret?1:0),id);
+      v.max===undefined?current.maxContribution:v.max,input.isSecret===undefined?current.isSecret:(input.isSecret?1:0),input.active===undefined?current.active:(input.active?1:0),id);
     this.publish();
     return this.event(id);
   }
