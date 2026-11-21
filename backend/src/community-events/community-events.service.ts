@@ -72,7 +72,16 @@ export class CommunityEventsService {
     return row;
   }
 
-  private publish() { this.presence.server?.emit('community-events:updated'); }
+  private publish(activation?: any) {
+    this.presence.server?.emit('community-events:updated');
+    if (activation) {
+      this.presence.server?.emit('party:notification', {
+        type: 'event',
+        title: 'Community Event',
+        message: 'Event: ' + activation.title + (activation.description ? ' — ' + activation.description : ''),
+      });
+    }
+  }
 
   private validate(input: EventInput, partial = false) {
     const title = input.title === undefined && partial ? undefined : String(input.title ?? '').trim();
@@ -211,7 +220,7 @@ export class CommunityEventsService {
       let activation:any=null;
       if (updated.currentAmount >= updated.targetAmount) activation=this.activateInTransaction(id,'TARGET');
       this.sqlite.exec('COMMIT');
-      this.publish();
+      this.publish(activation);
       return { success:true, contributed:charged, tokenBalance:newBalance, event:updated, activation };
     } catch(error) {
       this.sqlite.exec('ROLLBACK');
@@ -226,7 +235,7 @@ export class CommunityEventsService {
       if (row.completed) throw new BadRequestException('Ez az egyszeri esemény már teljesült.');
       const activation = this.activateInTransaction(id,'ADMIN');
       this.sqlite.exec('COMMIT');
-      this.publish();
+      this.publish(activation);
       return activation;
     } catch(error) { this.sqlite.exec('ROLLBACK'); throw error; }
   }
