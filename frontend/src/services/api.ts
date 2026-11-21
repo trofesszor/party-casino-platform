@@ -13,6 +13,8 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
 };
 export const api = {
 
+  adminGetNotificationSettings: (token:string) => request<Record<string,boolean>>('/api/admin/notification-settings',{headers:{Authorization:`Bearer ${token}`}}),
+  adminSaveNotificationSettings: (token:string,settings:Record<string,boolean>) => request<Record<string,boolean>>('/api/admin/notification-settings',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(settings)}),
   getPartyNotifications: (playerId?:number) => request<{id:number;type:'event'|'wheel'|'system'|'duel';title:string|null;message:string;createdAt:string}[]>(`/api/events/notifications${playerId ? `?playerId=${playerId}` : ''}`),
   getCommunityEvents: () => request<{events:CommunityEvent[];recentActivations:CommunityActivation[]}>('/api/community-events'),
   contributeCommunityEvent: (eventId:number,playerId:number,amount:number) => request<any>(`/api/community-events/${eventId}/contribute`,{method:'POST',body:JSON.stringify({playerId,amount})}),
