@@ -314,6 +314,11 @@ onMounted(loadPlayers);
               <article><small>Teljesített küldetések</small><strong>{{displayedStats.questsCompleted}}</strong></article>
               <article><small>Kapart sorsjegyek</small><strong>{{displayedStats.scratchTickets}}</strong></article>
               <article><small>Fotójutalmak</small><strong>{{displayedStats.photoRewards}}</strong></article>
+              <article><small>Rulett tétek (CR)</small><strong>{{displayedStats.rouletteTokens.toLocaleString('hu-HU')}}</strong></article>
+              <article><small>Felfedett kaparósok</small><strong>{{displayedStats.scratchRevealed}}</strong></article>
+              <article><small>Kaparós nyeremény (CR)</small><strong>{{displayedStats.scratchPrizes.toLocaleString('hu-HU')}}</strong></article>
+              <article><small>Összes elköltött token</small><strong>{{displayedStats.tokensSpent.toLocaleString('hu-HU')}}</strong></article>
+              <article><small>Összes megszerzett token</small><strong>{{displayedStats.tokensWon.toLocaleString('hu-HU')}}</strong></article>
             </div>
             <div class="casino-stats-highlights">
               <div><small>Legnagyobb össznyeremény</small><strong>{{displayedStats.topWinner?.name||'—'}}</strong><span>{{displayedStats.topWinner?'+'+displayedStats.topWinner.amount+' CR':'Nincs adat'}}</span></div>
