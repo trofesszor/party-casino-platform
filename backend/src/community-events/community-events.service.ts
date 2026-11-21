@@ -103,7 +103,7 @@ export class CommunityEventsService {
         (e.is_secret=0 AND e.is_active=1 AND e.is_completed=0
           AND (e.next_available_at IS NULL OR datetime(e.next_available_at)<=CURRENT_TIMESTAMP))
         OR
-        (e.is_secret=1 AND EXISTS(SELECT 1 FROM community_event_activations a WHERE a.event_id=e.id))
+        (e.is_secret=1 AND (e.is_active=1 OR EXISTS(SELECT 1 FROM community_event_activations a WHERE a.event_id=e.id)))
       )
       ORDER BY CASE WHEN e.is_secret=1 THEN 0 ELSE 1 END,e.created_at DESC`).all() as any[];
     const recent = this.sqlite.prepare(`SELECT id,title,description,total_contributions AS totalContributions,
