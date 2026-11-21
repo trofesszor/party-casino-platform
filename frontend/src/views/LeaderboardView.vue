@@ -30,10 +30,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 
 <template>
   <main class="leaderboard-page">
-    <header class="leaderboard-header">
-      <a class="brand" href="/">PARTY<span>CASINO</span></a>
-      <a class="ghost leaderboard-back" href="/">Vissza a játékokhoz</a>
-    </header>
+    <header class="leaderboard-header casino-shared-header"><a class="brand" href="/">PARTY<span>CASINO</span></a><nav class="shared-nav"><a href="/">Lobby</a><a href="/community-events">Events</a><a class="active" href="/leaderboard">Leaderboard</a><a href="/shop">Shop</a></nav><a class="ghost leaderboard-back" href="/">Vissza a játékokhoz</a></header>
 
     <section class="leaderboard-content">
       <div class="leaderboard-intro">
