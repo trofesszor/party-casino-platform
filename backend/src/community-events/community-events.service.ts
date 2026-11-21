@@ -1,6 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DATABASE } from '../database/database.module';
 import { PlayerPresenceGateway } from '../players/player-presence.gateway';
+import { EventsGateway } from '../events/events.gateway';
 
 type EventInput = {
   title?: string; description?: string; targetAmount?: number; repeatMode?: 'ONCE'|'REPEATABLE'|'COOLDOWN';
@@ -9,7 +10,7 @@ type EventInput = {
 
 @Injectable()
 export class CommunityEventsService {
-  constructor(@Inject(DATABASE) private readonly database: any, private readonly presence: PlayerPresenceGateway) {
+  constructor(@Inject(DATABASE) private readonly database: any, private readonly presence: PlayerPresenceGateway, private readonly events: EventsGateway) {
     const sqlite = this.database.sqlite;
     sqlite.exec(`
       CREATE TABLE IF NOT EXISTS community_events (
@@ -75,9 +76,9 @@ export class CommunityEventsService {
   private publish(activation?: any) {
     this.presence.server?.emit('community-events:updated');
     if (activation) {
-      this.presence.server?.emit('party:notification', {
+      this.events.publish('party:notification', {
         type: 'event',
-        title: 'Community Event',
+        title: 'KÖZÖSSÉGI ESEMÉNY TELJESÜLT',
         message: 'Event: ' + activation.title + (activation.description ? ' — ' + activation.description : ''),
       });
     }
