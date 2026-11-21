@@ -60,6 +60,7 @@ export const DATABASE = Symbol('DATABASE');
           ends_at INTEGER,
           updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        ALTER TABLE lucky_wheel_state ADD COLUMN spinner_player_id INTEGER REFERENCES players(id) ON DELETE SET NULL;
         CREATE TABLE IF NOT EXISTS side_quest_pool (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           title TEXT NOT NULL,
