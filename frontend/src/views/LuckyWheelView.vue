@@ -98,7 +98,7 @@ onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInter
 
 <template>
  <main class="lucky-wheel-page">
-  <header class="roulette-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><span class="live-indicator">● {{ isDisplay?'KÖZÖS TV KIJELZŐ':'KÖZÖS SZERENCSEKERÉK' }}</span></header>
+  <header class="roulette-header casino-shared-header"><a href="/" class="brand">PARTY<span>CASINO</span></a><nav class="shared-nav"><a href="/">Lobby</a><a href="/community-events">Events</a><a href="/leaderboard">Leaderboard</a><a href="/shop">Shop</a></nav><span class="live-indicator">● {{ isDisplay?'KÖZÖS TV KIJELZŐ':'KÖZÖS SZERENCSEKERÉK' }}</span></header>
   <section class="lucky-wheel-content">
    <p class="eyebrow">PARTY CHALLENGE</p><h1>Szerencse<span>kerék</span></h1>
    <p class="muted wheel-subtitle">Egy kerék, egy pörgetés, mindenki ugyanazt látja.</p>
