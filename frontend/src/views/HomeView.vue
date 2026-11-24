@@ -23,6 +23,7 @@ const verifierResult = ref('');
 let verificationPinPollTimer: ReturnType<typeof setInterval> | undefined;
 const photoSession = ref<{questId:number;title:string;sessionId:string;cameraUrl:string;expiresAt:string}|null>(null);
 let photoPollTimer: ReturnType<typeof setInterval> | undefined;
+let sideQuestCameraWindow:Window|null=null;
 const activeSideQuests = ref<SideQuest[]>([]);
 type TokenPhotoStatus={enabled:boolean;eligible:boolean;balance:number;balanceThreshold:number;rewardAmount:number;cooldownMinutes:number;dailyLimit:number;dailyUsed:number;dailyRemaining:number;pending:boolean;sessionId:string|null;expiresAt:string|null;reason:string|null};
 const tokenPhotoStatus=ref<TokenPhotoStatus|null>(null);
@@ -30,6 +31,7 @@ const tokenPhotoSession=ref<{sessionId:string;cameraUrl:string;expiresAt:string;
 const tokenPhotoBusy=ref(false);
 const tokenPhotoMessage=ref('');
 let tokenPhotoPollTimer:ReturnType<typeof setInterval>|undefined;
+let tokenCameraWindow:Window|null=null;
 async function loadTokenPhotoStatus(){
   if(!player.value)return;
   try{tokenPhotoStatus.value=await api.getTokenPhotoStatus(player.value.id);}
@@ -38,25 +40,29 @@ async function loadTokenPhotoStatus(){
 async function startTokenPhotoUpload(){
   if(!player.value||tokenPhotoBusy.value)return;
   tokenPhotoBusy.value=true;tokenPhotoMessage.value='';
+  tokenCameraWindow=window.open('about:blank','_blank');
   try{
     const session=await api.createTokenPhotoSession(player.value.id);
     tokenPhotoSession.value=session;
+    if(tokenCameraWindow)tokenCameraWindow.location.href=session.cameraUrl;
     if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);
     tokenPhotoPollTimer=setInterval(checkTokenPhotoUpload,2500);
     await loadTokenPhotoStatus();
-  }catch(e:any){tokenPhotoMessage.value=e.message||'Nem sikerült elindítani a fotófeltöltést.';await loadTokenPhotoStatus();}
+  }catch(e:any){if(tokenCameraWindow&&!tokenCameraWindow.closed)tokenCameraWindow.close();tokenCameraWindow=null;tokenPhotoMessage.value=e.message||'Nem sikerült elindítani a fotófeltöltést.';await loadTokenPhotoStatus();}
   finally{tokenPhotoBusy.value=false;}
 }
 async function checkTokenPhotoUpload(){
   if(!player.value||!tokenPhotoSession.value)return;
   if(Date.now()>=Date.parse(tokenPhotoSession.value.expiresAt)){
     if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);tokenPhotoPollTimer=undefined;tokenPhotoSession.value=null;
+    if(tokenCameraWindow&&!tokenCameraWindow.closed)tokenCameraWindow.close();tokenCameraWindow=null;
     tokenPhotoMessage.value='A fotófeltöltési idő lejárt. Próbáld újra később.';await loadTokenPhotoStatus();return;
   }
   try{
     const result=await api.checkTokenPhotoSession(player.value.id,tokenPhotoSession.value.sessionId);
     if(result.completed){
       if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);tokenPhotoPollTimer=undefined;tokenPhotoSession.value=null;
+      if(tokenCameraWindow&&!tokenCameraWindow.closed){tokenCameraWindow.close();window.focus();}tokenCameraWindow=null;
       tokenPhotoMessage.value=`Sikeres feltöltés! +${result.rewardAmount} CR jóváírva.`;
       const balance=await api.getPlayerBalance(player.value.id);tokenBalance.value=balance.tokenBalance;
       await loadTokenPhotoStatus();
@@ -133,12 +139,15 @@ function resetVerifierPin() { verifierPin.value='';verifierQuest.value=null;veri
 async function startPhotoQuest(quest:SideQuest) {
   if(!player.value||sideQuestBusy.value)return;
   sideQuestBusy.value=true;sideQuestError.value='';
+  sideQuestCameraWindow=window.open('about:blank','_blank');
   try {
     const session=await api.createSideQuestPhotoSession(player.value.id,quest.id);
     photoSession.value={questId:quest.id,title:session.questTitle,sessionId:session.sessionId,cameraUrl:session.cameraUrl,expiresAt:session.expiresAt};
+    if(sideQuestCameraWindow)sideQuestCameraWindow.location.href=session.cameraUrl;
     if(photoPollTimer)clearInterval(photoPollTimer);
     photoPollTimer=setInterval(checkPhotoQuestCompletion,2500);
   } catch(e:any) {
+    if(sideQuestCameraWindow&&!sideQuestCameraWindow.closed)sideQuestCameraWindow.close();sideQuestCameraWindow=null;
     sideQuestError.value=e.message||'Nem sikerült elindítani a fotófeltöltést.';
   } finally { sideQuestBusy.value=false; }
 }
@@ -147,6 +156,7 @@ async function checkPhotoQuestCompletion() {
   if(Date.now()>=Date.parse(photoSession.value.expiresAt)) {
     if(photoPollTimer)clearInterval(photoPollTimer);
     photoPollTimer=undefined;photoSession.value=null;
+    if(sideQuestCameraWindow&&!sideQuestCameraWindow.closed)sideQuestCameraWindow.close();sideQuestCameraWindow=null;
     sideQuestError.value='A fotófeltöltési munkamenet lejárt. Indítsd újra a küldetés teljesítését.';
     return;
   }
@@ -155,6 +165,7 @@ async function checkPhotoQuestCompletion() {
     if(result.completed) {
       if(photoPollTimer)clearInterval(photoPollTimer);
       photoPollTimer=undefined;photoSession.value=null;
+      if(sideQuestCameraWindow&&!sideQuestCameraWindow.closed){sideQuestCameraWindow.close();window.focus();}sideQuestCameraWindow=null;
       await loadSideQuests();
     }
   } catch(e:any) {
@@ -167,6 +178,7 @@ async function checkPhotoQuestCompletion() {
 function closePhotoSession() {
   if(photoPollTimer)clearInterval(photoPollTimer);
   photoPollTimer=undefined;photoSession.value=null;
+  if(sideQuestCameraWindow&&!sideQuestCameraWindow.closed)sideQuestCameraWindow.close();sideQuestCameraWindow=null;
 }
 const onlinePlayers = ref<Player[]>([]);
 const duels = ref<Duel[]>([]);
