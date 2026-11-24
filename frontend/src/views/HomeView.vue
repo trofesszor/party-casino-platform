@@ -38,15 +38,13 @@ async function loadTokenPhotoStatus(){
 async function startTokenPhotoUpload(){
   if(!player.value||tokenPhotoBusy.value)return;
   tokenPhotoBusy.value=true;tokenPhotoMessage.value='';
-  const cameraTab=window.open('about:blank','_blank');
   try{
     const session=await api.createTokenPhotoSession(player.value.id);
     tokenPhotoSession.value=session;
-    if(cameraTab){cameraTab.opener=null;cameraTab.location.href=session.cameraUrl;}
     if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);
     tokenPhotoPollTimer=setInterval(checkTokenPhotoUpload,2500);
     await loadTokenPhotoStatus();
-  }catch(e:any){if(cameraTab)cameraTab.close();tokenPhotoMessage.value=e.message||'Nem sikerült elindítani a fotófeltöltést.';await loadTokenPhotoStatus();}
+  }catch(e:any){tokenPhotoMessage.value=e.message||'Nem sikerült elindítani a fotófeltöltést.';await loadTokenPhotoStatus();}
   finally{tokenPhotoBusy.value=false;}
 }
 async function checkTokenPhotoUpload(){
@@ -135,15 +133,12 @@ function resetVerifierPin() { verifierPin.value='';verifierQuest.value=null;veri
 async function startPhotoQuest(quest:SideQuest) {
   if(!player.value||sideQuestBusy.value)return;
   sideQuestBusy.value=true;sideQuestError.value='';
-  const cameraTab=window.open('about:blank','_blank');
   try {
     const session=await api.createSideQuestPhotoSession(player.value.id,quest.id);
     photoSession.value={questId:quest.id,title:session.questTitle,sessionId:session.sessionId,cameraUrl:session.cameraUrl,expiresAt:session.expiresAt};
-    if(cameraTab) { cameraTab.opener=null; cameraTab.location.href=session.cameraUrl; }
     if(photoPollTimer)clearInterval(photoPollTimer);
     photoPollTimer=setInterval(checkPhotoQuestCompletion,2500);
   } catch(e:any) {
-    if(cameraTab)cameraTab.close();
     sideQuestError.value=e.message||'Nem sikerült elindítani a fotófeltöltést.';
   } finally { sideQuestBusy.value=false; }
 }
@@ -411,12 +406,22 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
       </div>
     </section>
 
+    <div v-if="tokenPhotoSession" class="quest-qr-overlay" @click.self="tokenPhotoSession=null">
+      <section class="quest-qr-modal panel photo-quest-modal camera-embed-modal">
+        <button class="ghost quest-qr-close" @click="tokenPhotoSession=null">✕</button>
+        <p class="eyebrow">SNAPPIN · TOKEN REWARD</p><h2>Fotófeltöltés</h2>
+        <p class="muted">Töltsd fel a fotót a Snappin kameráján keresztül. Sikeres ellenőrzés után jóváírjuk a jutalmat.</p>
+        <iframe class="snappin-camera-frame" :src="tokenPhotoSession.cameraUrl" title="Snappin fotófeltöltő kamera" allow="camera; microphone; fullscreen" referrerpolicy="no-referrer"></iframe>
+        <span class="photo-upload-wait"><span class="online-dot"></span> Feltöltés ellenőrzése…</span>
+        <button class="ghost" @click="tokenPhotoSession=null">Bezárás</button>
+      </section>
+    </div>
     <div v-if="photoSession" class="quest-qr-overlay" @click.self="closePhotoSession">
       <section class="quest-qr-modal panel photo-quest-modal">
         <button class="ghost quest-qr-close" @click="closePhotoSession">✕</button>
         <p class="eyebrow">SNAPPIN PHOTO VERIFICATION</p><h2>{{ photoSession.title }}</h2>
-        <p class="muted">A Snappin kamerát új böngészőlapon nyitottuk meg. Készítsd el és töltsd fel a küldetés bizonyítékát, majd térj vissza ide.</p>
-        <a class="primary photo-camera-link" :href="photoSession.cameraUrl" target="_blank" rel="noopener noreferrer">Snappin kamera megnyitása ↗</a>
+        <p class="muted">Készítsd el és töltsd fel a küldetés bizonyítékát a beágyazott Snappin kamerában.</p>
+        <iframe class="snappin-camera-frame" :src="photoSession.cameraUrl" title="Snappin fotófeltöltő kamera" allow="camera; microphone; fullscreen" referrerpolicy="no-referrer"></iframe>
         <small class="muted">Automatikusan ellenőrizzük a feltöltést. Lejárat: {{ new Date(photoSession.expiresAt).toLocaleTimeString() }}</small>
         <span class="photo-upload-wait"><span class="online-dot"></span> Fotófeltöltésre várakozás…</span>
         <button class="ghost" @click="closePhotoSession">Bezárás</button>
