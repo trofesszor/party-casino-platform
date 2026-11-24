@@ -2152,3 +2152,10 @@ input:focus,textarea:focus,select:focus{border-color:#b9f36a55!important;box-sha
 .casino-stats-photo-banner{display:block;width:100%;height:clamp(220px,32vw,390px);object-fit:cover;border-radius:14px;margin:0 0 20px;border:1px solid #ffffff30;box-shadow:0 12px 34px #0006}
 .stats-group-photo-preview{display:none}
 @media(max-width:650px){.casino-stats-photo-banner{height:220px;margin-bottom:15px}}
+
+
+/* Snappin camera embedded in the player upload modal */
+.snappin-camera-frame{display:block;width:100%;height:min(68vh,680px);min-height:420px;border:1px solid #ffffff20;border-radius:12px;background:#0d0e12}
+.camera-embed-modal{width:min(760px,calc(100vw - 28px));max-height:calc(100dvh - 28px);overflow-y:auto}
+.photo-quest-modal .snappin-camera-frame{margin:14px 0}
+@media(max-width:640px){.camera-embed-modal{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);padding:16px}.snappin-camera-frame{height:calc(100dvh - 260px);min-height:360px;border-radius:10px}}
