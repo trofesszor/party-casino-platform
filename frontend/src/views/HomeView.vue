@@ -411,7 +411,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         <button class="ghost quest-qr-close" @click="tokenPhotoSession=null">✕</button>
         <p class="eyebrow">SNAPPIN · TOKEN REWARD</p><h2>Fotófeltöltés</h2>
         <p class="muted">Töltsd fel a fotót a Snappin kameráján keresztül. Sikeres ellenőrzés után jóváírjuk a jutalmat.</p>
-        <iframe class="snappin-camera-frame" :src="tokenPhotoSession.cameraUrl" title="Snappin fotófeltöltő kamera" allow="camera; microphone; fullscreen" referrerpolicy="no-referrer"></iframe>
+        <div class="camera-embed-fallback"><p>A Snappin kamerát külön böngészőlapon kell megnyitni a biztonságos feltöltéshez.</p><a class="primary photo-camera-link" :href="tokenPhotoSession.cameraUrl" target="_blank" rel="noopener noreferrer">Snappin kamera megnyitása ↗</a></div>
         <span class="photo-upload-wait"><span class="online-dot"></span> Feltöltés ellenőrzése…</span>
         <button class="ghost" @click="tokenPhotoSession=null">Bezárás</button>
       </section>
@@ -421,7 +421,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         <button class="ghost quest-qr-close" @click="closePhotoSession">✕</button>
         <p class="eyebrow">SNAPPIN PHOTO VERIFICATION</p><h2>{{ photoSession.title }}</h2>
         <p class="muted">Készítsd el és töltsd fel a küldetés bizonyítékát a beágyazott Snappin kamerában.</p>
-        <iframe class="snappin-camera-frame" :src="photoSession.cameraUrl" title="Snappin fotófeltöltő kamera" allow="camera; microphone; fullscreen" referrerpolicy="no-referrer"></iframe>
+        <div class="camera-embed-fallback"><p>A Snappin kamerát külön böngészőlapon kell megnyitni a biztonságos feltöltéshez.</p><a class="primary photo-camera-link" :href="photoSession.cameraUrl" target="_blank" rel="noopener noreferrer">Snappin kamera megnyitása ↗</a></div>
         <small class="muted">Automatikusan ellenőrizzük a feltöltést. Lejárat: {{ new Date(photoSession.expiresAt).toLocaleTimeString() }}</small>
         <span class="photo-upload-wait"><span class="online-dot"></span> Fotófeltöltésre várakozás…</span>
         <button class="ghost" @click="closePhotoSession">Bezárás</button>
