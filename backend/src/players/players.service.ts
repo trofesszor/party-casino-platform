@@ -294,20 +294,42 @@ export class PlayersService {
     } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
   }
 
+  private snappinEventPromise:Promise<string>|null=null;
+
   private snappinConfig() {
     const baseUrl=String(process.env.SNAPPIN_API_URL??'').trim().replace(/\/$/,'');
     const apiKey=String(process.env.SNAPPIN_API_KEY??'').trim();
-    const eventId=String(process.env.SNAPPIN_EVENT_ID??'').trim();
-    if(!baseUrl||!apiKey||!eventId) throw new BadRequestException('A Snappin integráció nincs konfigurálva. Állítsd be a SNAPPIN_API_URL, SNAPPIN_API_KEY és SNAPPIN_EVENT_ID értékeket.');
-    return {baseUrl,apiKey,eventId};
+    const configuredEventId=String(process.env.SNAPPIN_EVENT_ID??'').trim();
+    if(!baseUrl||!apiKey) throw new BadRequestException('A Snappin integráció nincs konfigurálva. Állítsd be a SNAPPIN_API_URL és SNAPPIN_API_KEY értékeket.');
+    const apiBaseUrl=baseUrl.endsWith('/api/v1/integrations')?baseUrl:baseUrl+'/api/v1/integrations';
+    return {apiBaseUrl,apiKey,configuredEventId};
   }
 
   private async snappinRequest(path:string, init:RequestInit = {}) {
-    const {baseUrl,apiKey}=this.snappinConfig();
-    const response=await fetch(baseUrl+path,{...init,signal:init.signal??AbortSignal.timeout(12000),headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`,...init.headers}});
+    const {apiBaseUrl,apiKey}=this.snappinConfig();
+    const response=await fetch(apiBaseUrl+path,{...init,signal:init.signal??AbortSignal.timeout(12000),headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`,...init.headers}});
     const payload:any=await response.json().catch(()=>({}));
     if(!response.ok) throw new BadRequestException(payload.message||'A Snappin szolgáltatás nem érhető el.');
     return payload;
+  }
+
+  private async getSnappinEventId():Promise<string> {
+    const {configuredEventId}=this.snappinConfig();
+    if(configuredEventId)return configuredEventId;
+    if(!this.snappinEventPromise){
+      this.snappinEventPromise=(async()=>{
+        const externalReference='party-casino:photo-uploads';
+        const listed:any=await this.snappinRequest('/events?externalReference='+encodeURIComponent(externalReference));
+        const events=Array.isArray(listed)?listed:Array.isArray(listed?.events)?listed.events:[];
+        const existing=events.find((event:any)=>event?.externalReference===externalReference&&String(event?.status??'').toUpperCase()==='ACTIVE'&&event?.id);
+        if(existing)return String(existing.id);
+        const created:any=await this.snappinRequest('/events',{method:'POST',body:JSON.stringify({name:'Party Casino – Fotófeltöltések',externalReference})});
+        const id=String(created?.id??'');
+        if(!id)throw new BadRequestException('A Snappin nem adott vissza event ID-t az esemény létrehozásakor.');
+        return id;
+      })().catch(error=>{this.snappinEventPromise=null;throw error;});
+    }
+    return this.snappinEventPromise;
   }
 
   async createSideQuestPhotoSession(playerId:number,questId:number) {
@@ -315,10 +337,10 @@ export class PlayersService {
     const quest=sqlite.prepare("SELECT id,photo_enabled AS photoEnabled,status,title FROM player_side_quests WHERE id=? AND player_id=?").get(questId,playerId) as {id:number;photoEnabled:number;status:string;title:string}|undefined;
     if(!quest||quest.status!=='ACTIVE') throw new BadRequestException('Az aktív küldetés nem található.');
     if(!quest.photoEnabled) throw new BadRequestException('Ehhez a küldetéshez PIN-kódos igazolás szükséges.');
-    const {eventId}=this.snappinConfig();
+    const eventId=await this.getSnappinEventId();
     const player=sqlite.prepare('SELECT name FROM players WHERE id=?').get(playerId) as {name:string}|undefined;
     const externalReference=`party-casino:quest:${questId}:player:${playerId}:${randomUUID()}`;
-    const payload=await this.snappinRequest('/api/integrations/sessions',{method:'POST',body:JSON.stringify({eventId,externalReference,guest:{externalId:`party-casino-player-${playerId}`,displayName:player?.name??'Party Casino player'},expiresInSeconds:300})});
+    const payload=await this.snappinRequest(`/events/${encodeURIComponent(eventId)}/sessions`,{method:'POST',body:JSON.stringify({source:'INTEGRATION',externalReference,guest:{externalId:`party-casino-player-${playerId}`,displayName:player?.name??'Party Casino player'},maxPhotos:1,expiresInSeconds:300})});
     const sessionId=String(payload.sessionId??''),cameraUrl=String(payload.cameraUrl??''),expiresAt=String(payload.expiresAt??'');
     if(!sessionId||!cameraUrl||!expiresAt) throw new BadRequestException('A Snappin API válasza hiányos (sessionId, cameraUrl, expiresAt).');
     let parsedUrl:URL; try{parsedUrl=new URL(cameraUrl);}catch{throw new BadRequestException('A Snappin API érvénytelen kamera URL-t adott vissza.');}
@@ -336,8 +358,8 @@ export class PlayersService {
     if(!local)throw new BadRequestException('A fotófeltöltési munkamenet nem található.');
     if(local.status==='COMPLETED')return {success:true,completed:true,questId,photoId:local.photoId};
     if(local.status!=='PENDING'||Date.parse(local.expiresAt)<=Date.now()){sqlite.prepare("UPDATE side_quest_photo_sessions SET status='EXPIRED' WHERE session_id=? AND status='PENDING'").run(sessionId);throw new BadRequestException('A fotófeltöltési munkamenet lejárt.');}
-    const {eventId}=this.snappinConfig();
-    const verify:any=await this.snappinRequest('/api/integrations/sessions/'+encodeURIComponent(sessionId));
+    const eventId=await this.getSnappinEventId();
+    const verify:any=await this.snappinRequest('/sessions/'+encodeURIComponent(sessionId));
     if(String(verify.eventId??'')!==eventId||String(verify.externalReference??'')!==local.externalReference)throw new BadRequestException('A Snappin munkamenet esemény- vagy külső hivatkozása nem egyezik.');
     const photoId=String(verify.photo?.id??''),status=String(verify.status??'').toUpperCase();
     if(status!=='UPLOADED'||!photoId)return {success:true,completed:false,status:status||'PENDING'};
@@ -422,8 +444,8 @@ export class PlayersService {
       sqlite.exec('COMMIT');
     } catch(error) { sqlite.exec('ROLLBACK'); throw error; }
     try {
-      const {eventId}=this.snappinConfig();
-      const payload=await this.snappinRequest('/api/integrations/sessions',{method:'POST',body:JSON.stringify({eventId,externalReference,guest:{externalId:`party-casino-player-${playerId}`,displayName:player.name},expiresInSeconds:300})});
+      const eventId=await this.getSnappinEventId();
+      const payload=await this.snappinRequest(`/events/${encodeURIComponent(eventId)}/sessions`,{method:'POST',body:JSON.stringify({source:'INTEGRATION',externalReference,guest:{externalId:`party-casino-player-${playerId}`,displayName:player.name},maxPhotos:1,expiresInSeconds:300})});
       const sessionId=String(payload.sessionId??''),cameraUrl=String(payload.cameraUrl??''),expiresAt=String(payload.expiresAt??'');
       if(!sessionId||!cameraUrl||!expiresAt) throw new BadRequestException('A Snappin API válasza hiányos.');
       let parsedUrl:URL;try{parsedUrl=new URL(cameraUrl);}catch{throw new BadRequestException('A Snappin kamera URL érvénytelen.');}
@@ -447,8 +469,8 @@ export class PlayersService {
       sqlite.prepare("UPDATE token_photo_sessions SET status='EXPIRED' WHERE session_id=? AND status='PENDING'").run(sessionId);
       return {success:true,completed:false,status:'EXPIRED'};
     }
-    const {eventId}=this.snappinConfig();
-    const verify:any=await this.snappinRequest('/api/integrations/sessions/'+encodeURIComponent(sessionId));
+    const eventId=await this.getSnappinEventId();
+    const verify:any=await this.snappinRequest('/sessions/'+encodeURIComponent(sessionId));
     if(String(verify.eventId??'')!==eventId||String(verify.externalReference??'')!==local.externalReference) throw new BadRequestException('A Snappin munkamenet esemény- vagy külső hivatkozása nem egyezik.');
     const photoId=String(verify.photo?.id??''),remoteStatus=String(verify.status??'').toUpperCase();
     if(remoteStatus==='EXPIRED'||remoteStatus==='CANCELLED'){
