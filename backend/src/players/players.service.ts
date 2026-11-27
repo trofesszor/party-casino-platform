@@ -191,14 +191,15 @@ export class PlayersService {
       const active = sqlite.prepare("SELECT COUNT(*) AS count FROM player_side_quests WHERE player_id = ? AND status = 'ACTIVE'").get(playerId) as { count: number };
       const maxActive=this.getCasinoGameSettings().maxActiveSideQuests;
       if (active.count >= maxActive) throw new BadRequestException('Elérted az aktív side questek limitjét ('+maxActive+').');
+      const preferredPhotoType = randomInt(4) < 3 ? 1 : 0;
       const quest = sqlite.prepare(`
         SELECT id, title, description, photo_enabled AS photoEnabled FROM side_quest_pool
         WHERE enabled = 1 AND NOT EXISTS (
           SELECT 1 FROM player_side_quests assigned
           WHERE assigned.player_id = ? AND assigned.pool_quest_id = side_quest_pool.id AND assigned.status <> 'SKIPPED'
         )
-        ORDER BY RANDOM() LIMIT 1
-      `).get(playerId) as { id: number; title: string; description: string; photoEnabled:number } | undefined;
+        ORDER BY CASE WHEN photo_enabled = ? THEN 0 ELSE 1 END, RANDOM() LIMIT 1
+      `).get(playerId, preferredPhotoType) as { id: number; title: string; description: string; photoEnabled:number } | undefined;
       if (!quest) throw new BadRequestException('Nincs több kiosztható side quest a poolban.');
       const result = sqlite.prepare("INSERT INTO player_side_quests (player_id, pool_quest_id, title, description, photo_enabled) VALUES (?, ?, ?, ?, ?)").run(playerId, quest.id, quest.title, quest.description, quest.photoEnabled);
       sqlite.exec('COMMIT');
