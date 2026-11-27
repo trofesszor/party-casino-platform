@@ -121,7 +121,6 @@
 .rotor-caption .red, .studio-history .red { background: oklch(46% .155 14); }
 .rotor-caption .green, .studio-history .green { background: oklch(39% .088 166); }
 .rotor-no-result { color: var(--rotor-accent); }
-.tv-roulette-screen .roulette-rotor { width: min(100%, 60dvh, 520px); padding-block: 0; }
 
 .studio-history {
   display: grid;

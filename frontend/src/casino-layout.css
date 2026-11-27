@@ -442,22 +442,10 @@
 }
 .leaderboard-own-rank strong { color: var(--accent); font-size: 1.6rem; font-variant-numeric: tabular-nums; }
 .shop-player-inventory { min-width: 0; }
-.tv-layout { grid-template-columns: minmax(0, 1fr) minmax(270px, 330px); }
-.tv-sidebar { min-width: 0; }
-
-@media (max-width: 900px) and (min-width: 651px) {
-  .tv-layout { grid-template-columns: minmax(0, 1fr) minmax(195px, 26vw); }
-}
 @media (max-width: 790px) {
   .leaderboard-content, .wheel-room-grid { grid-template-columns: minmax(0, 1fr); }
   .leaderboard-own-rank { margin-top: 12px; }
 }
-@media (max-width: 650px) {
-  .tv-dashboard { block-size: auto; min-block-size: 100dvh; overflow: visible; }
-  .tv-layout { display: flex; height: auto; flex-direction: column; overflow: visible; }
-  .tv-main-screen { min-height: 50dvh; }
-}
-
 .player-wallet.player-wallet-inline {
   position: relative !important;
   inset: auto !important;
