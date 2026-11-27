@@ -189,7 +189,7 @@
 .floor-games {
   display: grid;
   grid-template-columns: 1.45fr 1fr;
-  grid-template-rows: repeat(2, minmax(135px, auto));
+  grid-template-rows: repeat(3, minmax(110px, auto));
   gap: clamp(9px, 1.5vw, 19px);
 }
 .floor-games > a {
@@ -204,7 +204,7 @@
 .floor-games > a:hover { border-color: var(--accent); translate: 0 -2px; }
 .floor-games > a:active { translate: 0 1px; }
 .floor-featured {
-  grid-row: span 2;
+  grid-row: span 3;
   isolation: isolate;
   display: flex;
   align-items: center;
@@ -344,7 +344,7 @@
 .tv-dashboard .tv-panel-heading small, .tv-dashboard .tv-screen-toolbar small { display: none; }
 .tv-dashboard .tv-main-screen { border-top: 2px solid var(--accent) !important; }
 
-@media (max-width: 1060px) {
+@media (max-width: 1160px) {
   .masthead-desktop, .masthead-exit, .masthead-name { display: none; }
   .casino-masthead-inner { grid-template-columns: minmax(0, 1fr) auto; }
   .masthead-toggle { display: inline-grid; width: 44px; height: 44px; place-items: center; }

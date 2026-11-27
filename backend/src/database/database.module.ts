@@ -134,6 +134,11 @@ export const DATABASE = Symbol('DATABASE');
           completed_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_duels_players ON duels(challenger_id, opponent_id, status);
+        CREATE TABLE IF NOT EXISTS blackjack_holds (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          amount INTEGER NOT NULL CHECK(amount > 0)
+        );
         CREATE TABLE IF NOT EXISTS token_transactions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,

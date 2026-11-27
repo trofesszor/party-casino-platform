@@ -4,6 +4,7 @@ import App from './App.vue';
 import HomeView from './views/HomeView.vue';
 import DisplayView from './views/DisplayView.vue';
 import RouletteView from './views/RouletteView.vue';
+import BlackjackView from './views/BlackjackView.vue';
 import SlotsView from './views/SlotsView.vue';
 import AdminView from './views/AdminView.vue';
 import LuckyWheelView from './views/LuckyWheelView.vue';
@@ -17,6 +18,7 @@ import './casino-theme.css';
 import './casino-layout.css';
 import './roulette-studio.css';
 import './midnight-mint.css';
+import './blackjack.css';
 const router = createRouter({ history: createWebHistory(), scrollBehavior(to, from, saved) {
   if (saved) return saved;
   if (to.hash) return { el: to.hash };
@@ -25,6 +27,7 @@ const router = createRouter({ history: createWebHistory(), scrollBehavior(to, fr
   { path: '/', component: HomeView },
   { path: '/display', component: DisplayView },
   { path: '/roulette', component: RouletteView },
+  { path: '/blackjack', component: BlackjackView },
   { path: '/slots', component: SlotsView },
   { path: '/lucky-wheel', component: LuckyWheelView },
   { path: '/leaderboard', component: LeaderboardView },

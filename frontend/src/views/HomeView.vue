@@ -312,6 +312,11 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
           <div><h2>Szerencsekerék</h2><p>Közös pörgetés a többiekkel.</p></div>
           <span class="floor-arrow" aria-hidden="true">→</span>
         </RouterLink>
+        <RouterLink class="floor-game floor-blackjack" to="/blackjack">
+          <div class="floor-game-art" aria-hidden="true"><span>A♠</span><span>J♥</span></div>
+          <div><h2>Blackjack</h2><p>Közös asztal, hat szabadon foglalható székkel.</p></div>
+          <span class="floor-arrow" aria-hidden="true">→</span>
+        </RouterLink>
       </section>
 
       <nav class="floor-utilities" aria-label="További lehetőségek">

@@ -16,6 +16,7 @@ const links = [
   { path: '/', label: 'Játékok' },
   { path: '/roulette', label: 'Rulett' },
   { path: '/slots', label: 'Slot' },
+  { path: '/blackjack', label: 'Blackjack' },
   { path: '/lucky-wheel', label: 'Szerencsekerék' },
   { path: '/community-events', label: 'Események' },
   { path: '/leaderboard', label: 'Ranglista' },

@@ -1,3 +1,4 @@
+import { BlackjackModule } from './blackjack/blackjack.module';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from './database/database.module';
 import { PlayersModule } from './players/players.module';
@@ -8,6 +9,6 @@ import { LuckyWheelModule } from './lucky-wheel/lucky-wheel.module';
 import { CommunityEventsModule } from './community-events/community-events.module';
 
 @Module({
-  imports: [DatabaseModule, PlayersModule, RouletteModule, SlotsModule, AdminModule, LuckyWheelModule, CommunityEventsModule],
+  imports: [DatabaseModule, BlackjackModule, PlayersModule, RouletteModule, SlotsModule, AdminModule, LuckyWheelModule, CommunityEventsModule],
 })
 export class AppModule {}
