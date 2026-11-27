@@ -8,6 +8,7 @@ import PlayerWallet from '../components/PlayerWallet.vue';
 import type { SlotBonus, SlotCoin, SlotProgressives, SlotSpin, SlotStake, SlotState, SlotTier, SlotTile } from '../types';
 
 const audio = useGameAudio();
+const dogBarkUrl = new URL('../assets/slot-dog-bark.mp3', import.meta.url).href;
 const playerId = Number(localStorage.getItem('party-player-id')) || 0;
 const rules = ref<SlotState>();
 const jackpots = ref<SlotProgressives>();
@@ -46,7 +47,7 @@ const grandCount = computed(() => displayedBonus.value?.coins.filter(bell => bel
 const majorCollected = computed(() => displayedBonus.value?.coins.some(bell => bell?.tier === 'major') ?? false);
 const newBells = ref<number[]>([]);
 const newBellCount = computed(() => newBells.value.length);
-const bellStaggerMs = 38;
+const bellStaggerMs = ref(38);
 const bellFallMs = 610;
 const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 const jackpotCards = computed<Array<{ tier: SlotTier; amount: number; progressive: boolean }>>(() => {
@@ -124,8 +125,8 @@ function tierTitle(tier: SlotTier) {
 }
 function barkForBells(count: number) {
   for (let bell = 0; bell < count; bell++) {
-    if (bell === 0) audio.effect('bark');
-    else audio.after(85 * bell, () => audio.effect('bark'));
+    if (bell === 0) void audio.playClip();
+    else audio.after(85 * bell, audio.playClip);
   }
 }
 async function animate(grid: SlotTile[], held: readonly boolean[], wasBonus: boolean) {
@@ -159,8 +160,8 @@ async function spin() {
   last.value = null;
   newBells.value = [];
   if (!wasBonus) {
+    audio.prepareClip(dogBarkUrl);
     audio.effect('reel');
-    audio.announce(freeSpins.value ? 'Indul az ingyenpörgetés.' : 'Indul a pörgetés.');
   }
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
     rolling.value = columns.map(() => true);
@@ -181,12 +182,13 @@ async function spin() {
     await animate(stagingGrid, held, wasBonus);
     if (!mounted) return;
     reel.value = feature ? bonusGrid(feature) : reply.grid;
+    bellStaggerMs.value = wasBonus ? 38 : 95;
     newBells.value = incoming;
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!wasBonus) {
       if (reducedMotion) barkForBells(incoming.length);
       else for (const [index] of incoming.entries()) {
-        audio.after(Math.round(bellFallMs * .69) + index * bellStaggerMs, () => audio.effect('bark'));
+        audio.after(Math.round(bellFallMs * .69) + index * bellStaggerMs.value, audio.playClip);
       }
     }
     bonus.value = reply.bonus;
@@ -196,7 +198,7 @@ async function spin() {
     jackpots.value = pendingJackpots ?? reply.jackpots;
     last.value = reply;
     window.dispatchEvent(new Event('party-player-changed'));
-    if (incoming.length && !reducedMotion) await wait(bellFallMs + (incoming.length - 1) * bellStaggerMs);
+    if (incoming.length && !reducedMotion) await wait(bellFallMs + (incoming.length - 1) * bellStaggerMs.value);
     if (!mounted) return;
     const payout = reply.payoutAmount;
     if (!wasBonus && reply.bonus) {

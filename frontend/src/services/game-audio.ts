@@ -1,6 +1,6 @@
 import { onUnmounted, ref } from 'vue';
 
-type Cue = 'start' | 'end' | 'win' | 'reel' | 'bark';
+type Cue = 'start' | 'end' | 'win' | 'reel';
 const preferenceKey = 'party-game-audio';
 export const audioEnabled = ref(localStorage.getItem(preferenceKey) !== 'off');
 let audio: AudioContext | undefined;
@@ -8,10 +8,11 @@ let output: GainNode | undefined;
 let voiceOwner: symbol | undefined;
 
 function unlock() {
-  if (!audioEnabled.value || !window.AudioContext) return;
+  const Audio = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!audioEnabled.value || !Audio) return;
   try {
     if (!audio) {
-      audio = new AudioContext();
+      audio = new Audio();
       output = audio.createGain();
       output.connect(audio.destination);
     }
@@ -55,33 +56,35 @@ function tone(ctx: AudioContext, at: number, duration: number, from: number, to 
   oscillator.stop(at + duration);
 }
 
-function bark(ctx: AudioContext, at: number) {
-  const duration = .19;
-  const sample = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
-  const data = sample.getChannelData(0);
-  let phase = 0;
-  for (let i = 0; i < data.length; i++) {
-    const progress = i / data.length;
-    const envelope = Math.min(1, progress / .12) * Math.pow(1 - progress, 1.6);
-    phase += 2 * Math.PI * (235 - 105 * progress + 22 * Math.sin(progress * 14)) / ctx.sampleRate;
-    const rasp = (Math.random() * 2 - 1) * .6;
-    data[i] = envelope * (rasp + .5 * Math.tanh(3 * Math.sin(phase)) + .18 * Math.sin(phase * 4));
-  }
-  const source = ctx.createBufferSource();
-  const filter = ctx.createBiquadFilter();
-  const gain = ctx.createGain();
-  filter.type = 'bandpass';
-  filter.frequency.value = 870;
-  filter.Q.value = .65;
-  gain.gain.value = .45;
-  source.buffer = sample;
-  source.connect(filter).connect(gain).connect(output ?? ctx.destination);
-  source.start(at);
-}
-
 export function useGameAudio() {
   const owner = Symbol();
   const scheduled = new Set<ReturnType<typeof setTimeout>>();
+  let disposed = false;
+  let clip: Promise<AudioBuffer | undefined> | undefined;
+
+  function prepareClip(url: string) {
+    unlock();
+    const ctx = audio;
+    if (!audioEnabled.value || !ctx || clip) return;
+    clip = fetch(url).then(response => {
+      if (!response.ok) throw new Error('A hangfájl nem érhető el.');
+      return response.arrayBuffer();
+    }).then(data => ctx.decodeAudioData(data)).catch(() => {
+      clip = undefined;
+      return undefined;
+    });
+  }
+
+  async function playClip() {
+    if (!audioEnabled.value || document.hidden) return;
+    const buffer = await clip;
+    if (disposed || !buffer || !audioEnabled.value || document.hidden || audio?.state !== 'running') return;
+    const source = audio.createBufferSource();
+    source.buffer = buffer;
+    source.connect(output ?? audio.destination);
+    source.start();
+  }
+
   function effect(cue: Cue) {
     if (!audioEnabled.value || document.hidden || audio?.state !== 'running') return;
     const t = audio.currentTime;
@@ -100,9 +103,6 @@ export function useGameAudio() {
       case 'reel':
         tone(audio, t, .14, 290, 430, .07, 'triangle');
         tone(audio, t + .12, .18, 430, 235, .065, 'triangle');
-        break;
-      case 'bark':
-        bark(audio, t);
         break;
     }
   }
@@ -134,11 +134,12 @@ export function useGameAudio() {
   }
 
   onUnmounted(() => {
+    disposed = true;
     for (const timer of scheduled) clearTimeout(timer);
     stopSpeech();
   });
 
-  return { effect, announce, after, stopSpeech };
+  return { effect, announce, after, stopSpeech, prepareClip, playClip };
 }
 
 type RouletteRound = import('../types').RouletteRound;

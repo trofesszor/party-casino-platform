@@ -42,3 +42,6 @@ For phones on the same Wi-Fi, open `http://<HOST-LAN-IP>:5173`. The Vite dev ser
 - No game-specific logic or scoring has been added yet.
 - Google Fonts are currently referenced for visual styling; remove the import if the party network must be fully internet-independent.
 - Browser access to the Vite dev server is suitable for development. For camera features later, mobile browser security requirements may require local HTTPS.
+
+## Audio credits
+- Slot dog bark: [George vuf 1996](https://commons.wikimedia.org/wiki/File:George_vuf_1996.ogg) by Broadbeer, released into the public domain. Converted to mono MP3 with a small volume adjustment.
