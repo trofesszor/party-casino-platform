@@ -116,20 +116,44 @@
   from { transform: translateY(-19%); filter: blur(1px); }
   to { transform: translateY(19%); filter: blur(2px); }
 }
-.mint-cell:has(.mint-coin-value) .mint-symbol { opacity: .63; }
-.mint-coin-value {
-  display: grid;
-  justify-items: center;
-  position: absolute;
-  inset-inline: 1px;
-  inset-block-end: 6%;
-  color: #fff2be;
-  font-size: clamp(.5rem, 1.6vw, 1.05rem);
-  line-height: 1.08;
-  text-align: center;
-  text-shadow: 0 1px 3px #050406, 0 1px 6px #050406;
+.mint-cell.mint-captioned {
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
 }
-.mint-coin-value small { font-size: .7em; text-transform: uppercase; }
+.mint-cell.mint-captioned .mint-symbol {
+  inline-size: auto;
+  block-size: 100%;
+  max-inline-size: 92%;
+  max-block-size: 118px;
+}
+.mint-tile-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-self: stretch;
+  justify-self: stretch;
+  gap: 1px 4px;
+  min-width: 0;
+  padding: 2px 1px;
+  border-top: 1px solid oklch(85% .11 82 / .44);
+  background: #171619;
+  color: #fff3c3;
+  font-size: clamp(.57rem, 1.6vw, 1rem);
+  font-weight: 850;
+  line-height: 1.09;
+  text-align: center;
+}
+.mint-coin-value span { white-space: nowrap; }
+.mint-coin-value small { color: #c7daf2; font-size: .72em; text-transform: uppercase; }
+.mint-wild-caption { color: #ffda8a; letter-spacing: .09em; }
+.mint-bonus .mint-reel.rolling .mint-cell:not(.mint-held) {
+  animation: mint-empty-respin 190ms alternate infinite;
+}
+@keyframes mint-empty-respin {
+  from { border-color: oklch(85% .05 265 / .15); }
+  to { border-color: oklch(85% .11 160 / .53); }
+}
 .mint-result {
   display: flex;
   flex-wrap: wrap;
@@ -275,7 +299,7 @@
   .mint-cell .mint-symbol { width: 92%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .mint-reel.rolling .mint-cell .mint-symbol { animation: none; }
+  .mint-reel.rolling .mint-cell .mint-symbol, .mint-bonus .mint-reel.rolling .mint-cell:not(.mint-held) { animation: none; }
   .mint-cell { transition: none; }
 }
 

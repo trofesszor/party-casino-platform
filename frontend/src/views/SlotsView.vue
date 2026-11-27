@@ -25,7 +25,7 @@ const labels: Record<SlotTile['symbol'], string> = {
   cherry: 'Cseresznye', lemon: 'Citrom', lime: 'Lime', grapes: 'Szőlő', orange: 'Narancs',
   crescent: 'Rubinhold', wild: 'Wild', scatter: 'Scatter', coin: 'Harang', empty: 'Üres mező',
 };
-const reelSymbols: SlotTile['symbol'][] = ['cherry', 'lemon', 'lime', 'grapes', 'orange', 'crescent', 'wild', 'scatter', 'coin'];
+const reelSymbols: SlotTile['symbol'][] = ['cherry', 'lemon', 'lime', 'grapes', 'orange', 'crescent', 'wild', 'scatter'];
 const reel = ref<SlotTile[]>(Array.from({ length: 15 }, (_, index) => ({ symbol: reelSymbols[(index * 2) % reelSymbols.length] })));
 let mounted = false;
 let ticker: ReturnType<typeof setInterval> | undefined;
@@ -122,7 +122,7 @@ async function spin() {
     ticker = setInterval(() => {
       reel.value = reel.value.map((tile, index) => {
         if (!rolling.value[index % 5] || held[index]) return tile;
-        if (wasBonus) return { symbol: Math.random() < .35 ? 'coin' : 'empty' };
+        if (wasBonus) return { symbol: 'empty' };
         return { symbol: reelSymbols[Math.floor(Math.random() * reelSymbols.length)] };
       });
     }, 84);
@@ -203,11 +203,13 @@ onUnmounted(() => {
           </div>
           <div class="mint-reels" :aria-busy="busy">
             <div v-for="column in columns" :key="column" class="mint-reel" :class="{ rolling: rolling[column] }">
-              <div v-for="row in rows" :key="row" :class="['mint-cell', reel[row * 5 + column].coin?.tier, { 'mint-winning': !displayedBonus && winningPositions.has(row * 5 + column), 'mint-held': displayedBonus?.coins[row * 5 + column], 'mint-new-bell': newBells.includes(row * 5 + column) }]" role="img" :aria-label="displayTile(reel[row * 5 + column])">
+              <div v-for="row in rows" :key="row" :class="['mint-cell', reel[row * 5 + column].coin?.tier, { 'mint-winning': !displayedBonus && winningPositions.has(row * 5 + column), 'mint-held': displayedBonus?.coins[row * 5 + column], 'mint-new-bell': newBells.includes(row * 5 + column), 'mint-captioned': reel[row * 5 + column].coin || reel[row * 5 + column].symbol === 'wild' }]" role="img" :aria-label="displayTile(reel[row * 5 + column])">
                 <span :class="['mint-symbol', 'symbol-' + reel[row * 5 + column].symbol]" aria-hidden="true"></span>
-                <strong v-if="reel[row * 5 + column].coin" class="mint-coin-value">
-                  <small v-if="reel[row * 5 + column].coin?.tier">{{ reel[row * 5 + column].coin?.tier }}</small>{{ format(reel[row * 5 + column].coin!.value) }} CR
+                <strong v-if="reel[row * 5 + column].coin" class="mint-tile-caption mint-coin-value">
+                  <small v-if="reel[row * 5 + column].coin?.tier">{{ reel[row * 5 + column].coin?.tier }}</small>
+                  <span>{{ format(reel[row * 5 + column].coin!.value) }} CR</span>
                 </strong>
+                <strong v-else-if="reel[row * 5 + column].symbol === 'wild'" class="mint-tile-caption mint-wild-caption">WILD</strong>
               </div>
             </div>
           </div>
