@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { randomInt, randomUUID } from 'node:crypto';
+import { wheelSpinPrice } from '../casino/economy';
 import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
 
@@ -10,7 +11,7 @@ export class LuckyWheelService implements OnModuleInit {
   constructor(@Inject(DATABASE) private readonly database: any, private readonly events: EventsGateway) {}
   private setting(key:string,fallback:number){const row=this.database.sqlite.prepare('SELECT setting_value AS value FROM casino_settings WHERE setting_key=?').get(key) as {value:string}|undefined;return Number(row?.value??fallback);}
   private get spinDurationMs(){return this.setting('wheel_spin_duration_ms',7000);}
-  private get spinCost(){return this.setting('wheel_spin_cost',5);}
+  private get spinCost(){return this.setting('wheel_spin_cost',wheelSpinPrice);}
 
 
   onModuleInit() {

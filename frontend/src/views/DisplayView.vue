@@ -2,13 +2,33 @@
 import { activateGameAudio, useGameAudio } from '../services/game-audio';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { socket } from '../services/socket';
-import { api } from '../services/api';
+import { api, type CommunityEvent } from '../services/api';
 import type { RouletteState } from '../types';
 import RouletteWheel from '../components/RouletteWheel.vue';
 
 type ScreenMode = 'roulette' | 'wheel';
 const state = ref<RouletteState|null>(null);
 const visibleRouletteRound = ref<number | null>(null);
+type PublicNotice = Awaited<ReturnType<typeof api.getPartyNotifications>>[number];
+const notices = ref<PublicNotice[]>([]);
+const communityEvents = ref<CommunityEvent[]>([]);
+const credits = (value: number) => value.toLocaleString('hu-HU');
+const progress = (event: CommunityEvent) => Math.min(100, Math.round(event.currentAmount / Math.max(1, event.targetAmount) * 100));
+const noticeTime = (value: string) => new Date(value.includes('Z') ? value : value.replace(' ', 'T') + 'Z').toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+
+function onNotice(notice: PublicNotice & { audiencePlayerId?: number; playerId?: number }) {
+  if (notice.audiencePlayerId || notice.playerId || !notice.message) return;
+  notices.value = [notice, ...notices.value.filter(item => item.id !== notice.id)].slice(0, 8);
+}
+async function refreshRail() {
+  const [incoming, events] = await Promise.allSettled([api.getPartyNotifications(), api.getCommunityEvents()]);
+  if (incoming.status === 'fulfilled') {
+    const merged = new Map([...notices.value, ...incoming.value].map(item => [item.id, item]));
+    notices.value = [...merged.values()].sort((a, b) => b.id - a.id).slice(0, 8);
+  }
+  if (events.status === 'fulfilled') communityEvents.value = events.value.events;
+}
+
 const players = ref<{id:number;name:string}[]>([]);
 type DisplayWheelState = Awaited<ReturnType<typeof api.getLuckyWheel>> & { spinnerPlayerId?: number|null };
 const wheel = ref<DisplayWheelState|null>(null);
@@ -144,7 +164,10 @@ function onWheelChanged(next: DisplayWheelState) {
 }
 onMounted(()=>{
   void refreshData();
-  refreshTimer=setInterval(()=>void refreshData(),5000);
+  void refreshRail();
+  refreshTimer = setInterval(() => { void refreshData(); void refreshRail(); }, 5000);
+  socket.on('party:notification', onNotice);
+  socket.on('community-events:updated', refreshRail);
   socket.on('roulette:changed',onRouletteChanged);
   socket.on('players:online',onPlayersChanged);
   socket.on('lucky-wheel:changed',onWheelChanged);
@@ -152,6 +175,8 @@ onMounted(()=>{
 });
 onUnmounted(()=>{
   if(refreshTimer)clearInterval(refreshTimer);
+  socket.off('party:notification', onNotice);
+  socket.off('community-events:updated', refreshRail);
   socket.off('roulette:changed',onRouletteChanged);
   socket.off('players:online',onPlayersChanged);
   socket.off('lucky-wheel:changed',onWheelChanged);
@@ -218,6 +243,29 @@ onUnmounted(()=>{
         </section>
 
       </section>
+      <aside class="tv-sidebar" aria-label="Értesítések és események">
+        <section class="tv-panel">
+          <header class="tv-panel-heading"><h2>Értesítések</h2></header>
+          <ul v-if="notices.length" class="tv-rail-list">
+            <li v-for="notice in notices" :key="notice.id">
+              <div class="tv-rail-meta"><strong>{{ notice.title || 'Party Casino' }}</strong><time>{{ noticeTime(notice.createdAt) }}</time></div>
+              <p>{{ notice.message }}</p>
+            </li>
+          </ul>
+          <p v-else class="tv-rail-empty">Még nincs értesítés.</p>
+        </section>
+        <section class="tv-panel">
+          <header class="tv-panel-heading"><h2>Közösségi események</h2></header>
+          <ul v-if="communityEvents.length" class="tv-rail-list tv-event-progress">
+            <li v-for="event in communityEvents" :key="event.id">
+              <div class="tv-rail-meta"><strong>{{ event.isSecret && !event.unlocked ? 'Rejtett esemény' : event.title }}</strong><span>{{ progress(event) }}%</span></div>
+              <progress :value="progress(event)" max="100" :aria-label="event.isSecret && !event.unlocked ? 'Rejtett esemény' : event.title"></progress>
+              <p>{{ credits(event.currentAmount) }} / {{ credits(event.targetAmount) }} CR</p>
+            </li>
+          </ul>
+          <p v-else class="tv-rail-empty">Most nincs aktív esemény.</p>
+        </section>
+      </aside>
     </div>
   </main>
 </template>
@@ -245,7 +293,7 @@ onUnmounted(()=>{
 .tv-topbar { min-height: 0; height: clamp(36px, 7.5dvh, 76px); gap: 8px; }
 .tv-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(145px, clamp(200px, 26vw, 355px));
   grid-template-rows: minmax(0, 1fr);
   height: auto;
   min-height: 0;
@@ -369,6 +417,43 @@ onUnmounted(()=>{
 .tv-results .red { background-color: oklch(43% .157 21); }
 .tv-results .black { background-color: oklch(19% .023 260); }
 .tv-results .green { background-color: oklch(40% .115 155); }
+
+.tv-sidebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: var(--tv-gap);
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: clip;
+}
+.tv-sidebar .tv-panel { container-type: size; min-height: 0; max-height: none; }
+.tv-sidebar .tv-panel-heading { padding: clamp(5px, 1.3vmin, 14px); }
+.tv-sidebar h2 { margin: 0; font-size: clamp(.76rem, 2vmin, 1.2rem); }
+.tv-rail-list { padding: 0 clamp(5px, 1.3vmin, 14px); margin: 0; list-style: none; overflow: clip; }
+.tv-rail-list li { padding-block: clamp(4px, 1vmin, 12px); border-bottom: 1px solid var(--line); }
+.tv-rail-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.tv-rail-meta strong, .tv-rail-list p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.tv-rail-list strong { font-size: clamp(.72rem, 1.65vmin, 1rem); }
+.tv-rail-list :is(time, p, span), .tv-rail-empty { color: var(--muted); font-size: clamp(.69rem, 1.5vmin, .94rem); }
+.tv-rail-list p, .tv-rail-empty { margin: 4px 0 0; }
+.tv-rail-empty { padding: 0 8px; }
+.tv-event-progress progress { display: block; width: 100%; height: clamp(5px, 1vmin, 10px); margin-top: 4px; accent-color: var(--accent); }
+.tv-rail-list li:nth-child(n+5) { display: none; }
+@container (max-height: 255px) { .tv-rail-list li:nth-child(n+4) { display: none; } }
+@container (max-height: 185px) { .tv-rail-list li:nth-child(n+3) { display: none; } }
+@container (max-height: 128px) { .tv-rail-list li:nth-child(n+2) { display: none; } }
+@media (max-width: 650px) and (orientation: portrait) {
+  .tv-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) min(23dvh, 165px); }
+  .tv-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+}
 
 @media (max-width: 420px) {
   .tv-screen-switcher { flex-basis: 100%; }

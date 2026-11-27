@@ -43,5 +43,20 @@ For phones on the same Wi-Fi, open `http://<HOST-LAN-IP>:5173`. The Vite dev ser
 - Google Fonts are currently referenced for visual styling; remove the import if the party network must be fully internet-independent.
 - Browser access to the Vite dev server is suitable for development. For camera features later, mobile browser security requirements may require local HTTPS.
 
+## House party credit presets
+
+| Item | Default |
+| --- | ---: |
+| Starting balance | 100 CR |
+| Roulette | 1–25 CR total per player per round |
+| Slot | 1–25 CR per paid spin |
+| Blackjack | 2, 4, 10 or 20 CR starting stake |
+| Lucky Wheel | 5 CR per spin |
+| Scratch ticket / quest skip | 10 / 15 CR |
+| House party coupons | 10–30 CR |
+| Community goals | 60–180 CR |
+
+The slot's line payouts, bell values and jackpot frequencies use the house party balance. Paid stakes fund Grand at 3% and Major at 6%, with fractional contributions carried forward until they reach a whole credit. Existing jackpot balances are retained. Coupons are redeemed with the host using the in-app receipt.
+
 ## Audio credits
 - Slot dog bark: [Single Dog Bark](https://freesound.org/people/kwahmah_02/sounds/277058/) by kwahmah_02 (CC0 1.0). Converted to mono MP3, processed for clarity and trimmed to the audible bark.

@@ -47,7 +47,7 @@ const dozens: Choice[] = [1, 2, 3].map(n => ({
 }));
 const columns: Choice[] = [3, 2, 1].map(n => ({ type: 'COLUMN', value: String(n), label: `${n}. oszlop` }));
 const standardChoices = [...outside, ...dozens, ...columns];
-const chips = [1, 5, 10, 25, 100];
+const chipValues = [1, 5, 10, 25, 50, 100];
 const red = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const numberList = Array.from({ length: 36 }, (_, index) => {
   const number = index + 1;
@@ -77,6 +77,9 @@ const visibleBalance = computed(() => balance.value === null ? null : Math.max(0
   balance.value - queued.value.reduce((sum, bet) => sum + bet.amount, 0)));
 watch(visibleBalance, value => { rouletteDisplayBalance.value = value; }, { immediate: true });
 
+const maxBet = computed(() => state.value?.maxBet ?? 25);
+const chips = computed(() => chipValues.filter(value => value <= maxBet.value));
+watch(maxBet, limit => { if (chip.value > limit) chip.value = 1; });
 const totalStake = computed(() => myBets.value.reduce((sum, bet) => sum + bet.amount, 0));
 const secondsLeft = computed(() => Math.max(0, Math.ceil((Date.parse(round.value?.bettingEndsAt ?? '') - now.value) / 1000)));
 const accepting = computed(() => round.value?.status === 'BETTING' && secondsLeft.value > 0);
@@ -152,6 +155,10 @@ function onLanded(number: number) {
 }
 function placeBet(choice: Choice) {
   if (!accepting.value || !playerId || !round.value) return;
+  if (totalStake.value + chip.value > maxBet.value) {
+    error.value = 'A teljes tét egy körben legfeljebb ' + maxBet.value + ' CR lehet.';
+    return;
+  }
   error.value = '';
   balanceRevision++;
   queued.value.push({ choice, amount: chip.value, roundId: round.value.id });
@@ -230,7 +237,7 @@ onUnmounted(() => {
         </section>
 
         <section v-if="!isDisplay" class="studio-console" aria-label="Fogadóasztal">
-          <div class="studio-console-heading"><h2>Fogadóasztal</h2><span>{{ myBets.length }} tét · {{ totalStake }} CR</span></div>
+          <div class="studio-console-heading"><h2>Fogadóasztal</h2><span>{{ myBets.length }} tét · {{ totalStake }} / {{ maxBet }} CR</span></div>
           <div class="studio-chipline" role="group" aria-label="Zsetonérték">
             <span>Zseton</span>
             <button v-for="value in chips" :key="value" type="button" :aria-pressed="value === chip" :aria-label="value + ' CR'"

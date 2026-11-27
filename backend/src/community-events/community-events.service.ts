@@ -55,11 +55,32 @@ export class CommunityEventsService {
       const insert = sqlite.prepare(`INSERT INTO community_events
         (title,description,target_amount,repeat_mode,cooldown_minutes,min_contribution,is_secret,is_active)
         VALUES (?,?,?,?,?,?,?,?)`);
-      insert.run('Everybody Drinks','Közös koccintás: mindenki választhat egy italt, alkoholmenteset is.',500,'REPEATABLE',0,1,0,1);
-      insert.run('Random Victim','A közösség felold egy véletlenszerű, önkéntes party kihívást.',750,'COOLDOWN',30,1,0,1);
-      insert.run('Forbidden Word','Válasszatok egy tiltott szót, amit 10 percig senki nem mondhat ki.',1000,'ONCE',0,1,0,1);
-      insert.run('??? Secret Afterparty','Egy rejtett meglepetés esemény. Az admin bármikor aktiválhatja.',1500,'ONCE',0,1,1,0);
+      insert.run('Everybody Drinks','Közös koccintás: mindenki választhat egy italt, alkoholmenteset is.',60,'REPEATABLE',0,1,0,1);
+      insert.run('Random Victim','A közösség felold egy véletlenszerű, önkéntes party kihívást.',90,'COOLDOWN',30,1,0,1);
+      insert.run('Forbidden Word','Válasszatok egy tiltott szót, amit 10 percig senki nem mondhat ki.',120,'ONCE',0,1,0,1);
+      insert.run('??? Secret Afterparty','Egy rejtett meglepetés esemény. Az admin bármikor aktiválhatja.',180,'ONCE',0,1,1,0);
     }
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const migration = sqlite.prepare("INSERT OR IGNORE INTO casino_settings VALUES ('party_community_costs_v1','1')").run();
+      if (migration.changes) {
+        const update = sqlite.prepare(`
+          UPDATE community_events SET target_amount=?
+          WHERE title=? AND target_amount=? AND current_amount=0 AND is_completed=0
+            AND NOT EXISTS (SELECT 1 FROM community_event_activations WHERE event_id=community_events.id)
+            AND NOT EXISTS (SELECT 1 FROM community_event_contributions WHERE event_id=community_events.id)
+        `);
+        update.run(60, 'Everybody Drinks', 500);
+        update.run(90, 'Random Victim', 750);
+        update.run(120, 'Forbidden Word', 1000);
+        update.run(180, '??? Secret Afterparty', 1500);
+      }
+      sqlite.exec('COMMIT');
+    } catch (error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
+
   }
 
   private get sqlite() { return this.database.sqlite; }

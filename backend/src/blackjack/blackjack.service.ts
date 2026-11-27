@@ -1,10 +1,10 @@
 import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type { DatabaseSync } from 'node:sqlite';
+import { blackjackBets as bets } from '../casino/economy';
 import { DATABASE } from '../database/database.module';
 import { isBlackjack, scoreHand, shuffledShoe, total } from './blackjack-rules';
 import type { Card } from './blackjack-rules';
 
-const bets = [2, 4, 10, 20, 50, 100];
 type HeldBet = { id: number; playerId: number; amount: number };
 type Hand = {
   round: number;

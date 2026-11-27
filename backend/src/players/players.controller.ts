@@ -7,6 +7,7 @@ export class PlayersController {
   constructor(private readonly players: PlayersService, private readonly presence: PlayerPresenceGateway) {}
   @Post('join') join(@Body() body: { name: string }) { return this.players.join(body.name); }
   @Get() findAll() { return this.presence.getOnlinePlayers(); }
+  @Get('economy') getEconomy() { return this.players.getEconomy(); }
   @Get('leaderboard') getLeaderboard() { return this.players.getLeaderboard(); }
   @Get(':id/duels') getDuels(@Param('id') id:string) { return this.players.getDuels(Number(id)); }
   @Post(':id/duels') createDuel(@Param('id') id:string, @Body() body:{opponentId:number}) { return this.players.createDuel(Number(id),Number(body.opponentId)); }
@@ -25,6 +26,8 @@ export class PlayersController {
   @Get(':id/side-quests/:questId/verification-status') getSideQuestVerificationStatus(@Param('id') id:string,@Param('questId') questId:string) { return this.players.getSideQuestVerificationStatus(Number(id),Number(questId)); }
   @Post(':id/side-quests/:questId/verification') requestSideQuestVerification(@Param('id') id:string,@Param('questId') questId:string) { return this.players.requestSideQuestVerification(Number(id),Number(questId)); }
   @Get(':id/shop') getShop(@Param('id') id: string) { return this.players.getShop(Number(id)); }
+  @Get(':id/shop/redemptions') getShopRedemptions(@Param('id') id: string) { return this.players.getShopRedemptions(Number(id)); }
+  @Post(':id/shop/redeem') redeemShopCoupon(@Param('id') id: string, @Body() body: { itemKey: string }) { return this.players.redeemShopCoupon(Number(id), body.itemKey); }
   @Get(':id/scratch-tickets') getScratchTickets(@Param('id') id:string) { return this.players.getScratchTickets(Number(id)); }
   @Post(':id/scratch-tickets/:ticketId/reveal') revealScratchTicket(@Param('id') id:string,@Param('ticketId') ticketId:string) { return this.players.revealScratchTicket(Number(id),Number(ticketId)); }
   @Post(':id/shop/buy') buyShopItem(@Param('id') id: string, @Body() body:{itemKey:string}) { return this.players.buyShopItem(Number(id),body.itemKey); }

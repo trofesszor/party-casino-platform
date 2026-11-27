@@ -105,7 +105,7 @@ function openStakePicker() {
   if (!stakesLocked.value) stakeDialog.value?.showModal();
 }
 function chooseStake(nextDenomination: number, nextUnits: number) {
-  if (stakesLocked.value) return;
+  if (stakesLocked.value || nextDenomination * nextUnits > (rules.value?.maxBet ?? 25)) return;
   denomination.value = nextDenomination;
   units.value = nextUnits;
   stakeDialog.value?.close();
@@ -334,6 +334,7 @@ onUnmounted(() => {
                   <th scope="row">{{ unit }} <small>CR</small></th>
                   <td v-for="factor in rules.betUnits" :key="factor">
                     <button class="mint-stake-option" type="button" :aria-label="unit + ' CR × ' + factor + ' = ' + unit * factor + ' CR'"
+                      :disabled="unit * factor > rules.maxBet"
                       :aria-pressed="effectiveStake.denomination === unit && effectiveStake.units === factor" @click="chooseStake(unit, factor)">
                       {{ format(unit * factor) }}<small>CR</small>
                     </button>
@@ -343,7 +344,7 @@ onUnmounted(() => {
             </table>
             <footer class="mint-stake-footer">
               <span v-if="available !== null">Egyenleg <strong>{{ format(available) }} CR</strong></span>
-              <span>Kiválasztott tét <strong>{{ format(bet) }} CR</strong></span>
+              <span>Tét <strong>{{ format(bet) }} / {{ rules.maxBet }} CR</strong></span>
             </footer>
           </dialog>
           <p v-if="error" class="error mint-message" role="alert">{{ error }}</p>

@@ -1,4 +1,4 @@
-import type { Player, RouletteBetType, RouletteState, SlotSpin, SlotStake, SlotState } from '../types';
+import type { CreditEconomy, ShopItem, ShopRedemption, Player, RouletteBetType, RouletteState, SlotSpin, SlotStake, SlotState } from '../types';
 
 export type CommunityEvent = {id:number;title:string;description:string;targetAmount:number;currentAmount:number;repeatMode:'ONCE'|'REPEATABLE'|'COOLDOWN';isSecret:number;unlocked?:number;nextAvailableAt:string|null;contributorCount:number};
 export type CommunityEventAdmin = CommunityEvent & {cooldownMinutes:number;minContribution:number;maxContribution:number|null;active:number;completed:number;activationCount:number};
@@ -35,7 +35,10 @@ export const api = {
   respondToDuel: (playerId:number, duelId:number, accept:boolean) => request<Duel>(`/api/players/${playerId}/duels/${duelId}/respond`, { method:'POST', body:JSON.stringify({accept}) }),
   chooseDuelType: (playerId:number, duelId:number, duelType:string) => request<Duel>(`/api/players/${playerId}/duels/${duelId}/type`, { method:'POST', body:JSON.stringify({duelType}) }),
   submitDuelWinner: (playerId:number, duelId:number, winnerId:number) => request<Duel>(`/api/players/${playerId}/duels/${duelId}/result`, { method:'POST', body:JSON.stringify({winnerId}) }),
-  getShop: (playerId:number) => request<{itemKey:string;name:string;description:string;price:number;quantity:number}[]>(`/api/players/${playerId}/shop`),
+  getEconomy: () => request<CreditEconomy>('/api/players/economy'),
+  getShopRedemptions: (playerId: number) => request<ShopRedemption[]>(`/api/players/${playerId}/shop/redemptions`),
+  redeemShopCoupon: (playerId: number, itemKey: string) => request<ShopRedemption>(`/api/players/${playerId}/shop/redeem`, { method: 'POST', body: JSON.stringify({ itemKey }) }),
+  getShop: (playerId:number) => request<ShopItem[]>(`/api/players/${playerId}/shop`),
   buyShopItem: (playerId:number,itemKey:string) => request<{success:boolean;itemKey:string;quantity?:number;ticketId?:number;tokenBalance:number}>(`/api/players/${playerId}/shop/buy`, {method:'POST',body:JSON.stringify({itemKey})}),
   getScratchTickets: (playerId:number) => request<{id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;outcomeJson?:string|null;createdAt:string}[]>(`/api/players/${playerId}/scratch-tickets`),
   revealScratchTicket: (playerId:number,ticketId:number) => request<{success:boolean;ticketId:number;prizeAmount:number;outcome:string[][];alreadyRevealed:boolean}>(`/api/players/${playerId}/scratch-tickets/${ticketId}/reveal`,{method:'POST'}),

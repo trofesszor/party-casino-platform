@@ -1,13 +1,26 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import type { CreditEconomy, ShopItem, ShopRedemption } from '../types';
 import { api } from '../services/api';
 
 const router = useRouter();
 const playerId = Number(localStorage.getItem('party-player-id'));
 const playerName = localStorage.getItem('party-player-name') || '';
 const balance = ref(0);
-const items = ref<{itemKey:string;name:string;description:string;price:number;quantity:number}[]>([]);
+const items = ref<ShopItem[]>([]);
+const economy = ref<CreditEconomy>();
+const redemptions = ref<ShopRedemption[]>([]);
+const focusedRedemption = ref<ShopRedemption>();
+const partyIcons: Record<string, string> = { PARTY_SONG: '♫', PARTY_PHOTO: '◉', PARTY_SNACK: '◈', PARTY_MOCKTAIL: '◇', PARTY_KARAOKE: '♪', PARTY_GAME: '♣' };
+const isCoupon = (key: string) => key.startsWith('PARTY_');
+const usableCoupons = computed(() => items.value.filter(item => isCoupon(item.itemKey) && item.quantity > 0));
+const catalog = computed(() => [
+  { name: 'Házibuli-kuponok', items: items.value.filter(item => isCoupon(item.itemKey) && item.enabled) },
+  { name: 'Játéktárgyak', items: items.value.filter(item => !isCoupon(item.itemKey) && item.enabled) },
+]);
+const number = (value: number) => value.toLocaleString('hu-HU');
+const receiptTime = (value: string) => new Date(value.replace(' ', 'T') + 'Z').toLocaleString('hu-HU', { dateStyle: 'short', timeStyle: 'short' });
 const quests = ref<{id:number;title:string;description:string;status:'ACTIVE'|'COMPLETED'|'SKIPPED'}[]>([]);
 const busy = ref(false);
 const error = ref('');
@@ -26,13 +39,17 @@ let scratchContext:CanvasRenderingContext2D|null=null;
 async function refresh() {
   if (!playerId || !playerName) { router.replace('/'); return; }
   try {
-    const [shop, sideQuests, wallet, tickets] = await Promise.all([
+    const [shop, sideQuests, wallet, tickets, credits, receipts] = await Promise.all([
       api.getShop(playerId),
       api.getPlayerSideQuests(playerId),
       api.getPlayerBalance(playerId),
       api.getScratchTickets(playerId),
+      api.getEconomy(),
+      api.getShopRedemptions(playerId),
     ]);
     items.value = shop;
+    economy.value = credits;
+    redemptions.value = receipts;
     quests.value = sideQuests;
     balance.value = wallet.tokenBalance;
     scratchTickets.value = tickets;
@@ -43,11 +60,12 @@ async function refresh() {
 async function buy(itemKey:string) {
   if (busy.value) return;
   const item = items.value.find(entry => entry.itemKey === itemKey);
-  if (!item || balance.value < item.price) return;
+  if (!item?.enabled || balance.value < item.price) return;
   busy.value = true; error.value = ''; notice.value = '';
   try {
     const purchase=await api.buyShopItem(playerId,itemKey);
     await refresh();
+    window.dispatchEvent(new Event('party-player-changed'));
     if(itemKey==='SCRATCH_TICKET'&&purchase.ticketId){activeTicket.value=scratchTickets.value.find(ticket=>ticket.id===purchase.ticketId)??{id:purchase.ticketId,status:'UNSCRATCHED',createdAt:new Date().toISOString()};notice.value='Sok szerencsét! Kapard le a sorsjegyet!';await nextTick();initializeScratchCard();}
     else notice.value = 'Sikeres vásárlás. A tárgy bekerült a készletedbe.';
   } catch (e:any) { error.value = e.message || 'A vásárlás nem sikerült.'; }
@@ -80,6 +98,23 @@ async function skipQuest(questId:number) {
   } catch (e:any) { error.value = e.message || 'A tárgy használata nem sikerült.'; }
   finally { busy.value = false; }
 }
+async function redeem(item: ShopItem) {
+  if (busy.value || !item.quantity || !window.confirm('Beváltod ezt a kupont a házigazdánál? ' + item.name)) return;
+  busy.value = true;
+  error.value = '';
+  notice.value = '';
+  try {
+    focusedRedemption.value = await api.redeemShopCoupon(playerId, item.itemKey);
+    await refresh();
+    notice.value = 'A kupon beváltva. Mutasd meg a bizonylatot a házigazdának.';
+  } catch (cause) {
+    await refresh();
+    error.value = cause instanceof Error ? cause.message : 'A beváltás sikertelen.';
+  } finally {
+    busy.value = false;
+  }
+}
+
 onMounted(refresh);
 </script>
 
@@ -93,28 +128,57 @@ onMounted(refresh);
     </section>
 
     <p v-if="error" class="shop-message shop-error">{{ error }}</p>
-    <p v-if="notice" class="shop-message shop-notice">{{ notice }}</p>
+    <p v-if="notice" class="shop-message shop-notice" role="status">{{ notice }}</p>
+
+    <details v-if="economy" class="shop-credit-guide panel">
+      <summary><strong>Kreditek és tétlimitek</strong><span>Egyenleg {{ number(balance) }} CR</span></summary>
+      <dl>
+        <div><dt>Kezdőegyenleg</dt><dd>{{ number(economy.startingCredits) }} CR</dd></div>
+        <div><dt>Rulett</dt><dd>1–{{ economy.rouletteRoundLimit }} CR körönként</dd></div>
+        <div><dt>Slot</dt><dd>1–{{ economy.slotStakeLimit }} CR pörgetésenként</dd></div>
+        <div><dt>Blackjack</dt><dd>{{ economy.blackjackBets.join(', ') }} CR alaptét</dd></div>
+        <div><dt>Szerencsekerék</dt><dd>{{ economy.wheelSpinCost }} CR pörgetésenként</dd></div>
+        <div><dt>Párbaj győztese</dt><dd>+{{ economy.duelReward }} CR</dd></div>
+        <div v-if="economy.photoReward.enabled"><dt>Fotóküldetés {{ economy.photoReward.balanceThreshold }} CR alatt</dt><dd>+{{ economy.photoReward.rewardAmount }} CR · napi {{ economy.photoReward.dailyLimit }}×</dd></div>
+      </dl>
+    </details>
 
     <div class="shop-layout">
-    <section class="shop-section">
-      <div class="shop-section-heading"><div><h2>Elérhető tárgyak</h2></div><span>{{ items.length }} TERMÉK</span></div>
-      <article v-for="item in items" :key="item.itemKey" class="shop-item panel">
-        <div class="shop-item-icon"><span v-if="item.itemKey === 'SCRATCH_TICKET'">🎟️</span><span v-else>⏭</span></div>
-        <div class="shop-item-copy">
-          <span class="shop-item-tag">{{ item.itemKey === 'SCRATCH_TICKET' ? 'AZONNALI NYEREMÉNY' : 'HASZNÁLHATÓ TÁRGY' }}</span>
-          <h3>{{ item.name }}</h3>
-          <p class="muted">{{ item.description }}</p>
-          <small v-if="item.itemKey !== 'SCRATCH_TICKET'">Készleten: <strong>{{ item.quantity }} db</strong></small><small v-else>Öt lehetséges eredmény · akár 100 CR</small>
-        </div>
-        <div class="shop-item-buy">
-          <strong>{{ item.price }} <small>CR</small></strong>
-          <button class="primary" :disabled="busy || balance < item.price" @click="buy(item.itemKey)">{{ balance < item.price ? 'Nincs elég CR' : 'Vásárlás' }}</button>
-        </div>
-      </article>
-      <div v-if="!items.length && !error" class="shop-empty panel">Jelenleg nincs elérhető termék.</div>
-    </section>
+      <div class="shop-catalog">
+        <section v-for="group in catalog" v-show="group.items.length" :key="group.name" class="shop-section">
+          <div class="shop-section-heading"><h2>{{ group.name }}</h2></div>
+          <article v-for="item in group.items" :key="item.itemKey" class="shop-item panel">
+            <div class="shop-item-icon" aria-hidden="true">{{ partyIcons[item.itemKey] ?? (item.itemKey === 'SCRATCH_TICKET' ? '✦' : '»') }}</div>
+            <div class="shop-item-copy">
+              <h3>{{ item.name }}</h3>
+              <p class="muted">{{ item.description }}</p>
+              <small v-if="item.itemKey !== 'SCRATCH_TICKET' && item.quantity">Készleten {{ item.quantity }} db</small>
+            </div>
+            <div class="shop-item-buy">
+              <strong>{{ number(item.price) }} <small>CR</small></strong>
+              <button class="primary" :disabled="busy || balance < item.price" @click="buy(item.itemKey)">{{ balance < item.price ? 'Nincs elég CR' : 'Vásárlás' }}</button>
+            </div>
+          </article>
+        </section>
+        <p v-if="!items.some(item => item.enabled) && !error" class="shop-empty panel">Jelenleg nincs elérhető termék.</p>
+      </div>
 
-    <aside class="shop-player-inventory">
+      <aside class="shop-player-inventory">
+        <section v-if="usableCoupons.length || redemptions.length" class="shop-section">
+          <div class="shop-section-heading"><h2>Kuponjaid</h2></div>
+          <article v-for="item in usableCoupons" :key="item.itemKey" class="shop-quest-row panel">
+            <div><strong>{{ item.name }}</strong><p class="muted">{{ item.quantity }} db</p></div>
+            <button class="ghost" :disabled="busy" @click="redeem(item)">Beváltás</button>
+          </article>
+          <details v-if="redemptions.length" class="shop-credit-guide panel">
+            <summary><strong>Beváltási bizonylatok</strong></summary>
+            <ul class="shop-receipts">
+              <li v-for="receipt in redemptions" :key="receipt.id">
+                <button class="ghost" @click="focusedRedemption = receipt">{{ receipt.name }} · #{{ receipt.id }}</button>
+              </li>
+            </ul>
+          </details>
+        </section>
     <section class="shop-section inventory-section">
       <div class="shop-section-heading"><div><h2>Készlet és használat</h2></div><span>{{ questSkipItem?.quantity ?? 0 }} KÜLDETÉS KIHAGYÁS</span></div>
       <div v-if="!questSkipItem?.quantity" class="shop-empty panel">Még nincs használható tárgyad. Vásárolj egy küldetéskihagyást a fenti shopban.</div>
@@ -134,6 +198,12 @@ onMounted(refresh);
     </section>
     </aside>
     </div>
+    <section v-if="focusedRedemption" class="shop-receipt panel" role="status">
+      <h2>Beváltási bizonylat #{{ focusedRedemption.id }}</h2>
+      <p>{{ focusedRedemption.name }} · {{ playerName }}</p>
+      <time>{{ receiptTime(focusedRedemption.redeemedAt) }}</time>
+      <button class="ghost" @click="focusedRedemption = undefined">Bezárás</button>
+    </section>
     <div v-if="activeTicket" class="scratch-overlay" @click.self="activeTicket=null">
       <section class="scratch-modal panel">
         <button class="ghost scratch-close" @click="activeTicket=null">✕</button>
@@ -171,3 +241,25 @@ onMounted(refresh);
     <footer>PARTY CASINO <span>•</span> A vásárlások és tárgyhasználatok azonnal érvényesülnek</footer>
   </main>
 </template>
+
+<style scoped>
+.shop-credit-guide { margin: 0 auto 16px; padding: 10px 14px; }
+.shop-credit-guide summary { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 44px; cursor: pointer; }
+.shop-credit-guide summary strong::before { content: '+ '; color: var(--accent); }
+.shop-credit-guide[open] summary strong::before { content: '− '; }
+.shop-credit-guide summary span, .shop-credit-guide dd { color: var(--accent); font-variant-numeric: tabular-nums; }
+.shop-credit-guide dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 12px; margin: 8px 0; }
+.shop-credit-guide dt { color: var(--muted); }
+.shop-credit-guide dd { margin: 3px 0 0; }
+.shop-catalog, .shop-player-inventory { display: grid; gap: 16px; min-width: 0; align-content: start; }
+.shop-layout .scratch-inventory-section { grid-column: auto; }
+.shop-receipts { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.shop-receipts button, .shop-receipt button { min-height: 44px; }
+.shop-receipt { position: fixed; z-index: 76; inset: auto var(--gutter) max(18px, var(--safe-bottom)) auto; width: min(380px, calc(100% - 2 * var(--gutter))); padding: 16px; overflow-wrap: anywhere; }
+.shop-receipt h2 { margin-top: 0; }
+.shop-receipt button { display: block; margin-top: 12px; }
+@media (max-width: 420px) {
+  .shop-item-buy button, .shop-quest-row button { min-height: 44px; }
+  .shop-item-copy { min-width: 0; overflow-wrap: anywhere; }
+}
+</style>

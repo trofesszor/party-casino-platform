@@ -1,3 +1,4 @@
+import { partyCoupons, questSkipPrice, rouletteRoundLimit, scratchTicketPrice, startingCredits, wheelSpinPrice } from '../casino/economy';
 import { jackpotStarts } from '../slots/slots-game';
 import { Global, Module } from '@nestjs/common';
 import { DatabaseSync } from 'node:sqlite';
@@ -208,8 +209,20 @@ export const DATABASE = Symbol('DATABASE');
         sqlite.exec('ALTER TABLE casino_roulette_bets ADD COLUMN payout_amount INTEGER NOT NULL DEFAULT 0');
       }
 
-      sqlite.prepare("INSERT OR IGNORE INTO shop_items (item_key,name,description,price,enabled) VALUES ('QUEST_SKIP','Küldetés kihagyás','Egy aktív side quest kihagyása. A kihagyott küldetést később újra megkaphatod.',25,1)").run();
-      sqlite.prepare("INSERT OR IGNORE INTO shop_items (item_key,name,description,price,enabled) VALUES ('SCRATCH_TICKET','Kapard és nyerj!','Kapard le a mezőt, és derítsd ki, nyertél-e akár 100 CR-t!',20,1)").run();
+      const seedShop = sqlite.prepare('INSERT OR IGNORE INTO shop_items (item_key,name,description,price,enabled) VALUES (?,?,?,?,1)');
+      seedShop.run('QUEST_SKIP', 'Küldetés kihagyás', 'Egy aktív side quest kihagyása. Később újra megkaphatod.', questSkipPrice);
+      seedShop.run('SCRATCH_TICKET', 'Kapard és nyerj!', 'Kapard le a mezőt, és derítsd ki, nyertél-e akár 100 CR-t!', scratchTicketPrice);
+      for (const coupon of partyCoupons) seedShop.run(...coupon);
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS shop_redemptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+          item_key TEXT NOT NULL REFERENCES shop_items(item_key),
+          item_name TEXT NOT NULL,
+          redeemed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS shop_redemptions_player ON shop_redemptions(player_id, id);
+      `);
       sqlite.exec("CREATE TABLE IF NOT EXISTS scratch_tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE, prize_amount INTEGER NOT NULL CHECK(prize_amount IN (0,10,25,50,100)), outcome_json TEXT NOT NULL DEFAULT '[[\"🍒\",\"🍋\",\"🔔\"],[\"🍀\",\"💎\",\"⭐\"],[\"🍋\",\"🍒\",\"🍀\"]]', status TEXT NOT NULL DEFAULT 'UNSCRATCHED' CHECK(status IN ('UNSCRATCHED','REVEALED')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, revealed_at TEXT)");
       const scratchColumns=sqlite.prepare('PRAGMA table_info(scratch_tickets)').all() as Array<{name:string}>;
       if(!scratchColumns.some(column=>column.name==='outcome_json'))sqlite.exec("ALTER TABLE scratch_tickets ADD COLUMN outcome_json TEXT NOT NULL DEFAULT '[[\"🍒\",\"🍋\",\"🔔\"],[\"🍀\",\"💎\",\"⭐\"],[\"🍋\",\"🍒\",\"🍀\"]]' ");
@@ -231,12 +244,12 @@ export const DATABASE = Symbol('DATABASE');
         CREATE TABLE IF NOT EXISTS token_photo_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS casino_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT NOT NULL);
       `);
-      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('default_player_tokens','100')").run();
-      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('wheel_spin_cost','5')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('default_player_tokens',?)").run(String(startingCredits));
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('wheel_spin_cost',?)").run(String(wheelSpinPrice));
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('wheel_spin_duration_ms','7000')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_betting_seconds','20')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_result_seconds','5')").run();
-      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_max_bet','100')").run();
+      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_max_bet',?)").run(String(rouletteRoundLimit));
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('duel_reward','10')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('max_active_side_quests','2')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('quest_pin_expiry_seconds','90')").run();
@@ -255,6 +268,22 @@ export const DATABASE = Symbol('DATABASE');
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_color','1')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_odd_even','1')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_payout_low_high','1')").run();
+
+      // Migrate only the old preset values. Admin changes and player balances are kept.
+      sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        const migration = sqlite.prepare("INSERT OR IGNORE INTO casino_settings VALUES ('party_economy_v1','1')").run();
+        if (migration.changes) {
+          sqlite.prepare("UPDATE casino_settings SET setting_value=? WHERE setting_key='roulette_max_bet' AND setting_value='100'").run(String(rouletteRoundLimit));
+          const reprice = sqlite.prepare('UPDATE shop_items SET price=? WHERE item_key=? AND price=?');
+          reprice.run(questSkipPrice, 'QUEST_SKIP', 25);
+          reprice.run(scratchTicketPrice, 'SCRATCH_TICKET', 20);
+        }
+        sqlite.exec('COMMIT');
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
 
       const tokenPhotoDefaults: Array<[string,string]> = [['enabled','1'],['balance_threshold','50'],['reward_amount','10'],['cooldown_minutes','60'],['daily_limit','2']];
       const insertTokenPhotoSetting=sqlite.prepare('INSERT OR IGNORE INTO token_photo_settings (setting_key,setting_value) VALUES (?,?)');
@@ -306,6 +335,9 @@ export const DATABASE = Symbol('DATABASE');
       const slotColumns = sqlite.prepare('PRAGMA table_info(slot_player_state)').all() as Array<{ name: string }>;
       if (!slotColumns.some(column => column.name === 'free_stake')) sqlite.exec('ALTER TABLE slot_player_state ADD COLUMN free_stake TEXT');
       if (!slotColumns.some(column => column.name === 'bonus_state')) sqlite.exec('ALTER TABLE slot_player_state ADD COLUMN bonus_state TEXT');
+      const jackpotColumns = sqlite.prepare('PRAGMA table_info(slot_jackpots)').all() as Array<{ name: string }>;
+      if (!jackpotColumns.some(column => column.name === 'grand_carry')) sqlite.exec('ALTER TABLE slot_jackpots ADD COLUMN grand_carry INTEGER NOT NULL DEFAULT 0');
+      if (!jackpotColumns.some(column => column.name === 'major_carry')) sqlite.exec('ALTER TABLE slot_jackpots ADD COLUMN major_carry INTEGER NOT NULL DEFAULT 0');
       sqlite.prepare('INSERT OR IGNORE INTO slot_jackpots (id, grand, major) VALUES (1, ?, ?)').run(jackpotStarts.grand, jackpotStarts.major);
       return { sqlite, db: drizzle({ client: sqlite }) };
     },

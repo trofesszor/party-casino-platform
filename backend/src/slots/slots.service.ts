@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { DatabaseSync } from 'node:sqlite';
+import { slotStakeLimit } from '../casino/economy';
 import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
 import { amount, bellBonus, betUnits, denominations, jackpotStarts, respin, scoreBonus, scoreGrid, slotRules, spinGrid } from './slots-game';
@@ -87,11 +88,16 @@ export class SlotsService {
         freeSpins--;
         freeStake = freeSpins > 0 ? stake : null;
       } else {
+        if (betAmount > slotStakeLimit) throw new BadRequestException('A slot tétje legfeljebb ' + slotStakeLimit + ' CR lehet.');
         if (player.tokenBalance < betAmount) throw new BadRequestException('Nincs elegendő CR a pörgetéshez.');
         paidAmount = betAmount;
         this.record(player.id, -paidAmount, 'SLOT_BET', 'Midnight Mint tét');
-        jackpots.grand += Math.max(1, Math.floor(paidAmount / 10));
-        jackpots.major += Math.max(1, Math.floor(paidAmount / 5));
+        const carry = sqlite.prepare('SELECT grand_carry AS grand, major_carry AS major FROM slot_jackpots WHERE id=1').get() as Progressives;
+        const grandShare = carry.grand + paidAmount * 3;
+        const majorShare = carry.major + paidAmount * 6;
+        jackpots.grand += Math.floor(grandShare / 100);
+        jackpots.major += Math.floor(majorShare / 100);
+        sqlite.prepare('UPDATE slot_jackpots SET grand_carry=?, major_carry=? WHERE id=1').run(grandShare % 100, majorShare % 100);
       }
       grid = spinGrid(stake);
       wins = scoreGrid(grid, stake);

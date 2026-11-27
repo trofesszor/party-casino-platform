@@ -1,6 +1,7 @@
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { EventsGateway } from '../events/events.gateway';
 import { createHash, createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { blackjackBets, isPartyCoupon, rouletteRoundLimit, slotStakeLimit, startingCredits, wheelSpinPrice } from '../casino/economy';
 import { DATABASE } from '../database/database.module';
 
 @Injectable()
@@ -77,13 +78,13 @@ export class PlayersService {
     }
   }
 
-  private readonly gameSettingDefaults={wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:100,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1};
+  private readonly gameSettingDefaults={wheelSpinCost:wheelSpinPrice,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:rouletteRoundLimit,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1};
   getCasinoGameSettings(){
     const rows=this.database.sqlite.prepare("SELECT setting_key AS key,setting_value AS value FROM casino_settings").all() as Array<{key:string;value:string}>;
     const values=Object.fromEntries(rows.map(r=>[r.key,Number(r.value)]));
     return {
-      wheelSpinCost:values.wheel_spin_cost??5,wheelSpinDurationMs:values.wheel_spin_duration_ms??7000,
-      rouletteBettingSeconds:values.roulette_betting_seconds??20,rouletteResultSeconds:values.roulette_result_seconds??5,rouletteMaxBet:values.roulette_max_bet??100,
+      wheelSpinCost:values.wheel_spin_cost??wheelSpinPrice,wheelSpinDurationMs:values.wheel_spin_duration_ms??7000,
+      rouletteBettingSeconds:values.roulette_betting_seconds??20,rouletteResultSeconds:values.roulette_result_seconds??5,rouletteMaxBet:values.roulette_max_bet??rouletteRoundLimit,
       duelReward:values.duel_reward??10,maxActiveSideQuests:values.max_active_side_quests??2,questPinExpirySeconds:values.quest_pin_expiry_seconds??90,
       scratchLossPercent:values.scratch_loss_percent??60,scratch10Percent:values.scratch_10_percent??25,scratch25Percent:values.scratch_25_percent??10,scratch50Percent:values.scratch_50_percent??4,scratch100Percent:values.scratch_100_percent??1,
       roulettePayoutNumber:values.roulette_payout_number??35,roulettePayoutSplit:values.roulette_payout_split??17,roulettePayoutStreet:values.roulette_payout_street??11,roulettePayoutCorner:values.roulette_payout_corner??8,roulettePayoutSixLine:values.roulette_payout_six_line??5,roulettePayoutDozen:values.roulette_payout_dozen??2,roulettePayoutColumn:values.roulette_payout_column??2,roulettePayoutColor:values.roulette_payout_color??1,roulettePayoutOddEven:values.roulette_payout_odd_even??1,roulettePayoutLowHigh:values.roulette_payout_low_high??1
@@ -104,7 +105,7 @@ export class PlayersService {
 
   getDefaultPlayerTokens() {
     const row=this.database.sqlite.prepare("SELECT setting_value AS value FROM casino_settings WHERE setting_key='default_player_tokens'").get() as {value:string}|undefined;
-    return {defaultTokens:Number(row?.value??100)};
+    return {defaultTokens:Number(row?.value??startingCredits)};
   }
 
   setDefaultPlayerTokens(value:number) {
@@ -658,15 +659,59 @@ export class PlayersService {
     return this.database.sqlite.prepare('SELECT item_key AS itemKey, name, description, price, enabled FROM shop_items WHERE item_key=?').get(itemKey);
   }
 
+  getEconomy() {
+    const settings = this.getCasinoGameSettings();
+    return {
+      startingCredits: this.getDefaultPlayerTokens().defaultTokens,
+      wheelSpinCost: settings.wheelSpinCost,
+      rouletteRoundLimit: settings.rouletteMaxBet,
+      slotStakeLimit,
+      blackjackBets,
+      duelReward: settings.duelReward,
+      photoReward: this.getTokenPhotoSettings(),
+    };
+  }
+
+  getShopRedemptions(playerId: number) {
+    return this.database.sqlite.prepare(`
+      SELECT id, item_key AS itemKey, item_name AS name, redeemed_at AS redeemedAt
+      FROM shop_redemptions WHERE player_id=? ORDER BY id DESC LIMIT 10
+    `).all(playerId);
+  }
+
+  redeemShopCoupon(playerId: number, itemKeyInput: string) {
+    const itemKey = String(itemKeyInput ?? '').trim().toUpperCase();
+    if (!isPartyCoupon(itemKey)) throw new BadRequestException('Ez a termék nem házibuli-kupon.');
+    const sqlite = this.database.sqlite;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const used = sqlite.prepare(`
+        UPDATE player_inventory SET quantity=quantity-1, updated_at=CURRENT_TIMESTAMP
+        WHERE player_id=? AND item_key=? AND quantity>0
+      `).run(playerId, itemKey);
+      if (!used.changes) throw new BadRequestException('Nincs ilyen kupon a készletedben.');
+      const item = sqlite.prepare('SELECT name FROM shop_items WHERE item_key=?').get(itemKey) as { name: string };
+      const redemption = sqlite.prepare(`
+        INSERT INTO shop_redemptions (player_id,item_key,item_name) VALUES (?,?,?)
+        RETURNING id,item_key AS itemKey,item_name AS name,redeemed_at AS redeemedAt
+      `).get(playerId, itemKey, item.name);
+      sqlite.exec('COMMIT');
+      return redemption;
+    } catch (error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   getShop(playerId: number) {
     const player = this.database.sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId);
     if (!player) throw new BadRequestException('A játékos nem található.');
     return this.database.sqlite.prepare(`
       SELECT s.item_key AS itemKey, s.name, s.description, s.price,
-        COALESCE(i.quantity,0) AS quantity
+        COALESCE(i.quantity,0) AS quantity, s.enabled
       FROM shop_items s
       LEFT JOIN player_inventory i ON i.item_key=s.item_key AND i.player_id=?
-      WHERE s.enabled=1 ORDER BY s.price ASC, s.name ASC
+      WHERE s.enabled=1 OR i.quantity>0 ORDER BY s.price ASC, s.name ASC
     `).all(playerId);
   }
 

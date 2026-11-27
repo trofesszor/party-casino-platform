@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, OnModuleDestroy, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
+import { rouletteRoundLimit } from '../casino/economy';
 import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
 
@@ -14,7 +15,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
   private setting(key:string,fallback:number){const row=this.database.sqlite.prepare('SELECT setting_value AS value FROM casino_settings WHERE setting_key=?').get(key) as {value:string}|undefined;return Number(row?.value??fallback);}
   private get bettingSeconds(){return this.setting('roulette_betting_seconds',20);}
   private get resultSeconds(){return this.setting('roulette_result_seconds',5);}
-  private get maxBet(){return this.setting('roulette_max_bet',100);}
+  private get maxBet(){return this.setting('roulette_max_bet',rouletteRoundLimit);}
 
 
   onModuleInit() {
@@ -34,7 +35,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
 
   getState() {
     const currentRound = this.latestRound();
-    if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds };
+    if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds, maxBet: this.maxBet };
     const bets = this.database.sqlite.prepare(`
       SELECT b.id AS id, b.player_id AS playerId, p.name AS playerName,
         b.bet_type AS betType, b.bet_value AS betValue, b.amount AS amount
@@ -48,7 +49,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
       FROM casino_roulette_rounds WHERE status = 'COMPLETED' AND id < ?
       ORDER BY id DESC LIMIT 10
     `).all(currentRound.id);
-    return { currentRound, bets, winners, history, bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds };
+    return { currentRound, bets, winners, history, bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds, maxBet: this.maxBet };
   }
 
   placeBet(playerId: number, input: { betType: string; betValue: string | number; amount?: number; roundId?: number }) {
@@ -74,6 +75,9 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     let tokenBalance: number;
     sqlite.exec('BEGIN IMMEDIATE');
     try {
+      const { total } = sqlite.prepare('SELECT COALESCE(SUM(amount),0) AS total FROM casino_roulette_bets WHERE player_id=? AND round_id=?')
+        .get(playerId, round.id) as { total: number };
+      if (total + amount > this.maxBet) throw new BadRequestException('A teljes tét egy körben legfeljebb ' + this.maxBet + ' CR lehet.');
       const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(amount, playerId, amount);
       if (Number(debit.changes) !== 1) throw new BadRequestException('Nincs elegendő token a fogadáshoz.');
       const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
