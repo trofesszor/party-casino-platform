@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 
 export const denominations = [1, 2, 5, 10];
 export const betUnits = [1, 2, 3, 5, 10];
-export const bellBonus = { trigger: 5, respins: 3 };
+export const bellBonus = { trigger: 5, respins: 3, grandBells: 3, fullBoardMultiplier: 2 };
 export const jackpotStarts = { grand: 2500, major: 600 };
 export const jackpotMultipliers = { minor: 80, mini: 20 };
 export const symbols = [
@@ -18,7 +18,7 @@ export const symbols = [
 ] as const;
 
 export type SymbolId = typeof symbols[number]['id'];
-export type Coin = { value: number; tier?: 'mini' | 'minor' };
+export type Coin = { value: number; tier?: JackpotTier };
 export type Tile = { symbol: SymbolId | 'empty'; coin?: Coin };
 export type Stake = { denomination: number; units: number };
 export type Bonus = { coins: Array<Coin | null>; remaining: number; stake: Stake };
@@ -58,25 +58,51 @@ export function amount(stake: Stake) {
   return stake.denomination * stake.units;
 }
 
-export function drawCoin(stake: Stake): Coin {
-  const special = randomInt(100);
-  if (special < 2) return { value: stake.denomination * jackpotMultipliers.minor, tier: 'minor' };
-  if (special < 9) return { value: stake.denomination * jackpotMultipliers.mini, tier: 'mini' };
+function coinDraw(stake: Stake, existing: Array<Coin | null> = []) {
+  let major = existing.some(coin => coin?.tier === 'major');
+  let grand = existing.filter(coin => coin?.tier === 'grand').length;
   const values = [1, 1, 2, 2, 3, 5, 8];
-  return { value: amount(stake) * values[randomInt(values.length)] };
+  return (): Coin => {
+    const special = randomInt(100);
+    if (special < 2) return { value: stake.denomination * jackpotMultipliers.minor, tier: 'minor' };
+    if (special < 9) return { value: stake.denomination * jackpotMultipliers.mini, tier: 'mini' };
+    if (special === 9 && !major) {
+      major = true;
+      return { value: 0, tier: 'major' };
+    }
+    if (special >= 10 && special < 13 && grand < bellBonus.grandBells) {
+      grand++;
+      return { value: 0, tier: 'grand' };
+    }
+    return { value: amount(stake) * values[randomInt(values.length)] };
+  };
 }
 
-function drawTile(stake: Stake): Tile {
+function drawTile(drawCoin: () => Coin): Tile {
   let draw = randomInt(totalWeight);
   for (const symbol of symbols) {
     draw -= symbol.weight;
-    if (draw < 0) return symbol.id === 'coin' ? { symbol: symbol.id, coin: drawCoin(stake) } : { symbol: symbol.id };
+    if (draw < 0) return symbol.id === 'coin' ? { symbol: symbol.id, coin: drawCoin() } : { symbol: symbol.id };
   }
   throw new Error('Invalid slot symbol weights.');
 }
 
 export function spinGrid(stake: Stake) {
-  return Array.from({ length: 15 }, () => drawTile(stake));
+  const drawCoin = coinDraw(stake);
+  return Array.from({ length: 15 }, () => drawTile(drawCoin));
+}
+
+export function scoreBonus(bells: Coin[], jackpots: typeof jackpotStarts) {
+  const jackpotWins: JackpotWin[] = bells.flatMap(bell =>
+    bell.tier === 'mini' || bell.tier === 'minor' ? [{ tier: bell.tier, amount: bell.value }] : []);
+  if (bells.some(bell => bell.tier === 'major')) jackpotWins.push({ tier: 'major', amount: jackpots.major });
+  if (bells.filter(bell => bell.tier === 'grand').length >= bellBonus.grandBells) {
+    jackpotWins.push({ tier: 'grand', amount: jackpots.grand });
+  }
+  const normalAmount = bells.reduce((sum, bell) => sum + (bell.tier ? 0 : bell.value), 0);
+  const subtotal = jackpotWins.reduce((sum, win) => sum + win.amount, normalAmount);
+  const bonusMultiplier = bells.length === 15 ? bellBonus.fullBoardMultiplier : 1;
+  return { jackpotWins, bonusMultiplier, payoutAmount: subtotal * bonusMultiplier };
 }
 
 export function scoreGrid(grid: Tile[], stake: Stake) {
@@ -96,10 +122,11 @@ export function scoreGrid(grid: Tile[], stake: Stake) {
 
 export function respin(bonus: Bonus): Bonus {
   let added = false;
+  const drawCoin = coinDraw(bonus.stake, bonus.coins);
   const coins = bonus.coins.map(coin => {
     if (coin || randomInt(100) >= 13) return coin;
     added = true;
-    return drawCoin(bonus.stake);
+    return drawCoin();
   });
   return { ...bonus, coins, remaining: added ? bellBonus.respins : bonus.remaining - 1 };
 }

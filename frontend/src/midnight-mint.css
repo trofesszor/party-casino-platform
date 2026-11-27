@@ -403,3 +403,16 @@
   .mint-respin-refill .mint-respin-lit, .mint-bonus .mint-new-bell :is(.mint-symbol, .mint-tile-caption) { animation: none; }
   .mint-respin-ghost { display: none; }
 }
+
+.mint-bonus-progress { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 12px; }
+.mint-machine-head .mint-major-progress { color: #b9ec99; }
+.mint-cell.mint-captioned.major, .mint-bonus .mint-cell.mint-held.major { border-color: #a7e98c; }
+.mint-cell.mint-captioned.grand, .mint-bonus .mint-cell.mint-held.grand { border-color: #ffa799; }
+.mint-cell.major .symbol-coin { filter: hue-rotate(53deg); }
+.mint-cell.grand .symbol-coin { filter: hue-rotate(328deg) saturate(1.6); }
+.mint-cell.major .mint-coin-value small, .mint-cell.grand .mint-coin-value small {
+  color: inherit;
+  font-size: .84em;
+}
+.mint-cell.major .mint-coin-value { color: #c4efb0; }
+.mint-cell.grand .mint-coin-value { color: #ffc4b9; }

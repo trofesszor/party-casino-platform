@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { api } from '../services/api';
 import { socket } from '../services/socket';
 import PlayerWallet from '../components/PlayerWallet.vue';
-import type { SlotBonus, SlotProgressives, SlotSpin, SlotStake, SlotState, SlotTier, SlotTile } from '../types';
+import type { SlotBonus, SlotCoin, SlotProgressives, SlotSpin, SlotStake, SlotState, SlotTier, SlotTile } from '../types';
 
 const playerId = Number(localStorage.getItem('party-player-id')) || 0;
 const rules = ref<SlotState>();
@@ -39,6 +39,8 @@ const canSpin = computed(() => !busy.value && Boolean(rules.value && playerId &&
 const winningPositions = computed(() => new Set(last.value?.wins.flatMap(win => win.positions) ?? []));
 const displayedBonus = computed(() => bonus.value ?? last.value?.finishedBonus ?? null);
 const lockedBells = computed(() => displayedBonus.value?.coins.filter(Boolean).length ?? 0);
+const grandCount = computed(() => displayedBonus.value?.coins.filter(bell => bell?.tier === 'grand').length ?? 0);
+const majorCollected = computed(() => displayedBonus.value?.coins.some(bell => bell?.tier === 'major') ?? false);
 const newBells = ref<number[]>([]);
 const newBellCount = computed(() => newBells.value.length);
 const bellStaggerMs = 38;
@@ -103,9 +105,16 @@ function chooseStake(nextDenomination: number, nextUnits: number) {
   stakeDialog.value?.close();
 }
 
+function bellValue(bell: SlotCoin) {
+  if (bell.tier === 'grand') return null;
+  if (bell.tier !== 'major') return bell.value;
+  return last.value?.jackpotWins.find(win => win.tier === 'major')?.amount ?? jackpots.value?.major ?? null;
+}
 function displayTile(tile: SlotTile) {
   if (!tile.coin) return labels[tile.symbol];
-  return tile.coin.tier ? `Harang · ${tile.coin.tier.toUpperCase()} · ${format(tile.coin.value)} CR` : `Harang · ${format(tile.coin.value)} CR`;
+  const tier = tile.coin.tier ? ' · ' + tierTitle(tile.coin.tier) : '';
+  const value = bellValue(tile.coin);
+  return 'Harang' + tier + (value === null ? '' : ' · ' + format(value) + ' CR');
 }
 function tierTitle(tier: SlotTier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
@@ -214,7 +223,11 @@ onUnmounted(() => {
         <section class="mint-machine" :class="{ 'mint-bonus': displayedBonus }" aria-label="Midnight Mint játékgép">
           <header class="mint-machine-head">
             <h2>{{ displayedBonus ? 'Harangeső' : 'Tárcsák' }}</h2>
-            <span v-if="displayedBonus" class="mint-bell-count">{{ lockedBells }} / 15 harang</span>
+            <div v-if="displayedBonus" class="mint-bonus-progress">
+              <span>{{ lockedBells }} / 15 harang</span>
+              <span v-if="majorCollected" class="mint-major-progress">Major begyűjtve</span>
+              <span>Grand {{ grandCount }} / {{ rules.bellBonus.grandBells }}</span>
+            </div>
             <span v-else-if="freeSpins">{{ freeSpins }} ingyenpörgetés</span>
           </header>
           <div v-if="displayedBonus" class="mint-respin-meter" :class="{ 'mint-respin-refill': newBellCount && bonus }" aria-live="polite">
@@ -232,7 +245,7 @@ onUnmounted(() => {
                 <span :class="['mint-symbol', 'symbol-' + reel[row * 5 + column].symbol]" aria-hidden="true"></span>
                 <strong v-if="reel[row * 5 + column].coin" class="mint-tile-caption mint-coin-value">
                   <small v-if="reel[row * 5 + column].coin?.tier">{{ reel[row * 5 + column].coin?.tier }}</small>
-                  <span>{{ format(reel[row * 5 + column].coin!.value) }} CR</span>
+                  <span v-if="bellValue(reel[row * 5 + column].coin!) !== null">{{ format(bellValue(reel[row * 5 + column].coin!)!) }} CR</span>
                 </strong>
                 <strong v-else-if="reel[row * 5 + column].symbol === 'wild'" class="mint-tile-caption mint-wild-caption">WILD</strong>
               </div>
@@ -254,6 +267,7 @@ onUnmounted(() => {
               <dt>{{ row.label }} <small v-if="row.count > 1">×{{ row.count }}</small></dt>
               <dd>{{ format(row.amount) }} CR</dd>
             </div>
+            <div v-if="last.bonusMultiplier > 1"><dt>Teljes tábla</dt><dd>×{{ last.bonusMultiplier }}</dd></div>
             <div class="mint-payout-total"><dt>Jóváírva összesen</dt><dd>{{ format(last.payoutAmount) }} CR</dd></div>
           </dl>
 
@@ -304,7 +318,7 @@ onUnmounted(() => {
         <details class="mint-rules">
           <summary>Játékszabályok és nyereménytábla</summary>
           <p>A tét a tétegység és a tétszorzó szorzata. A 9 nyerővonal balról jobbra fizet, legalább három egyező jelnél. A Wild a vonalszimbólumokat helyettesíti.</p>
-          <p>Legalább 3 Scatter 5 ingyenpörgetést ad. Legalább {{ rules.bellBonus.trigger }} harang indítja a Harangesőt {{ rules.bellBonus.respins }} díjmentes újrapörgetéssel ugyanazon a mezőn. Minden új harang visszaállítja a számlálót {{ rules.bellBonus.respins }}-ra. Ha három körön át nem érkezik új harang, a bónusz lezárul és jóváírja az összegyűlt értékeket. A lezáráskor 12–14 harang a Major, a teljes 15 mező a Grand jackpotot adja.</p>
+          <p>Legalább 3 Scatter 5 ingyenpörgetést ad. Legalább {{ rules.bellBonus.trigger }} harang indítja a Harangesőt {{ rules.bellBonus.respins }} díjmentes újrapörgetéssel ugyanazon a mezőn. Minden új harang visszaállítja a számlálót {{ rules.bellBonus.respins }}-ra. Ha három körön át nem érkezik új harang, a bónusz lezárul és jóváírja az összegyűlt értékeket. A Majorhoz egy Major harang, a Grandhoz {{ rules.bellBonus.grandBells }} Grand harang kell. Ha mind a 15 mező megtelik, a teljes bónusznyeremény, a megnyert jackpotokkal együtt, {{ rules.bellBonus.fullBoardMultiplier }}×-os szorzót kap.</p>
           <div class="mint-paytable">
             <table><thead><tr><th>Szimbólum</th><th>3 egyező</th><th>4 egyező</th><th>5 egyező</th></tr></thead>
               <tbody><tr v-for="entry in rules.paytable" :key="entry.symbol"><th scope="row">{{ entry.label }}</th><td v-for="(payout, index) in entry.payouts" :key="index">{{ payout }}×</td></tr></tbody>

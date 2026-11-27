@@ -8,14 +8,14 @@ export interface RouletteState { currentRound: RouletteRound | null; bets: Roule
 export type SlotTier = 'grand' | 'major' | 'minor' | 'mini';
 export type SlotProgressives = Record<'grand' | 'major', number>;
 export type SlotStake = { denomination: number; units: number };
-export type SlotCoin = { value: number; tier?: 'minor' | 'mini' };
+export type SlotCoin = { value: number; tier?: SlotTier };
 export type SlotTile = { symbol: 'cherry' | 'lemon' | 'lime' | 'grapes' | 'orange' | 'crescent' | 'wild' | 'scatter' | 'coin' | 'empty'; coin?: SlotCoin };
 export type SlotBonus = { coins: Array<SlotCoin | null>; remaining: number; stake: SlotStake };
 export type SlotState = {
   denominations: number[];
   betUnits: number[];
   jackpotStarts: SlotProgressives;
-  bellBonus: { trigger: number; respins: number };
+  bellBonus: { trigger: number; respins: number; grandBells: number; fullBoardMultiplier: number };
   jackpotMultipliers: Record<'minor' | 'mini', number>;
   lines: number[][];
   paytable: Array<{ symbol: SlotTile['symbol']; label: string; payouts: number[] }>;
@@ -35,5 +35,6 @@ export type SlotSpin = Pick<SlotState, 'jackpots' | 'freeSpins' | 'freeStake' | 
   winLabel: string;
   jackpotWins: Array<{ tier: SlotTier; amount: number }>;
   finishedBonus: SlotBonus | null;
+  bonusMultiplier: number;
   wins: Array<{ line: number; amount: number; positions: number[] }>;
 };

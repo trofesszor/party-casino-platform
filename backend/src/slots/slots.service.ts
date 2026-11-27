@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import type { DatabaseSync } from 'node:sqlite';
 import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
-import { amount, bellBonus, betUnits, denominations, jackpotStarts, respin, scoreGrid, slotRules, spinGrid } from './slots-game';
+import { amount, bellBonus, betUnits, denominations, jackpotStarts, respin, scoreBonus, scoreGrid, slotRules, spinGrid } from './slots-game';
 import type { Bonus, JackpotWin, Stake, Tile } from './slots-game';
 
 const legacyReels: Record<Tile['symbol'], string> = {
@@ -68,7 +68,8 @@ export class SlotsService {
     const stake = bonus?.stake ?? (usedFreeSpin ? freeStake ?? requestedStake : requestedStake);
     const betAmount = amount(stake);
     const jackpots = this.jackpots();
-    const jackpotWins: JackpotWin[] = [];
+    let jackpotWins: JackpotWin[] = [];
+    let bonusMultiplier = 1;
     let payoutAmount = 0;
     let freeSpinsAwarded = 0;
     let paidAmount = 0;
@@ -80,24 +81,7 @@ export class SlotsService {
     if (bonus) {
       bonus = respin(bonus);
       grid = bonus.coins.map(coin => coin ? { symbol: 'coin', coin } : { symbol: 'empty' } as const);
-      const locked = bonus.coins.flatMap(coin => coin ? [coin] : []);
-      if (bonus.remaining === 0 || locked.length === 15) {
-        for (const coin of locked) {
-          if (coin.tier) jackpotWins.push({ tier: coin.tier, amount: coin.value });
-          payoutAmount += coin.value;
-        }
-        const progressive = locked.length === 15 ? 'grand' : locked.length >= 12 ? 'major' : null;
-        if (progressive) {
-          jackpotWins.push({ tier: progressive, amount: jackpots[progressive] });
-          payoutAmount += jackpots[progressive];
-          jackpots[progressive] = jackpotStarts[progressive];
-        }
-        finishedBonus = bonus;
-        bonus = null;
-        winLabel = 'Harangeső lezárva';
-      } else {
-        winLabel = 'Harangeső folyamatban';
-      }
+      winLabel = 'Harangeső folyamatban';
     } else {
       if (usedFreeSpin) {
         freeSpins--;
@@ -128,6 +112,22 @@ export class SlotsService {
       }
     }
 
+    if (bonus) {
+      const locked = bonus.coins.flatMap(coin => coin ? [coin] : []);
+      if (bonus.remaining === 0 || locked.length === 15) {
+        const score = scoreBonus(locked, jackpots);
+        jackpotWins = score.jackpotWins;
+        bonusMultiplier = score.bonusMultiplier;
+        payoutAmount += score.payoutAmount;
+        for (const win of jackpotWins) {
+          if (win.tier === 'major' || win.tier === 'grand') jackpots[win.tier] = jackpotStarts[win.tier];
+        }
+        finishedBonus = bonus;
+        bonus = null;
+        winLabel = 'Harangeső lezárva';
+      }
+    }
+
     if (payoutAmount) this.record(player.id, payoutAmount, 'SLOT_WIN', winLabel);
     sqlite.prepare('UPDATE slot_jackpots SET grand = ?, major = ? WHERE id = 1').run(jackpots.grand, jackpots.major);
     sqlite.prepare(`INSERT INTO slot_player_state (player_id, free_spins, free_stake, bonus_state) VALUES (?, ?, ?, ?)
@@ -138,7 +138,7 @@ export class SlotsService {
       playerId: player.id, playerName: player.name, grid, reels: grid.slice(5, 8).map(tile => legacyReels[tile.symbol]),
       isWin: payoutAmount > 0, multiplier: payoutAmount / betAmount, betAmount, paidAmount,
       payoutAmount, tokenBalance: player.tokenBalance - paidAmount + payoutAmount, winLabel,
-      freeSpinsAwarded, freeSpins, freeStake, usedFreeSpin, stake, jackpots, jackpotWins, bonus, finishedBonus, wins,
+      freeSpinsAwarded, freeSpins, freeStake, usedFreeSpin, stake, jackpots, jackpotWins, bonus, finishedBonus, bonusMultiplier, wins,
       paytable: slotRules.paytable,
     };
   }
