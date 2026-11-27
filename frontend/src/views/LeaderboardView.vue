@@ -35,14 +35,14 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 
     <section class="leaderboard-content">
       <div class="leaderboard-intro">
-        <p class="eyebrow">PARTY CASINO · RANGLISTA</p>
+        
         <h1>Token <span>Leaderboard</span></h1>
         <p class="muted">A játékosok aktuális tokenegyenlege, legtöbbtől a legkevesebbig.</p>
       </div>
 
       <section class="leaderboard-panel panel">
         <header class="leaderboard-panel-heading">
-          <div><p class="eyebrow">JÁTÉKOSOK</p><h2>Ranglista</h2></div>
+          <div><h2>Ranglista</h2></div>
           <span class="leaderboard-count">{{ players.length }} játékos</span>
         </header>
         <div v-if="loading" class="leaderboard-empty">Ranglista betöltése…</div>

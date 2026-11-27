@@ -17,10 +17,10 @@ onMounted(load);
 </script>
 <template>
 <main class="community-page community-admin-page">
-<header class="community-topbar"><a class="brand" href="/">PARTY<span>CASINO</span></a><div><a class="ghost" href="/admin">Admin dashboard</a><a class="ghost" href="/">Kaszinó</a></div></header>
-<section class="community-hero"><p class="eyebrow">ADMIN CONTROL</p><h1>Community <span>Events</span></h1><p class="muted">Közösségi célok, titkos meglepetések és aktiválási előzmények kezelése.</p></section>
+<header class="community-topbar"><a class="brand" href="/">PARTY<span>CASINO</span></a><div><a class="ghost" href="/admin">Vezérlőpult</a><a class="ghost" href="/">Kaszinó</a></div></header>
+<section class="community-hero"><h1>Community <span>Events</span></h1><p class="muted">Közösségi célok, titkos meglepetések és aktiválási előzmények kezelése.</p></section>
 <p v-if="error" class="community-message error">{{error}}</p>
-<section class="panel community-editor"><div class="community-section-heading"><div><p class="eyebrow">{{editingId?'EDIT EVENT':'NEW EVENT'}}</p><h2>{{editingId?'Esemény szerkesztése':'Új közösségi esemény'}}</h2></div><button v-if="editingId" class="ghost" @click="reset">Mégse</button></div>
+<section class="panel community-editor"><div class="community-section-heading"><div><h2>{{editingId?'Esemény szerkesztése':'Új közösségi esemény'}}</h2></div><button v-if="editingId" class="ghost" @click="reset">Mégse</button></div>
 <form @submit.prevent="save" class="community-form">
 <label>Esemény neve<input v-model="form.title" maxlength="80" required placeholder="Everybody Drinks"></label>
 <label>Leírás<textarea v-model="form.description" maxlength="500" rows="3" placeholder="Mi történik, ha feloldjátok?"></textarea></label>
@@ -29,7 +29,7 @@ onMounted(load);
 <label class="community-check"><input v-model="form.active" type="checkbox"> Aktív, hozzájárulást fogad</label>
 <button class="primary" :disabled="busy||!form.title.trim()">{{busy?'Mentés…':editingId?'Módosítások mentése':'Esemény létrehozása'}}</button>
 </form></section>
-<section class="community-section"><div class="community-section-heading"><div><p class="eyebrow">EVENT MANAGEMENT</p><h2>Összes esemény</h2></div><button class="ghost" @click="load">Frissítés</button></div>
+<section class="community-section"><div class="community-section-heading"><div><h2>Összes esemény</h2></div><button class="ghost" @click="load">Frissítés</button></div>
 <article v-for="e in events" :key="e.id" class="panel community-admin-event"><div><div class="community-event-top"><h3>{{e.isSecret?'🔒 ':''}}{{e.title}}</h3><span class="community-event-tag">{{e.completed?'TELJESÍTVE':e.active?'AKTÍV':'INAKTÍV'}}</span></div><p class="muted">{{e.description}}</p><p class="muted">{{fmt(e.currentAmount)}} / {{fmt(e.targetAmount)}} CR · {{e.contributorCount}} támogató · {{e.activationCount}} aktiválás · {{e.repeatMode}}</p></div><div class="community-admin-actions"><button class="ghost" @click="edit(e)">Szerkesztés</button><button class="ghost" @click="toggle(e)">{{e.active?'Szüneteltetés':'Aktiválás'}}</button><button class="primary" @click="activate(e)">Manuális feloldás</button><button class="danger-button" @click="remove(e)">Törlés</button></div></article>
 <div v-if="!events.length" class="panel community-empty">Még nincs esemény létrehozva.</div></section>
 </main>

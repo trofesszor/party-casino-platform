@@ -13,6 +13,7 @@ import VerifyQuestView from './views/VerifyQuestView.vue';
 import CommunityEventsView from './views/CommunityEventsView.vue';
 import AdminCommunityEventsView from './views/AdminCommunityEventsView.vue';
 import './style.css';
+import './casino-theme.css';
 const router = createRouter({ history: createWebHistory(), routes: [
   { path: '/', component: HomeView },
   { path: '/display', component: DisplayView },

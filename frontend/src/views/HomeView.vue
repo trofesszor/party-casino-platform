@@ -269,15 +269,14 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
   <main v-if="!player" class="lobby-login">
     <section class="login-card panel">
       <div class="login-brand"><span class="brand-mark">♣</span><span>PARTY<span>CASINO</span></span></div>
-      <p class="eyebrow">PRIVATE PARTY · PLAYER LOBBY</p>
-      <h1>Ki vagy ma este?</h1>
+
+      <h1>Csatlakozás a kaszinóhoz</h1>
       <p class="muted">Lépj be a neveddel, és csatlakozz a közös kaszinóhoz.</p>
       <form @submit.prevent="enter">
-        <input v-model="name" maxlength="24" placeholder="A neved" autocomplete="nickname" autofocus>
-        <button class="primary lobby-cta" :disabled="busy || !name.trim()">{{ busy ? 'Belépés…' : 'Belépek a kaszinóba →' }}</button>
+        <label class="field-label">Játékosnév<input v-model="name" maxlength="24" placeholder="A neved" autocomplete="nickname" autofocus></label>
+        <button class="primary lobby-cta" :disabled="busy || !name.trim()">{{ busy ? 'Belépés…' : 'Csatlakozás' }}</button>
       </form>
       <p v-if="error" class="error">{{ error }}</p>
-      <div class="login-foot"><span class="online-dot"></span> Helyi party kaszinó · minden játékos ugyanabban a játékban</div>
     </section>
   </main>
 
@@ -286,62 +285,58 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
 
     <section class="lobby-shell">
       <aside class="lobby-rail">
-        <div class="rail-label">PARTY TOOLS</div>
-        <button class="rail-item active" @click="router.push('/')"><span>⌂</span><strong>Lobby</strong></button>
+        <div class="rail-label">Kaszinó</div>
+        <button class="rail-item active" @click="router.push('/')"><span>⌂</span><strong>Előtér</strong></button>
         <div class="rail-label rail-label-games">JÁTÉKOK</div>
-        <button class="rail-item" @click="router.push('/roulette')"><span>◉</span><strong>Rulett</strong><small>LIVE</small></button>
-        <button class="rail-item" @click="router.push('/slots')"><span>✦</span><strong>Slots</strong><small>PLAY</small></button>
-        <button class="rail-item" @click="router.push('/lucky-wheel')"><span>◎</span><strong>Szerencsekerék</strong><small>SHARED</small></button>
+        <button class="rail-item" @click="router.push('/roulette')"><span>◉</span><strong>Rulett</strong></button>
+        <button class="rail-item" @click="router.push('/slots')"><span>✦</span><strong>Slots</strong></button>
+        <button class="rail-item" @click="router.push('/lucky-wheel')"><span>◎</span><strong>Szerencsekerék</strong></button>
         <div class="rail-divider"></div>
         <div class="rail-label">EXTRÁK</div>
         <a class="rail-item" href="/verify-quest"><span>✓</span><strong>Quest PIN</strong></a>
-        <div class="rail-spacer"></div>
-        <div class="rail-party-note"><i></i><span><strong>PARTY LIVE</strong><small>A kaszinó minden játékosa szinkronban van.</small></span></div>
       </aside>
 
       <div class="lobby-main">
         <section class="lobby-hero-card">
-          <div class="hero-art">
-            <div class="hero-orb hero-orb-one"></div>
-            <div class="hero-orb hero-orb-two"></div>
-            <div class="hero-card-shape shape-one">♠</div>
-            <div class="hero-card-shape shape-two">♦</div>
-            <div class="hero-die">7</div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="hero-wheel-art"><span>0</span></div>
+            <div class="hero-chip hero-chip-red">25</div>
+            <div class="hero-chip hero-chip-gold">100</div>
           </div>
           <div class="lobby-hero-copy">
-            <span class="hero-kicker"><i></i> PARTY NIGHT IS LIVE</span>
-            <h1>Üdv a<br><span>kaszinóban.</span></h1>
-            <p>Játssz, kockáztass, hívd ki a többieket, és gyűjtsd a CR-t a ma esti ranglistához.</p>
+            <span class="hero-kicker"><i></i> A kaszinó nyitva</span>
+            <h1>Üdv a <span>kaszinóban!</span></h1>
+            <p>Ülj a rulettasztalhoz, vagy hívd ki a többieket egy párbajra.</p>
             <div class="hero-actions">
               <button class="primary hero-primary" @click="router.push('/roulette')">Rulett megnyitása <span>→</span></button>
-              <button class="hero-secondary" @click="router.push('/leaderboard')">Ranglista <span>↗</span></button>
+              <button class="hero-secondary" @click="router.push('/leaderboard')">Ranglista <span aria-hidden="true">↗︎</span></button>
             </div>
           </div>
           <div class="hero-stats">
-            <div><small>EGYENLEGED</small><strong>{{ tokenBalance.toLocaleString('hu-HU') }}</strong><span>CR TOKEN</span></div>
-            <div><small>AKTÍV PÁRBAJ</small><strong>{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }}</strong><span>CHALLENGE</span></div>
-            <div><small>SIDE QUEST</small><strong>{{ activeSideQuests.length }}/2</strong><span>AKTÍV</span></div>
+            <div><small>Egyenleg</small><strong>{{ tokenBalance.toLocaleString('hu-HU') }}</strong><span>CR</span></div>
+            <div><small>Aktív párbaj</small><strong>{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }}</strong></div>
+            <div><small>Küldetés</small><strong>{{ activeSideQuests.length }}/2</strong></div>
           </div>
         </section>
 
         <section class="lobby-section">
           <div class="lobby-section-head">
-            <div><span class="section-overline">CASINO FLOOR</span><h2>Válassz játékot</h2></div>
-            <span class="section-count">3 JÁTÉK · LIVE</span>
+            <div><h2>Válassz játékot</h2></div>
+      
           </div>
           <div class="lobby-game-grid">
             <button class="lobby-game-card roulette-card" @click="router.push('/roulette')">
-              <div class="game-glow"></div><span class="game-card-badge">LIVE · MULTIPLAYER</span>
+        
               <div class="game-art roulette-art"><span>0</span><b>R</b></div>
-              <div class="game-card-copy"><h3>European Roulette</h3><p>Közös asztal · mindenki ugyanazt az eredményt látja.</p><strong>Játék →</strong></div>
+              <div class="game-card-copy"><h3>Európai rulett</h3><p>Közös asztal · mindenki ugyanazt az eredményt látja.</p><strong>Játék →</strong></div>
             </button>
             <button class="lobby-game-card slots-card" @click="router.push('/slots')">
-              <div class="game-glow"></div><span class="game-card-badge">PERSONAL GAME</span>
+        
               <div class="game-art slots-art"><span>7</span><span>★</span><span>7</span></div>
               <div class="game-card-copy"><h3>Lucky Slots</h3><p>Pörgess saját gépet, és próbáld megütni a nagy nyereményt.</p><strong>Játék →</strong></div>
             </button>
             <button class="lobby-game-card wheel-card" @click="router.push('/lucky-wheel')">
-              <div class="game-glow"></div><span class="game-card-badge">SHARED · PARTY</span>
+        
               <div class="game-art wheel-art"><span>✦</span></div>
               <div class="game-card-copy"><h3>Szerencsekerék</h3><p>Egy pörgetés, egy eredmény, mindenki együtt nézi.</p><strong>Kerék megnyitása →</strong></div>
             </button>
@@ -350,30 +345,30 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
 
         <section class="lobby-feature-row">
           <button class="feature-tile events-tile" @click="router.push('/community-events')">
-            <div class="feature-tile-art">✦</div><div><span class="section-overline">COMMUNITY</span><h3>Community Events</h3><p>Közösen gyűjtitek össze a tokeneket a következő party unlockhoz.</p><strong>Felfedezés →</strong></div>
+            <div class="feature-tile-art">✦</div><div><h3>Közösségi események</h3><p>Közösen gyűjtitek össze a tokeneket a következő party unlockhoz.</p><strong>Felfedezés →</strong></div>
           </button>
           <button class="feature-tile shop-tile" @click="router.push('/shop')">
-            <div class="feature-tile-art">◇</div><div><span class="section-overline">MARKET</span><h3>Party Shop</h3><p>Quest skip, kaparós sorsjegy és további tárgyak CR-ért.</p><strong>Shop megnyitása →</strong></div>
+            <div class="feature-tile-art">◇</div><div><h3>Kaszinóbolt</h3><p>Quest skip, kaparós sorsjegy és további tárgyak CR-ért.</p><strong>Shop megnyitása →</strong></div>
           </button>
         </section>
 
         <section v-if="tokenPhotoStatus?.enabled && (tokenPhotoStatus.eligible || tokenPhotoStatus.pending || tokenPhotoSession || tokenPhotoMessage)" class="token-photo-reward panel lobby-reward-card">
           <div class="reward-icon">✦</div>
-          <div><span class="section-overline">SNAPPIN · BONUS</span><h3>Fotóért tokeneket?</h3><p>Ha az egyenleged {{tokenPhotoStatus.balanceThreshold}} CR alatt van, egy fotófeltöltéssel <strong>+{{tokenPhotoStatus.rewardAmount}} CR</strong>-t szerezhetsz.</p><small>Napi lehetőség: {{tokenPhotoStatus.dailyRemaining}} / {{tokenPhotoStatus.dailyLimit}} · Várakozás: {{tokenPhotoStatus.cooldownMinutes}} perc</small></div>
+          <div><h3>Fotóért tokeneket?</h3><p>Ha az egyenleged {{tokenPhotoStatus.balanceThreshold}} CR alatt van, egy fotófeltöltéssel <strong>+{{tokenPhotoStatus.rewardAmount}} CR</strong>-t szerezhetsz.</p><small>Napi lehetőség: {{tokenPhotoStatus.dailyRemaining}} / {{tokenPhotoStatus.dailyLimit}} · Várakozás: {{tokenPhotoStatus.cooldownMinutes}} perc</small></div>
           <div class="reward-action"><button class="primary" :disabled="tokenPhotoBusy || !tokenPhotoStatus.eligible || !!tokenPhotoSession" @click="startTokenPhotoUpload">{{tokenPhotoBusy?'Indítás…':tokenPhotoSession?'Feltöltés folyamatban…':tokenPhotoStatus.eligible?'Fotó feltöltése · +'+tokenPhotoStatus.rewardAmount+' CR':tokenPhotoStatus.pending?'Feltöltés folyamatban…':tokenPhotoStatus.reason==='COOLDOWN'?'Várakozás…':tokenPhotoStatus.reason==='DAILY_LIMIT'?'Napi limit elérve':'Nem elérhető'}}</button><small v-if="tokenPhotoStatus.pending">Már van aktív feltöltésed.</small></div>
           <p v-if="tokenPhotoMessage" class="token-photo-message">{{tokenPhotoMessage}}</p>
         </section>
 
         <section class="lobby-section activity-section">
           <div class="lobby-section-head">
-            <div><span class="section-overline">PARTY ACTIVITY</span><h2>Mi történik most?</h2></div>
-            <span class="live-pill"><i></i> LIVE</span>
+            <div><h2>Párbajok és küldetések</h2></div>
+      
           </div>
           <div class="activity-grid">
             <section class="activity-card panel">
-              <header class="activity-card-head"><div><span class="section-overline">CHALLENGES</span><h3>Párbajok</h3></div><span class="activity-count">{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }} AKTÍV</span></header>
+              <header class="activity-card-head"><div><h3>Párbajok</h3></div><span class="activity-count">{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }} AKTÍV</span></header>
               <div class="duel-challenge-bar">
-                <select v-model.number="duelOpponentId"><option value="">Válassz ellenfelet…</option><option v-for="p in onlinePlayers.filter(p=>p.id!==player?.id)" :key="p.id" :value="p.id">{{ p.name }}</option></select>
+                <select v-model.number="duelOpponentId" aria-label="Párbajellenfél"><option value="">Válassz ellenfelet…</option><option v-for="p in onlinePlayers.filter(p=>p.id!==player?.id)" :key="p.id" :value="p.id">{{ p.name }}</option></select>
                 <button class="primary" :disabled="duelBusy || !duelOpponentId" @click="challengePlayer">Kihívás</button>
               </div>
               <p v-if="duelError" class="error">{{ duelError }}</p>
@@ -390,7 +385,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
             </section>
 
             <section class="quest-verify-inline panel">
-              <div class="quest-verify-inline-head"><span class="quest-verify-icon">✓</span><div><span class="section-overline">VERIFICATION</span><h3>Másik játékos küldetésének ellenőrzése</h3><p>Írd be a 3 jegyű PIN-kódot a teljesítés jóváhagyásához.</p></div></div>
+              <div class="quest-verify-inline-head"><span class="quest-verify-icon">✓</span><div><h3>Másik játékos küldetésének ellenőrzése</h3><p>Írd be a 3 jegyű PIN-kódot a teljesítés jóváhagyásához.</p></div></div>
               <form v-if="!verifierQuest && !verifierResult" class="quest-verify-inline-form" @submit.prevent="lookupVerifierPin">
                 <input v-model="verifierPin" inputmode="numeric" autocomplete="one-time-code" maxlength="3" pattern="[0-9]{3}" placeholder="000" aria-label="Háromjegyű PIN-kód">
                 <button class="primary" :disabled="verifierBusy || verifierPin.length!==3">{{verifierBusy?'Ellenőrzés…':'PIN ellenőrzése'}}</button>
@@ -399,7 +394,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
               <div v-if="verifierResult" class="quest-verify-result"><strong>✓ Visszaigazolás rögzítve</strong><span>{{verifierResult}}</span><button class="ghost" @click="resetVerifierPin">Új PIN</button></div>
               <p v-if="verifierError" class="error">{{verifierError}}</p>
             </section><section class="activity-card panel quest-activity-card">
-              <header class="activity-card-head"><div><span class="section-overline">EXTRA CHALLENGES</span><h3>Side quests</h3></div><span class="quest-counter">{{activeSideQuests.length}} / 2</span></header>
+              <header class="activity-card-head"><div><h3>Küldetések</h3></div><span class="quest-counter">{{activeSideQuests.length}} / 2</span></header>
               <div v-if="activeSideQuests.length" class="quest-mini-list">
                 <article v-for="(quest,index) in activeSideQuests" :key="quest.id" class="quest-mini">
                   <div class="quest-mini-number">0{{index+1}}</div><div class="quest-mini-copy"><strong>{{quest.title}}</strong><p>{{quest.description}}</p><small>{{quest.photoEnabled?'📷 FOTO':'✓ PIN ELLENŐRZÉS'}}</small></div>
@@ -420,7 +415,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
     <div v-if="tokenPhotoSession" class="quest-qr-overlay" @click.self="tokenPhotoSession=null">
       <section class="quest-qr-modal panel photo-quest-modal camera-embed-modal">
         <button class="ghost quest-qr-close" @click="tokenPhotoSession=null">✕</button>
-        <p class="eyebrow">SNAPPIN · TOKEN REWARD</p><h2>Fotófeltöltés</h2>
+        <h2>Fotófeltöltés</h2>
         <p class="muted">Töltsd fel a fotót a Snappin kameráján keresztül. Sikeres ellenőrzés után jóváírjuk a jutalmat.</p>
         <div class="camera-embed-fallback"><p>A Snappin kamerát külön böngészőlapon kell megnyitni a biztonságos feltöltéshez.</p><a class="primary photo-camera-link" :href="tokenPhotoSession.cameraUrl" target="_blank" rel="noopener noreferrer">Snappin kamera megnyitása ↗</a></div>
         <span class="photo-upload-wait"><span class="online-dot"></span> Feltöltés ellenőrzése…</span>
@@ -430,7 +425,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
     <div v-if="photoSession" class="quest-qr-overlay" @click.self="closePhotoSession">
       <section class="quest-qr-modal panel photo-quest-modal">
         <button class="ghost quest-qr-close" @click="closePhotoSession">✕</button>
-        <p class="eyebrow">SNAPPIN PHOTO VERIFICATION</p><h2>{{ photoSession.title }}</h2>
+        <h2>{{ photoSession.title }}</h2>
         <p class="muted">Készítsd el és töltsd fel a küldetés bizonyítékát a beágyazott Snappin kamerában.</p>
         <div class="camera-embed-fallback"><p>A Snappin kamerát külön böngészőlapon kell megnyitni a biztonságos feltöltéshez.</p><a class="primary photo-camera-link" :href="photoSession.cameraUrl" target="_blank" rel="noopener noreferrer">Snappin kamera megnyitása ↗</a></div>
         <small class="muted">Automatikusan ellenőrizzük a feltöltést. Lejárat: {{ new Date(photoSession.expiresAt).toLocaleTimeString() }}</small>

@@ -101,7 +101,7 @@ onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInter
  <main class="lucky-wheel-page">
   <CasinoHeader />
   <section class="lucky-wheel-content">
-   <p class="eyebrow">PARTY CHALLENGE</p><h1>Szerencse<span>kerék</span></h1>
+   <h1>Szerencse<span>kerék</span></h1>
    <p class="muted wheel-subtitle">Egy kerék, egy pörgetés, mindenki ugyanazt látja.</p>
    <section class="wheel-stage panel">
     <div class="wheel-pointer"></div>

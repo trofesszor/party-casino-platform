@@ -44,9 +44,9 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
 <template>
   <main class="community-page">
     <CasinoHeader />
-    <section class="community-hero"><p class="eyebrow">WORK TOGETHER · UNLOCK TOGETHER</p><h1>Community <span>Events</span></h1><p class="muted">A közösség együtt gyűjti össze a tokeneket, hogy feloldja a következő közös élményt.</p></section>
+    <section class="community-hero"><h1>Community <span>Events</span></h1><p class="muted">A közösség együtt gyűjti össze a tokeneket, hogy feloldja a következő közös élményt.</p></section>
     <p v-if="message" class="community-message success">{{message}}</p><p v-if="error" class="community-message error">{{error}}</p>
-    <section class="community-section"><div class="community-section-heading"><div><p class="eyebrow">LIVE FUNDRAISERS</p><h2>Aktív események</h2></div><span>{{events.length}} AKTÍV</span></div>
+    <section class="community-section"><div class="community-section-heading"><div><h2>Aktív események</h2></div><span>{{events.length}} AKTÍV</span></div>
       <div v-if="!events.length" class="panel community-empty">Jelenleg nincs aktív közösségi esemény. Nézz vissza később!</div>
       <article v-for="event in events" :key="event.id" class="panel community-event-card">
         <template v-if="event.isSecret">
@@ -59,15 +59,15 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
         </template>
         <div class="community-progress"><span :style="{width:percent(event)+'%'}"></span></div>
         <div class="community-progress-meta"><strong>{{fmt(event.currentAmount)}} <small>/ {{fmt(event.targetAmount)}} CR</small></strong><span>{{event.contributorCount}} támogató</span></div>
-        <div class="community-contribute" v-if="canJoin"><input v-model.number="amounts[event.id]" type="number" min="1" :max="balance" placeholder="Token mennyiség"><button class="primary" :disabled="busyId===event.id||balance<1" @click="contribute(event)">{{busyId===event.id?'Küldés…':'Hozzájárulás →'}}</button></div>
+        <div class="community-contribute" v-if="canJoin"><input v-model.number="amounts[event.id]" type="number" min="1" :max="balance" placeholder="Tokenmennyiség" aria-label="Hozzájárulás tokenben"><button class="primary" :disabled="busyId===event.id||balance<1" @click="contribute(event)">{{busyId===event.id?'Küldés…':'Hozzájárulás →'}}</button></div>
         <p v-else class="muted">A hozzájáruláshoz lépj be játékosként.</p>
         <button v-if="!event.isSecret" class="community-history-link" @click="showHistory(event)">Hozzájárulások és előzmények →</button>
       </article>
     </section>
-    <section class="community-section"><div class="community-section-heading"><div><p class="eyebrow">UNLOCKED</p><h2>Legutóbb feloldva</h2></div></div>
+    <section class="community-section"><div class="community-section-heading"><div><h2>Legutóbb feloldva</h2></div></div>
       <div v-if="!activations.length" class="panel community-empty">Még nem oldottatok fel közösségi eseményt.</div>
       <article v-for="activation in activations" :key="activation.id" class="panel community-activation"><span>✦</span><div><h3>{{activation.title}}</h3><p>{{activation.description}}</p><small>{{fmt(activation.totalContributions)}} CR · {{activation.participantCount}} résztvevő · {{new Date(activation.activatedAt+'Z').toLocaleString('hu-HU')}}</small></div></article>
     </section>
-    <div v-if="history" class="community-modal-backdrop" @click.self="history=null"><section class="panel community-history-modal"><button class="ghost community-modal-close" @click="history=null">Bezárás</button><p class="eyebrow">EVENT HISTORY</p><h2>{{history.title}}</h2><h3>Top támogatók</h3><p v-for="(p,i) in history.leaderboard" :key="p.playerName" class="muted">#{{i+1}} {{p.playerName}} · {{fmt(p.totalAmount)}} CR</p><h3>Aktiválások</h3><p v-for="a in history.activations" :key="a.id" class="muted">{{new Date(a.activatedAt+'Z').toLocaleString('hu-HU')}} · {{fmt(a.totalContributions)}} CR · {{a.participantCount}} fő</p><h3>Legutóbbi hozzájárulások</h3><p v-for="c in history.contributions" :key="c.id" class="muted">{{c.playerName}} · {{fmt(c.amount)}} CR</p></section></div>
+    <div v-if="history" class="community-modal-backdrop" @click.self="history=null"><section class="panel community-history-modal"><button class="ghost community-modal-close" @click="history=null">Bezárás</button><h2>{{history.title}}</h2><h3>Top támogatók</h3><p v-for="(p,i) in history.leaderboard" :key="p.playerName" class="muted">#{{i+1}} {{p.playerName}} · {{fmt(p.totalAmount)}} CR</p><h3>Aktiválások</h3><p v-for="a in history.activations" :key="a.id" class="muted">{{new Date(a.activatedAt+'Z').toLocaleString('hu-HU')}} · {{fmt(a.totalContributions)}} CR · {{a.participantCount}} fő</p><h3>Legutóbbi hozzájárulások</h3><p v-for="c in history.contributions" :key="c.id" class="muted">{{c.playerName}} · {{fmt(c.amount)}} CR</p></section></div>
   </main>
 </template>

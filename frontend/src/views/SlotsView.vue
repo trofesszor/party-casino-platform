@@ -90,16 +90,15 @@ async function spin() {
 
     <section class="slot-machine-content">
       <div class="slot-heading">
-        <p class="eyebrow">CLASSIC CASINO · 3 REEL SLOT</p>
         <h1>LUCKY <span>7</span></h1>
-        <p class="muted">A saját géped. A saját pörgetésed. Próbáld ki a szerencséd.</p>
+        <p class="muted">Válassz tétet, és pörgesd meg a tárcsákat.</p>
       </div>
 
       <div class="slot-cabinet" :class="{ 'is-spinning': busy, 'is-winning': result.startsWith('JACKPOT') }">
         <div class="slot-top-lights"><i v-for="n in 13" :key="n"></i></div>
         <div class="slot-marquee">
           <span class="marquee-star">✦</span>
-          <div><small>PARTY CASINO PRESENTS</small><strong>LUCKY <b>7</b></strong><em>★ ★ ★ WIN BIG ★ ★ ★</em></div>
+          <div><strong>LUCKY <b>7</b></strong></div>
           <span class="marquee-star">✦</span>
         </div>
         <div class="slot-side-bolts"><i></i><i></i></div>
@@ -113,22 +112,21 @@ async function spin() {
               <div class="slot-reel-reflection"></div>
             </div>
           </div>
-          <div class="slot-payline"><span>◆</span><b>WIN LINE</b><span>◆</span></div>
+          <div class="slot-payline"><span>◆</span><b>Nyerővonal</b><span>◆</span></div>
         </div>
         <div class="slot-bet-selector">
-          <div><span class="eyebrow">SELECT YOUR BET</span><small>Choose a stake for this spin</small></div>
+          <strong>Tét kiválasztása</strong>
           <div class="slot-bet-options">
             <button v-for="amount in betOptions" :key="amount" :class="{ active: selectedBet === amount }" :disabled="busy" @click="selectedBet = amount">{{ amount }}<small>CR</small></button>
           </div>
         </div>
         <div class="slot-lower-panel">
-          <div class="slot-status-screen"><span class="status-dot"></span>{{ busy ? 'REELS IN MOTION' : result ? (winMultiplier > 0 ? 'WINNER!' : 'GOOD LUCK NEXT TIME') : 'INSERT YOUR LUCK' }}<small>YOUR TOKENS: {{ tokenBalance }}</small></div>
+          <div class="slot-status-screen"><span class="status-dot"></span>{{ busy ? 'Pörög…' : result ? (winMultiplier > 0 ? 'Nyeremény!' : 'Most nem nyertél') : 'Pörgetésre kész' }}<small>Egyenleg: {{ tokenBalance }}</small></div>
           <button class="slot-spin-button" :disabled="busy || !canPlay" @click="spin">
             <span class="spin-button-icon">{{ busy ? '⟳' : '★' }}</span>
-            <strong>{{ busy ? 'SPINNING' : 'SPIN' }}</strong>
-            <small>{{ busy ? 'GOOD LUCK' : 'PULL TO PLAY' }}</small>
+            <strong>{{ busy ? 'Pörgetés…' : 'Pörgetés' }}</strong>
           </button>
-          <div class="slot-side-display"><span>FREE SPINS</span><strong>{{ freeSpins }}</strong><span>SPINS: {{ spinCount }}</span></div>
+          <div class="slot-side-display"><span>Ingyenpörgetés</span><strong>{{ freeSpins }}</strong><span>Pörgetések: {{ spinCount }}</span></div>
         </div>
         <div class="slot-bottom-lights"><i v-for="n in 13" :key="n"></i></div>
       </div>
@@ -138,11 +136,11 @@ async function spin() {
       <p v-else class="slot-current-bet">Current bet: <strong>{{ selectedBet }} CR</strong> · Balance: <strong>{{ tokenBalance }} CR</strong><span v-if="freeSpins"> · Free spin available (no stake deducted)</span></p>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="!canPlay" class="muted small slot-login-hint">A játékhoz először lépj be a főoldalon.</p>
-      <div class="slot-paytable">
-        <p class="eyebrow">PAYTABLE · MULTIPLIERS</p>
+      <section class="slot-paytable" aria-labelledby="slot-paytable-title">
+        <h2 id="slot-paytable-title">Nyereménytábla</h2>
         <div class="slot-paytable-rows"><div v-for="item in paytable" :key="item.combination"><span>{{ item.combination }}</span><strong>{{ item.multiplier }}×</strong></div></div>
-        <small>⭐ Wild substitutes for regular symbols · 🪙 Bonus awards 5 free spins</small>
-      </div>
+        <small>⭐ A csillag helyettesíti a normál szimbólumokat. 🪙 A bónusz 5 ingyenpörgetést ad.</small>
+      </section>
     </section>
   </main>
 </template>

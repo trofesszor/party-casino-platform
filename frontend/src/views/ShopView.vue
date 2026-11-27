@@ -89,7 +89,7 @@ onMounted(refresh);
     <CasinoHeader />
 
     <section class="shop-intro">
-      <p class="eyebrow">PARTY CASINO · EXTRÁK</p>
+      
       <h1>Játékos <span>shop.</span></h1>
       <p class="muted">Vásárolj hasznos tárgyakat a játék során szerzett CR tokenekből.</p>
     </section>
@@ -98,7 +98,7 @@ onMounted(refresh);
     <p v-if="notice" class="shop-message shop-notice">{{ notice }}</p>
 
     <section class="shop-section">
-      <div class="shop-section-heading"><div><p class="eyebrow">KÍNÁLAT</p><h2>Elérhető tárgyak</h2></div><span>{{ items.length }} TERMÉK</span></div>
+      <div class="shop-section-heading"><div><h2>Elérhető tárgyak</h2></div><span>{{ items.length }} TERMÉK</span></div>
       <article v-for="item in items" :key="item.itemKey" class="shop-item panel">
         <div class="shop-item-icon"><span v-if="item.itemKey === 'SCRATCH_TICKET'">🎟️</span><span v-else>⏭</span></div>
         <div class="shop-item-copy">
@@ -116,7 +116,7 @@ onMounted(refresh);
     </section>
 
     <section class="shop-section inventory-section">
-      <div class="shop-section-heading"><div><p class="eyebrow">SAJÁT TÁRGYAK</p><h2>Készlet és használat</h2></div><span>{{ questSkipItem?.quantity ?? 0 }} KÜLDETÉS KIHAGYÁS</span></div>
+      <div class="shop-section-heading"><div><h2>Készlet és használat</h2></div><span>{{ questSkipItem?.quantity ?? 0 }} KÜLDETÉS KIHAGYÁS</span></div>
       <div v-if="!questSkipItem?.quantity" class="shop-empty panel">Még nincs használható tárgyad. Vásárolj egy küldetéskihagyást a fenti shopban.</div>
       <template v-else>
         <p class="shop-inventory-note">Válaszd ki, melyik aktív side questet szeretnéd kihagyni. Minden használat 1 tárgyba kerül.</p>
@@ -129,7 +129,7 @@ onMounted(refresh);
     </section>
 
     <section v-if="scratchTickets.length" class="shop-section scratch-inventory-section">
-      <div class="shop-section-heading"><div><p class="eyebrow">SORJEGYEK</p><h2>Sorsjegyeid</h2></div><span>{{ scratchTickets.filter(ticket=>ticket.status==='UNSCRATCHED').length }} FELKAPARATLAN</span></div>
+      <div class="shop-section-heading"><div><h2>Sorsjegyeid</h2></div><span>{{ scratchTickets.filter(ticket=>ticket.status==='UNSCRATCHED').length }} FELKAPARATLAN</span></div>
       <div class="scratch-ticket-list"><button v-for="ticket in scratchTickets" :key="ticket.id" class="scratch-ticket-mini" @click="openScratchTicket(ticket)"><span>✦</span><strong>{{ ticket.status==='UNSCRATCHED'?'LEKAPARÁSRA VÁR':'FELFEDVE' }}</strong><small>#{{ ticket.id }}</small></button></div>
     </section>
     <div v-if="activeTicket" class="scratch-overlay" @click.self="activeTicket=null">

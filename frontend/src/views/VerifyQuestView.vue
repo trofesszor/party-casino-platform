@@ -40,7 +40,7 @@ function reset() { pin.value = ''; quest.value = null; result.value = ''; error.
   <main class="page-shell login-shell">
     <section class="panel login-panel quest-verification-panel">
       <a class="brand" href="/">PARTY<span>CASINO</span></a>
-      <p class="eyebrow">SIDE QUEST VERIFICATION</p>
+      
       <template v-if="result">
         <h1>Visszaigazolás rögzítve</h1>
         <p class="muted">{{ result }}</p>

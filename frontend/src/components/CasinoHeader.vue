@@ -42,27 +42,29 @@ onUnmounted(() => {
 
 <template>
   <header class="casino-header casino-global-header">
-    <a class="casino-brand" href="/"><span class="brand-mark">♣</span><span><strong>PARTY CASINO</strong><em>PRIVATE PARTY GAMING</em></span></a>
-    <nav class="casino-nav desktop-casino-nav">
-      <a href="/" :class="{ active: activePath === '/' }">Lobby</a>
-      <a href="/community-events" :class="{ active: activePath === '/community-events' }">Events</a>
-      <a href="/leaderboard" :class="{ active: activePath === '/leaderboard' }">Leaderboard</a>
-      <a href="/shop" :class="{ active: activePath === '/shop' }">Shop</a>
+    <a class="casino-brand" href="/"><span class="brand-mark">♣</span><span><strong>PARTY CASINO</strong></span></a>
+    <nav class="casino-nav desktop-casino-nav" aria-label="Kaszinó menü">
+      <a href="/" :class="{ active: activePath === '/' }">Előtér</a>
+      <a href="/community-events" :class="{ active: activePath === '/community-events' }">Események</a>
+      <a href="/leaderboard" :class="{ active: activePath === '/leaderboard' }">Ranglista</a>
+      <a href="/shop" :class="{ active: activePath === '/shop' }">Bolt</a>
     </nav>
     <div class="header-player">
       <div v-if="playerName" class="header-avatar">{{ playerName.slice(0,1).toUpperCase() }}</div>
-      <div v-if="playerName" class="header-player-copy"><strong>{{ playerName }}</strong><small>ONLINE</small></div>
+      <div v-if="playerName" class="header-player-copy"><strong>{{ playerName }}</strong></div>
       <button v-if="playerId" class="header-balance" @click="router.push('/leaderboard')"><span>◈</span>{{ balance.toLocaleString('hu-HU') }} <small>CR</small></button>
-      <button class="mobile-menu-button" aria-label="Menü" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">☰</button>
+      <button class="mobile-menu-button" aria-label="Menü" aria-controls="casino-mobile-menu" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><span class="menu-glyph" aria-hidden="true"></span></button>
       <button v-if="playerId" class="header-exit" @click="logout">Kilépés</button>
     </div>
-    <div v-if="menuOpen" class="mobile-casino-menu" @click="closeMenu">
-      <a href="/">Lobby</a>
-      <a href="/community-events">Events</a>
-      <a href="/leaderboard">Leaderboard</a>
-      <a href="/shop">Shop</a>
+    <Transition name="casino-menu">
+    <nav v-if="menuOpen" id="casino-mobile-menu" class="mobile-casino-menu" aria-label="Kaszinó menü" @click="closeMenu">
+      <a href="/">Előtér</a>
+      <a href="/community-events">Események</a>
+      <a href="/leaderboard">Ranglista</a>
+      <a href="/shop">Bolt</a>
       <a href="/verify-quest" class="mobile-quest-link">✓ Quest PIN ellenőrzés</a>
       <button v-if="playerId" class="mobile-menu-logout" @click.stop="logout">Kilépés</button>
-    </div>
+    </nav>
+    </Transition>
   </header>
 </template>
