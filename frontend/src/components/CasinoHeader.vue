@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api } from '../services/api';
+import { rouletteDisplayBalance } from '../services/roulette-balance';
 import { identifyPlayer } from '../services/socket';
 
 const route = useRoute();
@@ -9,6 +10,7 @@ const router = useRouter();
 const playerId = ref(Number(localStorage.getItem('party-player-id')) || 0);
 const playerName = ref(localStorage.getItem('party-player-name') || '');
 const balance = ref(0);
+const shownBalance = computed(() => route.path === '/roulette' ? rouletteDisplayBalance.value ?? balance.value : balance.value);
 const menuOpen = ref(false);
 const links = [
   { path: '/', label: 'Játékok' },
@@ -61,7 +63,7 @@ onUnmounted(() => {
       </nav>
       <div class="masthead-account">
         <span v-if="playerName" class="masthead-name">{{ playerName }}</span>
-        <RouterLink v-if="playerId" to="/leaderboard" class="masthead-balance" aria-label="Egyenleg és ranglista">{{ balance.toLocaleString('hu-HU') }} <small>CR</small></RouterLink>
+        <RouterLink v-if="playerId" to="/leaderboard" class="masthead-balance" aria-label="Egyenleg és ranglista">{{ shownBalance.toLocaleString('hu-HU') }} <small>CR</small></RouterLink>
         <button v-if="playerId" class="masthead-exit" @click="logout">Kilépés</button>
         <button class="mobile-menu-button masthead-toggle" type="button" :aria-label="menuOpen ? 'Menü bezárása' : 'Menü megnyitása'" aria-controls="casino-mobile-menu" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><span class="menu-glyph" aria-hidden="true"></span></button>
       </div>

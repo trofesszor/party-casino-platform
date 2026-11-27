@@ -41,6 +41,9 @@ const displayedBonus = computed(() => bonus.value ?? last.value?.finishedBonus ?
 const lockedBells = computed(() => displayedBonus.value?.coins.filter(Boolean).length ?? 0);
 const newBells = ref<number[]>([]);
 const newBellCount = computed(() => newBells.value.length);
+const bellStaggerMs = 38;
+const bellFallMs = 610;
+const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 const jackpotCards = computed<Array<{ tier: SlotTier; amount: number; progressive: boolean }>>(() => {
   if (!rules.value || !jackpots.value) return [];
   return [
@@ -99,7 +102,7 @@ async function animate(grid: SlotTile[], held: readonly boolean[]) {
     return;
   }
   for (const column of columns) {
-    await new Promise<void>(resolve => setTimeout(resolve, column === 0 ? 290 : 115));
+    await wait(column === 0 ? 290 : 115);
     if (!mounted) return;
     rolling.value[column] = false;
     for (const row of rows) {
@@ -130,11 +133,13 @@ async function spin() {
   try {
     const reply = await api.spinSlots(playerId, effectiveStake.value);
     if (!mounted) return;
-    await animate(reply.grid, held);
-    if (!mounted) return;
     const feature = reply.bonus ?? reply.finishedBonus;
+    const incoming = feature?.coins.flatMap((coin, index) => coin && !held[index] ? [index] : []) ?? [];
+    const stagingGrid: SlotTile[] = reply.grid.map((tile, index) => incoming.includes(index) ? { symbol: 'empty' } : tile);
+    await animate(stagingGrid, held);
+    if (!mounted) return;
     reel.value = feature ? bonusGrid(feature) : reply.grid;
-    if (feature) newBells.value = feature.coins.flatMap((coin, index) => coin && !held[index] ? [index] : []);
+    newBells.value = incoming;
     bonus.value = reply.bonus;
     freeSpins.value = reply.freeSpins;
     freeStake.value = reply.freeStake;
@@ -142,6 +147,9 @@ async function spin() {
     jackpots.value = pendingJackpots ?? reply.jackpots;
     last.value = reply;
     window.dispatchEvent(new Event('party-player-changed'));
+    if (incoming.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      await wait(bellFallMs + (incoming.length - 1) * bellStaggerMs);
+    }
   } catch (cause) {
     if (!mounted) return;
     reel.value = before;
@@ -203,7 +211,8 @@ onUnmounted(() => {
           </div>
           <div class="mint-reels" :aria-busy="busy">
             <div v-for="column in columns" :key="column" class="mint-reel" :class="{ rolling: rolling[column] }">
-              <div v-for="row in rows" :key="row" :class="['mint-cell', reel[row * 5 + column].coin?.tier, { 'mint-winning': !displayedBonus && winningPositions.has(row * 5 + column), 'mint-held': displayedBonus?.coins[row * 5 + column], 'mint-new-bell': newBells.includes(row * 5 + column), 'mint-captioned': reel[row * 5 + column].coin || reel[row * 5 + column].symbol === 'wild' }]" role="img" :aria-label="displayTile(reel[row * 5 + column])">
+              <div v-for="row in rows" :key="row" :class="['mint-cell', reel[row * 5 + column].coin?.tier, { 'mint-winning': !displayedBonus && winningPositions.has(row * 5 + column), 'mint-held': displayedBonus?.coins[row * 5 + column], 'mint-new-bell': newBells.includes(row * 5 + column), 'mint-captioned': reel[row * 5 + column].coin || reel[row * 5 + column].symbol === 'wild' }]" role="img" :aria-label="displayTile(reel[row * 5 + column])"
+                :style="{ '--mint-fall-delay': Math.max(0, newBells.indexOf(row * 5 + column)) * bellStaggerMs + 'ms', '--mint-fall-duration': bellFallMs + 'ms' }">
                 <span :class="['mint-symbol', 'symbol-' + reel[row * 5 + column].symbol]" aria-hidden="true"></span>
                 <strong v-if="reel[row * 5 + column].coin" class="mint-tile-caption mint-coin-value">
                   <small v-if="reel[row * 5 + column].coin?.tier">{{ reel[row * 5 + column].coin?.tier }}</small>

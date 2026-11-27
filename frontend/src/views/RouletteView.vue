@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { api } from '../services/api';
+import { rouletteDisplayBalance } from '../services/roulette-balance';
 import { socket } from '../services/socket';
 import type { RouletteBet, RouletteBetType, RouletteState } from '../types';
 import PlayerWallet from '../components/PlayerWallet.vue';
@@ -16,7 +17,9 @@ const now = ref(Date.now());
 const error = ref('');
 const queued = ref<QueuedBet[]>([]);
 let sending = false;
-const balance = ref(0);
+const balance = ref<number | null>(null);
+let balanceRevision = 0;
+let refreshAfterBets = false;
 const chip = ref(1);
 const landedRound = ref<number | null>(null);
 let clock: ReturnType<typeof setInterval> | undefined;
@@ -67,6 +70,10 @@ for (let column = 0; column < 12; column++) {
 
 const round = computed(() => state.value?.currentRound);
 const myBets = computed(() => state.value?.bets.filter(bet => bet.playerId === playerId) ?? []);
+const visibleBalance = computed(() => balance.value === null ? null : Math.max(0,
+  balance.value - queued.value.reduce((sum, bet) => sum + bet.amount, 0)));
+watch(visibleBalance, value => { rouletteDisplayBalance.value = value; }, { immediate: true });
+
 const totalStake = computed(() => myBets.value.reduce((sum, bet) => sum + bet.amount, 0));
 const secondsLeft = computed(() => Math.max(0, Math.ceil((Date.parse(round.value?.bettingEndsAt ?? '') - now.value) / 1000)));
 const accepting = computed(() => round.value?.status === 'BETTING' && secondsLeft.value > 0);
@@ -110,15 +117,35 @@ function describe(bet: RouletteBet) {
   return `${names[bet.betType]} · ${standard?.label ?? bet.betValue.split(',').join(' + ')}`;
 }
 async function refreshBalance() {
-  if (playerId) balance.value = (await api.getPlayerBalance(playerId)).tokenBalance;
+  if (!playerId) return;
+  if (sending) {
+    refreshAfterBets = true;
+    return;
+  }
+  const revision = ++balanceRevision;
+  try {
+    const next = await api.getPlayerBalance(playerId);
+    if (revision === balanceRevision && !sending) balance.value = next.tokenBalance;
+  } catch { /* The existing balance stays visible during a network interruption. */ }
 }
 function onState(payload: RouletteState) {
+  const previous = round.value;
   state.value = payload;
-  refreshBalance().catch(() => {});
+  const current = payload.currentRound;
+  if (current?.status !== 'COMPLETED' || (previous?.id === current.id && previous.status === 'COMPLETED')) return;
+  void refreshBalance();
+  if (previous?.id === current.id && previous.status === 'BETTING' && !isDisplay.value) {
+    void nextTick(() => {
+      if (round.value?.id !== current.id || round.value.status !== 'COMPLETED') return;
+      const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+    });
+  }
 }
 function placeBet(choice: Choice) {
   if (!accepting.value || !playerId || !round.value) return;
   error.value = '';
+  balanceRevision++;
   queued.value.push({ choice, amount: chip.value, roundId: round.value.id });
   void sendBets();
 }
@@ -131,8 +158,11 @@ async function sendBets() {
       try {
         if (!accepting.value || round.value?.id !== bet.roundId) throw new Error('Ez a rulettkör már véget ért.');
         const result = await api.placeRouletteBet(playerId, bet.choice.type, bet.choice.value, bet.amount, bet.roundId);
+        if (typeof result.tokenBalance === 'number') balance.value = result.tokenBalance;
+        else refreshAfterBets = true;
         if (round.value?.id === bet.roundId && round.value.status === 'BETTING' && result.bets.length >= (state.value?.bets.length ?? 0)) onState(result);
       } catch (cause) {
+        refreshAfterBets = true;
         error.value = cause instanceof Error ? cause.message : 'A tét elhelyezése sikertelen.';
       } finally {
         queued.value.shift();
@@ -140,9 +170,14 @@ async function sendBets() {
     }
   } finally {
     sending = false;
+    if (refreshAfterBets) {
+      refreshAfterBets = false;
+      void refreshBalance();
+    }
   }
 }
 function loadState() {
+  void refreshBalance();
   api.getRouletteState().then(onState).catch(cause => { error.value = cause.message; });
 }
 onMounted(() => {
@@ -152,6 +187,7 @@ onMounted(() => {
   clock = setInterval(() => { now.value = Date.now(); }, 200);
 });
 onUnmounted(() => {
+  rouletteDisplayBalance.value = null;
   socket.off('roulette:changed', onState);
   socket.off('connect', loadState);
   clearInterval(clock);
@@ -239,7 +275,7 @@ onUnmounted(() => {
       </div>
 
       <div class="studio-footer">
-        <div v-if="playerId && !isDisplay" class="studio-wallet"><span>Egyenleg <strong>{{ balance.toLocaleString('hu-HU') }} CR</strong></span><PlayerWallet inline /></div>
+        <div v-if="playerId && !isDisplay" class="studio-wallet"><span>Egyenleg <strong>{{ visibleBalance === null ? '–' : visibleBalance.toLocaleString('hu-HU') + ' CR' }}</strong></span><PlayerWallet inline /></div>
         <details class="studio-log">
           <summary>Asztalon lévő tétek <b>{{ state?.bets.length || 0 }}</b></summary>
           <p v-if="!state?.bets.length">Még nincs tét ebben a körben.</p>

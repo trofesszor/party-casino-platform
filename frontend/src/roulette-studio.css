@@ -326,7 +326,6 @@
   inset-inline-end: 2px;
   inset-block-end: 2px;
 }
-.studio-board-cell:has(.studio-placed-chip) { padding-bottom: 20px; }
 .studio-chip-pending { opacity: .63; }
 
 @media (max-width: 940px) {
@@ -381,6 +380,13 @@
   .studio-observation { grid-template-columns: minmax(0, 1fr); }
   .studio-observation .roulette-rotor { max-width: 215px; }
   .studio-history { border-inline-start: 0; border-top: 1px solid var(--studio-line); }
+  .studio-board-cell .studio-placed-chip {
+    min-inline-size: 18px;
+    block-size: 18px;
+    border-width: 1px;
+    padding-inline: 2px;
+    font-size: .59rem;
+  }
   .studio-chipline { gap: 4px; }
   .studio-chipline > span { margin-inline-end: 3px; }
   .studio-footer { grid-template-columns: minmax(0, 1fr); }

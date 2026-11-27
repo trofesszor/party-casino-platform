@@ -342,12 +342,28 @@
 }
 .mint-respin-meter .mint-respin-lit { background: oklch(81% .126 164); color: #10221d; font-weight: 800; }
 .mint-respin-refill .mint-respin-lit { animation: mint-bell-arrival 420ms cubic-bezier(.18,.78,.25,1); }
-.mint-bonus .mint-cell.mint-new-bell .mint-symbol { animation: mint-bell-arrival 420ms cubic-bezier(.18,.78,.25,1); }
+.mint-bonus .mint-cell.mint-new-bell .mint-symbol {
+  animation: mint-bell-drop var(--mint-fall-duration) var(--mint-fall-delay) both;
+}
+.mint-bonus .mint-cell.mint-new-bell .mint-tile-caption {
+  animation: mint-bell-value var(--mint-fall-duration) var(--mint-fall-delay) both;
+}
+@keyframes mint-bell-drop {
+  0% { transform: translateY(-165%) rotate(-8deg) scale(.94); opacity: 0; animation-timing-function: cubic-bezier(.48, .05, .92, .61); }
+  18% { opacity: 1; }
+  69% { transform: translateY(5%) rotate(2deg) scale(1.06, .93); opacity: 1; animation-timing-function: ease-out; }
+  84% { transform: translateY(-9%) rotate(-1deg); opacity: 1; animation-timing-function: ease-in; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes mint-bell-value {
+  0%, 66% { opacity: 0; }
+  100% { opacity: 1; }
+}
 @keyframes mint-bell-arrival {
   from { transform: translateY(-12%) scale(.83); opacity: .5; }
   65% { transform: translateY(0) scale(1.06); opacity: 1; }
   to { transform: none; opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .mint-respin-refill .mint-respin-lit, .mint-bonus .mint-cell.mint-new-bell .mint-symbol { animation: none; }
+  .mint-respin-refill .mint-respin-lit, .mint-bonus .mint-new-bell :is(.mint-symbol, .mint-tile-caption) { animation: none; }
 }

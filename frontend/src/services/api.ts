@@ -79,7 +79,7 @@ export const api = {
   getPlayerTransactions: (playerId: number) => request<{ id: number; amount: number; balanceAfter: number; type: string; description: string; createdAt: string }[]>(`/api/players/${playerId}/transactions`),
   getRouletteState: () => request<RouletteState>('/api/roulette'),
   placeRouletteBet: (playerId: number, betType: RouletteBetType, betValue: string | number, amount: number, roundId?: number) =>
-    request<RouletteState>('/api/roulette/bets', { method: 'POST', body: JSON.stringify({ playerId, betType, betValue, amount, roundId }) }),
+    request<RouletteState & { tokenBalance?: number }>('/api/roulette/bets', { method: 'POST', body: JSON.stringify({ playerId, betType, betValue, amount, roundId }) }),
   getSlots: (playerId?: number) => request<SlotState>(`/api/slots${playerId ? '?playerId=' + playerId : ''}`),
   spinSlots: (playerId: number, stake: SlotStake) => request<SlotSpin>('/api/slots/spin', { method: 'POST', body: JSON.stringify({ playerId, ...stake }) }),
 };

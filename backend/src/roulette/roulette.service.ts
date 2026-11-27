@@ -71,11 +71,13 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     this.validateBet(betType, betValue);
 
     const sqlite = this.database.sqlite;
+    let tokenBalance: number;
     sqlite.exec('BEGIN IMMEDIATE');
     try {
       const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(amount, playerId, amount);
       if (Number(debit.changes) !== 1) throw new BadRequestException('Nincs elegendő token a fogadáshoz.');
       const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
+      tokenBalance = balance.tokenBalance;
       sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'ROULETTE_BET', ?)").run(playerId, -amount, balance.tokenBalance, 'Rulett tét: ' + betType + ' ' + betValue);
       sqlite.prepare('INSERT INTO casino_roulette_bets (round_id, player_id, bet_type, bet_value, amount) VALUES (?, ?, ?, ?, ?)').run(round.id, playerId, betType, betValue, amount);
       sqlite.exec('COMMIT');
@@ -83,7 +85,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
       sqlite.exec('ROLLBACK');
       throw error;
     }
-    return this.publishState();
+    return { ...this.publishState(), tokenBalance };
   }
 
   private validateBet(type: string, value: string) {
