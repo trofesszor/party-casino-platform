@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Headers, Param, Post, UnauthorizedException } from '@nestjs/common';
+import { RouletteService } from '../roulette/roulette.service';
 import { BlackjackService } from '../blackjack/blackjack.service';
 import { PlayersService } from '../players/players.service';
 import { PlayerPresenceGateway } from '../players/player-presence.gateway';
@@ -13,6 +14,7 @@ export class AdminController {
     private readonly presence: PlayerPresenceGateway,
     private readonly events: EventsGateway,
     private readonly blackjack: BlackjackService,
+    private readonly roulette: RouletteService,
   ) {}
 
   private token(authorization?: string) {
@@ -72,6 +74,7 @@ export class AdminController {
     const result=this.players.resetPlayerData();
     this.presence.resetPlayerPresence();
     this.blackjack.reset();
+    this.roulette.restart();
     return result;
   }
 

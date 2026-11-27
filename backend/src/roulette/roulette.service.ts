@@ -31,6 +31,10 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy() { if (this.timer) clearTimeout(this.timer); }
 
+  restart() {
+    this.openNextRound();
+  }
+
   getState() {
     const currentRound = this.latestRound();
     if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds };

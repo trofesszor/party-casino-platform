@@ -1,3 +1,4 @@
+import { migrateSideQuestTables } from './side-quest-migration';
 import { migratePartyCredits } from '../casino/credit-migration';
 import { partyCoupons, questSkipPrice, scratchTicketPrice, startingCredits, wheelSpinPrice } from '../casino/economy';
 import { jackpotStarts } from '../slots/slots-game';
@@ -84,9 +85,10 @@ export const DATABASE = Symbol('DATABASE');
           pool_quest_id INTEGER REFERENCES side_quest_pool(id) ON DELETE SET NULL,
           title TEXT NOT NULL,
           description TEXT NOT NULL DEFAULT '',
-          status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','COMPLETED')),
+          status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','COMPLETED','SKIPPED')),
           assigned_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           completed_at TEXT,
+          skipped_at TEXT,
           photo_enabled INTEGER NOT NULL DEFAULT 0,
           completion_method TEXT,
           photo_id TEXT
@@ -152,30 +154,7 @@ export const DATABASE = Symbol('DATABASE');
         );
       `);
 
-      const questTable = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='player_side_quests'").get() as {sql:string}|undefined;
-      if (questTable && !questTable.sql.includes("'SKIPPED'")) {
-        sqlite.exec(`
-          ALTER TABLE player_side_quests RENAME TO player_side_quests_old;
-          CREATE TABLE player_side_quests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-            pool_quest_id INTEGER REFERENCES side_quest_pool(id) ON DELETE SET NULL,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE','COMPLETED','SKIPPED')),
-            assigned_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            completed_at TEXT,
-            skipped_at TEXT
-          );
-          INSERT INTO player_side_quests (id,player_id,pool_quest_id,title,description,status,assigned_at,completed_at)
-            SELECT id,player_id,pool_quest_id,title,description,status,assigned_at,completed_at FROM player_side_quests_old;
-          DROP TABLE player_side_quests_old;
-          CREATE INDEX IF NOT EXISTS idx_player_side_quests_active ON player_side_quests(player_id, status);
-        `);
-      } else {
-        const questColumns = sqlite.prepare('PRAGMA table_info(player_side_quests)').all() as Array<{name:string}>;
-        if (!questColumns.some(column => column.name === 'skipped_at')) sqlite.exec('ALTER TABLE player_side_quests ADD COLUMN skipped_at TEXT');
-      }
+      migrateSideQuestTables(sqlite);
 
       const poolColumns = sqlite.prepare('PRAGMA table_info(side_quest_pool)').all() as Array<{name:string}>;
       if (!poolColumns.some(column => column.name === 'photo_enabled')) sqlite.exec('ALTER TABLE side_quest_pool ADD COLUMN photo_enabled INTEGER NOT NULL DEFAULT 0');

@@ -5,11 +5,11 @@ A minimal local-network platform foundation. It intentionally has no accounts, p
 ## Stack
 - Vue 3 + Vite + TypeScript
 - NestJS + Socket.IO
-- SQLite (`better-sqlite3`) + Drizzle connection
+- SQLite (`node:sqlite`) + Drizzle connection
 - One backend process; SQLite file stored in `backend/data/party-casino.sqlite`
 
 ## Requirements
-- Node.js 20+
+- Node.js 24 recommended
 - npm 10+
 
 ## Run locally
@@ -27,6 +27,12 @@ Open:
 - API: http://localhost:3002/api/events
 
 For phones on the same Wi-Fi, open `http://<HOST-LAN-IP>:5173`. The Vite dev server is configured to listen on `0.0.0.0`; make sure the host firewall allows ports 5173 and 3002. For the eventual party build, serve the compiled frontend from NestJS or a small local reverse proxy so one LAN URL is enough.
+
+## Build and database startup
+
+Run `npm run build` from the repository root to compile both workspaces. For the backend alone, run `npm run build --workspace backend`.
+
+The backend runs SQLite migrations on startup, using the database in `backend/data/`. Start both development servers with `npm run dev`, or start the compiled backend with `npm run start --workspace backend`. The Admin casino reset clears player data and starts a new casino session.
 
 ## Current functionality
 - Players join by entering a name. Names are case-insensitive and unique for this party database; returning with the same name reuses the same player record.

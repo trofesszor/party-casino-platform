@@ -7,5 +7,6 @@ import { RouletteService } from './roulette.service';
   controllers: [RouletteController],
   imports: [EventsModule],
   providers: [RouletteService],
+  exports: [RouletteService],
 })
 export class RouletteModule {}

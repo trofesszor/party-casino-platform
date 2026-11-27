@@ -1,3 +1,4 @@
+import { RouletteModule } from '../roulette/roulette.module';
 import { BlackjackModule } from '../blackjack/blackjack.module';
 import { Module } from '@nestjs/common';
 import { PlayersModule } from '../players/players.module';
@@ -6,7 +7,7 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 @Module({
-  imports: [PlayersModule, EventsModule, BlackjackModule],
+  imports: [PlayersModule, EventsModule, BlackjackModule, RouletteModule],
   controllers: [AdminController],
   providers: [AdminService],
   exports: [AdminService],
