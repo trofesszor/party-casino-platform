@@ -295,7 +295,6 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         <div class="rail-divider"></div>
         <div class="rail-label">EXTRÁK</div>
         <a class="rail-item" href="/verify-quest"><span>✓</span><strong>Quest PIN</strong></a>
-        <a class="rail-item" href="/display" target="_blank"><span>▣</span><strong>TV kijelző</strong></a>
         <div class="rail-spacer"></div>
         <div class="rail-party-note"><i></i><span><strong>PARTY LIVE</strong><small>A kaszinó minden játékosa szinkronban van.</small></span></div>
       </aside>

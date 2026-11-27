@@ -62,7 +62,6 @@ onUnmounted(() => {
       <a href="/leaderboard">Leaderboard</a>
       <a href="/shop">Shop</a>
       <a href="/verify-quest" class="mobile-quest-link">✓ Quest PIN ellenőrzés</a>
-      <a href="/display" target="_blank">▣ TV kijelző</a>
       <button v-if="playerId" class="mobile-menu-logout" @click.stop="logout">Kilépés</button>
     </div>
   </header>
