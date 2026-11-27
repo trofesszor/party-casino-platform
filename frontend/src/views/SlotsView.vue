@@ -47,7 +47,9 @@ const grandCount = computed(() => displayedBonus.value?.coins.filter(bell => bel
 const majorCollected = computed(() => displayedBonus.value?.coins.some(bell => bell?.tier === 'major') ?? false);
 const newBells = ref<number[]>([]);
 const newBellCount = computed(() => newBells.value.length);
-const bellStaggerMs = ref(38);
+const bonusBellStaggerMs = 38;
+const baseBellStaggerMs = 240;
+const bellStaggerMs = ref(bonusBellStaggerMs);
 const bellFallMs = 610;
 const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 const jackpotCards = computed<Array<{ tier: SlotTier; amount: number; progressive: boolean }>>(() => {
@@ -123,16 +125,10 @@ function displayTile(tile: SlotTile) {
 function tierTitle(tier: SlotTier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
-function barkForBells(count: number) {
-  for (let bell = 0; bell < count; bell++) {
-    if (bell === 0) void audio.playClip();
-    else audio.after(85 * bell, audio.playClip);
-  }
-}
-async function animate(grid: SlotTile[], held: readonly boolean[], wasBonus: boolean) {
+async function animate(grid: SlotTile[], held: readonly boolean[], onBells: (count: number) => void) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     reel.value = grid;
-    if (!wasBonus) barkForBells(grid.filter(tile => tile.symbol === 'coin').length);
+    onBells(grid.filter(tile => tile.symbol === 'coin').length);
     return;
   }
   for (const column of columns) {
@@ -147,7 +143,7 @@ async function animate(grid: SlotTile[], held: readonly boolean[], wasBonus: boo
         if (grid[index].symbol === 'coin') bells++;
       }
     }
-    if (!wasBonus) barkForBells(bells);
+    onBells(bells);
   }
 }
 async function spin() {
@@ -179,17 +175,18 @@ async function spin() {
     const feature = reply.bonus ?? reply.finishedBonus;
     const incoming = feature?.coins.flatMap((coin, index) => coin && !held[index] ? [index] : []) ?? [];
     const stagingGrid: SlotTile[] = reply.grid.map((tile, index) => incoming.includes(index) ? { symbol: 'empty' } : tile);
-    await animate(stagingGrid, held, wasBonus);
+    const barks: Promise<void>[] = [];
+    await animate(stagingGrid, held, count => {
+      if (!wasBonus && count) barks.push(audio.playClips(count));
+    });
     if (!mounted) return;
     reel.value = feature ? bonusGrid(feature) : reply.grid;
-    bellStaggerMs.value = wasBonus ? 38 : 95;
+    bellStaggerMs.value = wasBonus ? bonusBellStaggerMs : baseBellStaggerMs;
     newBells.value = incoming;
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!wasBonus) {
-      if (reducedMotion) barkForBells(incoming.length);
-      else for (const [index] of incoming.entries()) {
-        audio.after(Math.round(bellFallMs * .69) + index * bellStaggerMs.value, audio.playClip);
-      }
+    if (!wasBonus && incoming.length) {
+      const initialDelay = reducedMotion ? 0 : Math.round(bellFallMs * .69);
+      barks.push(audio.playClips(incoming.length, initialDelay, baseBellStaggerMs));
     }
     bonus.value = reply.bonus;
     freeSpins.value = reply.freeSpins;
@@ -199,6 +196,7 @@ async function spin() {
     last.value = reply;
     window.dispatchEvent(new Event('party-player-changed'));
     if (incoming.length && !reducedMotion) await wait(bellFallMs + (incoming.length - 1) * bellStaggerMs.value);
+    await Promise.all(barks);
     if (!mounted) return;
     const payout = reply.payoutAmount;
     if (!wasBonus && reply.bonus) {
@@ -206,13 +204,10 @@ async function spin() {
       audio.announce('Harangeső indul. Újrapörgetések száma: ' + reply.bonus.remaining + '.', true);
     } else if (reply.finishedBonus) {
       audio.effect(payout ? 'win' : 'end');
-      audio.announce('A harangeső véget ért. Nyeremény: ' + payout + ' kredit.', true);
+      audio.announce('A harangeső véget ért.', true);
     } else if (!reply.bonus && (payout || reply.freeSpinsAwarded)) {
       audio.effect('win');
-      const announcements = [];
-      if (payout) announcements.push('Nyertél ' + payout + ' kreditet.');
-      if (reply.freeSpinsAwarded) announcements.push('Kaptál ' + reply.freeSpinsAwarded + ' ingyenpörgetést.');
-      audio.announce(announcements.join(' '), true);
+      if (reply.freeSpinsAwarded) audio.announce('Kaptál ' + reply.freeSpinsAwarded + ' ingyenpörgetést.', true);
     }
   } catch (cause) {
     if (!mounted) return;

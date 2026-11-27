@@ -1,4 +1,4 @@
-import { onUnmounted, ref } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 
 type Cue = 'start' | 'end' | 'win' | 'reel';
 const preferenceKey = 'party-game-audio';
@@ -61,7 +61,10 @@ function tone(ctx: AudioContext, at: number, duration: number, from: number, to 
 
 export function useGameAudio(canPlay = () => audioEnabled.value) {
   const owner = Symbol();
-  const scheduled = new Set<ReturnType<typeof setTimeout>>();
+  const clipSources = new Map<AudioBufferSourceNode, () => void>();
+  let clipVersion = 0;
+  let nextClipAt = 0;
+  let stopWatchingClips: (() => void) | undefined;
   let disposed = false;
   let clip: Promise<AudioBuffer | undefined> | undefined;
 
@@ -70,7 +73,12 @@ export function useGameAudio(canPlay = () => audioEnabled.value) {
     void activateGameAudio();
     const ctx = audio;
     if (!ctx || clip) return;
-    clip = fetch(url).then(response => {
+    if (!stopWatchingClips) {
+      stopWatchingClips = watch(canPlay, enabled => { if (!enabled) stopClips(); }, { flush: 'sync' });
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      ctx.addEventListener('statechange', onAudioStateChange);
+    }
+    clip = fetch(url, { signal: AbortSignal.timeout(3000) }).then(response => {
       if (!response.ok) throw new Error('A hangfájl nem érhető el.');
       return response.arrayBuffer();
     }).then(data => ctx.decodeAudioData(data)).catch(() => {
@@ -79,14 +87,53 @@ export function useGameAudio(canPlay = () => audioEnabled.value) {
     });
   }
 
-  async function playClip() {
-    if (!canPlay() || document.hidden) return;
+  async function playClips(count: number, delayMs = 0, spacingMs = 0) {
+    if (!count || !canPlay() || document.hidden) return;
+    const version = clipVersion;
     const buffer = await clip;
-    if (disposed || !buffer || !canPlay() || document.hidden || audio?.state !== 'running') return;
-    const source = audio.createBufferSource();
-    source.buffer = buffer;
-    source.connect(output ?? audio.destination);
-    source.start();
+    const ctx = audio;
+    if (disposed || version !== clipVersion || !buffer || !canPlay() || document.hidden || ctx?.state !== 'running') return;
+
+    // Queue barks on the audio clock so closely spaced bells cannot overlap.
+    const spacing = Math.max(buffer.duration + .012, spacingMs / 1000);
+    const finished: Promise<void>[] = [];
+    let start = Math.max(ctx.currentTime + delayMs / 1000, nextClipAt);
+    for (let index = 0; index < count; index++) {
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(output ?? ctx.destination);
+      finished.push(new Promise<void>(resolve => {
+        const finish = () => {
+          clipSources.delete(source);
+          source.onended = null;
+          source.disconnect();
+          resolve();
+        };
+        source.onended = finish;
+        clipSources.set(source, finish);
+      }));
+      source.start(start);
+      start += spacing;
+    }
+    nextClipAt = start;
+    await Promise.all(finished);
+  }
+
+  function stopClips() {
+    clipVersion++;
+    nextClipAt = 0;
+    for (const [source, finish] of clipSources) {
+      source.stop();
+      finish();
+    }
+  }
+
+  function onVisibilityChange() {
+    if (document.hidden) stopClips();
+  }
+
+  function onAudioStateChange() {
+    if (audio?.state !== 'running') stopClips();
   }
 
   function effect(cue: Cue) {
@@ -125,25 +172,20 @@ export function useGameAudio(canPlay = () => audioEnabled.value) {
     speech.speak(utterance);
   }
 
-  function after(ms: number, callback: () => void) {
-    const timer = setTimeout(() => {
-      scheduled.delete(timer);
-      callback();
-    }, ms);
-    scheduled.add(timer);
-  }
-
   function stopSpeech() {
     if (voiceOwner === owner) window.speechSynthesis?.cancel();
   }
 
   onUnmounted(() => {
     disposed = true;
-    for (const timer of scheduled) clearTimeout(timer);
+    stopClips();
+    stopWatchingClips?.();
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    audio?.removeEventListener('statechange', onAudioStateChange);
     stopSpeech();
   });
 
-  return { effect, announce, after, stopSpeech, prepareClip, playClip };
+  return { effect, announce, stopSpeech, prepareClip, playClips };
 }
 
 type RouletteRound = import('../types').RouletteRound;
