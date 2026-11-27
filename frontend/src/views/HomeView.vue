@@ -303,8 +303,8 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         </RouterLink>
 
         <RouterLink class="floor-game floor-slot" to="/slots">
-          <div class="floor-game-art" aria-hidden="true"><span>7</span><span>✦</span><span>7</span></div>
-          <div><h2>Lucky Slots</h2><p>Saját gép és ingyenpörgetések.</p></div>
+          <div class="floor-game-art" aria-hidden="true"><span>♣</span><span>✦</span><span>♣</span></div>
+          <div><h2>Midnight Mint</h2><p>Saját gép és ingyenpörgetések.</p></div>
           <span class="floor-arrow" aria-hidden="true">→</span>
         </RouterLink>
         <RouterLink class="floor-game floor-wheel" to="/lucky-wheel">

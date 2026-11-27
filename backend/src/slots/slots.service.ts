@@ -1,137 +1,180 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { randomInt } from 'node:crypto';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { DatabaseSync } from 'node:sqlite';
 import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
+import { amount, betUnits, denominations, jackpotStarts, respin, scoreGrid, slotRules, spinGrid } from './slots-game';
+import type { Bonus, JackpotWin, Stake, Tile } from './slots-game';
 
-const SYMBOLS = [
-  { symbol: '🍒', weight: 30, payout: 2, name: 'Cherry' },
-  { symbol: '🍋', weight: 25, payout: 3, name: 'Lemon' },
-  { symbol: '🍇', weight: 20, payout: 4, name: 'Grapes' },
-  { symbol: '🍉', weight: 15, payout: 5, name: 'Watermelon' },
-  { symbol: '🔔', weight: 10, payout: 8, name: 'Bell' },
-  { symbol: '💎', weight: 7, payout: 15, name: 'Diamond' },
-  { symbol: '7️⃣', weight: 4, payout: 30, name: 'Lucky seven' },
-  { symbol: '⭐', weight: 5, payout: 0, name: 'Wild' },
-  { symbol: '🪙', weight: 4, payout: 0, name: 'Bonus' },
-] as const;
-
-const WILD = '⭐';
-const BONUS = '🪙';
-const PAYTABLE = [
-  { combination: 'Three 7️⃣', multiplier: 30 },
-  { combination: 'Three 💎', multiplier: 15 },
-  { combination: 'Three 🔔', multiplier: 8 },
-  { combination: 'Three 🍉', multiplier: 5 },
-  { combination: 'Three 🍇', multiplier: 4 },
-  { combination: 'Three 🍋', multiplier: 3 },
-  { combination: 'Three 🍒', multiplier: 2 },
-  { combination: 'Two matching symbols', multiplier: 1 },
-  { combination: 'Three ⭐ (Wild)', multiplier: 50 },
-  { combination: 'Three 🪙 (Bonus)', multiplier: 5, bonusSpins: 5 },
-];
+const legacyReels: Record<Tile['symbol'], string> = {
+  cherry: '🍒', lemon: '🍋', lime: '🍉', grapes: '🍇', orange: '🔔', crescent: '7️⃣',
+  wild: '⭐', scatter: '💎', coin: '🪙', empty: '·',
+};
+type Progressives = typeof jackpotStarts;
+type Player = { id: number; name: string; tokenBalance: number };
+type PlayerSlot = { freeSpins: number; freeStake: string | null; bonusState: string | null };
 
 @Injectable()
 export class SlotsService {
-  constructor(@Inject(DATABASE) private readonly database: any, private readonly gateway: EventsGateway) {}
+  constructor(@Inject(DATABASE) private readonly database: { sqlite: DatabaseSync }, private readonly gateway: EventsGateway) {}
 
-  spin(playerId: number, betAmount: number) {
-    const allowedBets = [1, 5, 10, 25, 50];
-    if (!allowedBets.includes(betAmount)) throw new NotFoundException('Érvénytelen tét. Válassz az elérhető tétek közül.');
+  state(playerId?: number) {
+    const player = playerId ? this.player(playerId) : null;
+    const slot = player ? this.playerSlot(player.id) : null;
+    return {
+      ...slotRules,
+      jackpots: this.jackpots(),
+      tokenBalance: player?.tokenBalance ?? null,
+      freeSpins: slot?.freeSpins ?? 0,
+      freeStake: this.decode<Stake>(slot?.freeStake),
+      bonus: this.decode<Bonus>(slot?.bonusState),
+    };
+  }
+
+  spin(playerId: number, legacyAmount: number, denomination?: number, units?: number) {
+    const requestedStake = this.stake(legacyAmount, denomination, units);
     const sqlite = this.database.sqlite;
-    const reels = Array.from({ length: 3 }, () => this.drawSymbol());
-    const evaluation = this.evaluate(reels);
-    const freeSpinsAwarded = reels.every(symbol => symbol === BONUS) ? 5 : 0;
-    const payoutAmount = evaluation.multiplier * betAmount;
-
     sqlite.exec('BEGIN IMMEDIATE');
-    try {
-      const player = sqlite.prepare('SELECT id, name, token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { id: number; name: string; tokenBalance: number } | undefined;
-      if (!player) throw new NotFoundException('A játékos nem található. Lépj be újra.');
-      sqlite.prepare('INSERT INTO slot_player_state (player_id, free_spins) VALUES (?, 0) ON CONFLICT(player_id) DO NOTHING').run(playerId);
-      const state = sqlite.prepare('SELECT free_spins AS freeSpins FROM slot_player_state WHERE player_id = ?').get(playerId) as { freeSpins: number };
-      const usedFreeSpin = state.freeSpins > 0;
-      if (usedFreeSpin) {
-        sqlite.prepare('UPDATE slot_player_state SET free_spins = free_spins - 1 WHERE player_id = ? AND free_spins > 0').run(playerId);
+    const result = (() => {
+      try {
+        const player = this.player(playerId);
+        if (!player) throw new NotFoundException('A játékos nem található. Lépj be újra.');
+        const spin = this.play(player, requestedStake);
+        sqlite.exec('COMMIT');
+        return spin;
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
+    })();
+
+    this.gateway.publish('slots:jackpots', result.jackpots);
+    if (result.jackpotWins.length || result.payoutAmount >= Math.max(50, result.betAmount * 8)) {
+      this.gateway.publish('party:notification', {
+        type: 'slots',
+        title: 'SLOT · NAGY NYEREMÉNY',
+        message: `${result.playerName} nyert a Midnight Mint gépen: +${result.payoutAmount} CR!`,
+      });
+    }
+    return result;
+  }
+
+  private play(player: Player, requestedStake: Stake) {
+    const sqlite = this.database.sqlite;
+    const existing = this.playerSlot(player.id);
+    let bonus = this.decode<Bonus>(existing?.bonusState);
+    let freeSpins = existing?.freeSpins ?? 0;
+    let freeStake = this.decode<Stake>(existing?.freeStake);
+    const usedFreeSpin = !bonus && freeSpins > 0;
+    const stake = bonus?.stake ?? (usedFreeSpin ? freeStake ?? requestedStake : requestedStake);
+    const betAmount = amount(stake);
+    const jackpots = this.jackpots();
+    const jackpotWins: JackpotWin[] = [];
+    let payoutAmount = 0;
+    let freeSpinsAwarded = 0;
+    let paidAmount = 0;
+    let grid: Tile[];
+    let winLabel = 'Nincs nyeremény';
+    let wins: ReturnType<typeof scoreGrid> = [];
+    let finishedBonus: Bonus | null = null;
+
+    if (bonus) {
+      bonus = respin(bonus);
+      grid = bonus.coins.map(coin => coin ? { symbol: 'coin', coin } : { symbol: 'empty' } as const);
+      const locked = bonus.coins.flatMap(coin => coin ? [coin] : []);
+      if (bonus.remaining === 0 || locked.length === 15) {
+        for (const coin of locked) {
+          if (coin.tier) jackpotWins.push({ tier: coin.tier, amount: coin.value });
+          payoutAmount += coin.value;
+        }
+        const progressive = locked.length === 15 ? 'grand' : locked.length >= 12 ? 'major' : null;
+        if (progressive) {
+          jackpotWins.push({ tier: progressive, amount: jackpots[progressive] });
+          payoutAmount += jackpots[progressive];
+          jackpots[progressive] = jackpotStarts[progressive];
+        }
+        finishedBonus = bonus;
+        bonus = null;
+        winLabel = 'Érmegyűjtés lezárva';
       } else {
-        const debit = sqlite.prepare('UPDATE players SET token_balance = token_balance - ? WHERE id = ? AND token_balance >= ?').run(betAmount, playerId, betAmount);
-        if (Number(debit.changes) !== 1) throw new NotFoundException('Nincs elegendő token a pörgetéshez.');
-        const afterDebit = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
-        sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'SLOT_BET', 'Slot gép pörgetés')").run(playerId, -betAmount, afterDebit.tokenBalance);
+        winLabel = 'Érmegyűjtés folyamatban';
       }
-
-      if (freeSpinsAwarded) sqlite.prepare('UPDATE slot_player_state SET free_spins = free_spins + ? WHERE player_id = ?').run(freeSpinsAwarded, playerId);
-      if (payoutAmount > 0) {
-        sqlite.prepare('UPDATE players SET token_balance = token_balance + ? WHERE id = ?').run(payoutAmount, playerId);
-        const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
-        sqlite.prepare("INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, 'SLOT_WIN', ?)").run(playerId, payoutAmount, balance.tokenBalance, evaluation.label);
+    } else {
+      if (usedFreeSpin) {
+        freeSpins--;
+        freeStake = freeSpins > 0 ? stake : null;
+      } else {
+        if (player.tokenBalance < betAmount) throw new BadRequestException('Nincs elegendő CR a pörgetéshez.');
+        paidAmount = betAmount;
+        this.record(player.id, -paidAmount, 'SLOT_BET', 'Midnight Mint tét');
+        jackpots.grand += Math.max(1, Math.floor(paidAmount / 10));
+        jackpots.major += Math.max(1, Math.floor(paidAmount / 5));
       }
-      const remaining = sqlite.prepare('SELECT free_spins AS freeSpins FROM slot_player_state WHERE player_id = ?').get(playerId) as { freeSpins: number };
-      const balance = sqlite.prepare('SELECT token_balance AS tokenBalance FROM players WHERE id = ?').get(playerId) as { tokenBalance: number };
-      sqlite.exec('COMMIT');
-      if (payoutAmount >= Math.max(50, betAmount * 8)) {
-        const lines = [
-          `${player.name} a slot gépen megütötte a főnyeremény-szagot: +${payoutAmount} CR!`,
-          `${player.name} akkorát szakított a sloton, hogy leesett a fél társaság álla: +${payoutAmount} CR!`,
-          `JACKPOT-RIADÓ! ${player.name} most nem kegyelmezett a slotnak: +${payoutAmount} CR!`,
-          `${player.name} háromszor rányomott a szerencsére, és a szerencse beadta a derekát: +${payoutAmount} CR!`
-        ];
-        this.gateway.publish('party:notification', { type:'slots', title:'SLOT · NAGY NYEREMÉNY', message:lines[randomInt(lines.length)] });
+      grid = spinGrid(stake);
+      wins = scoreGrid(grid, stake);
+      payoutAmount = wins.reduce((sum, win) => sum + win.amount, 0);
+      const coins = grid.map(tile => tile.coin ?? null);
+      freeSpinsAwarded = grid.filter(tile => tile.symbol === 'scatter').length >= 3 ? 5 : 0;
+      if (freeSpinsAwarded) {
+        freeSpins += freeSpinsAwarded;
+        freeStake = stake;
       }
-      return {
-        playerId,
-        playerName: player.name,
-        reels,
-        isWin: evaluation.multiplier > 0,
-        multiplier: evaluation.multiplier,
-        betAmount,
-        payoutAmount,
-        tokenBalance: balance.tokenBalance,
-        winLabel: evaluation.label,
-        freeSpinsAwarded,
-        freeSpins: remaining.freeSpins,
-        usedFreeSpin,
-        paytable: PAYTABLE,
-      };
-    } catch (error) {
-      sqlite.exec('ROLLBACK');
-      throw error;
+      if (coins.filter(Boolean).length >= 6) {
+        bonus = { coins, remaining: 3, stake };
+        winLabel = 'Érmegyűjtés indul';
+      } else if (freeSpinsAwarded) {
+        winLabel = `+${freeSpinsAwarded} ingyenpörgetés`;
+      } else if (payoutAmount > 0) {
+        winLabel = `${wins.length} nyerő sor`;
+      }
     }
+
+    if (payoutAmount) this.record(player.id, payoutAmount, 'SLOT_WIN', winLabel);
+    sqlite.prepare('UPDATE slot_jackpots SET grand = ?, major = ? WHERE id = 1').run(jackpots.grand, jackpots.major);
+    sqlite.prepare(`INSERT INTO slot_player_state (player_id, free_spins, free_stake, bonus_state) VALUES (?, ?, ?, ?)
+      ON CONFLICT(player_id) DO UPDATE SET free_spins = excluded.free_spins, free_stake = excluded.free_stake, bonus_state = excluded.bonus_state`)
+      .run(player.id, freeSpins, freeStake ? JSON.stringify(freeStake) : null, bonus ? JSON.stringify(bonus) : null);
+
+    return {
+      playerId: player.id, playerName: player.name, grid, reels: grid.slice(5, 8).map(tile => legacyReels[tile.symbol]),
+      isWin: payoutAmount > 0, multiplier: payoutAmount / betAmount, betAmount, paidAmount,
+      payoutAmount, tokenBalance: player.tokenBalance - paidAmount + payoutAmount, winLabel,
+      freeSpinsAwarded, freeSpins, freeStake, usedFreeSpin, stake, jackpots, jackpotWins, bonus, finishedBonus, wins,
+      paytable: slotRules.paytable,
+    };
   }
 
-  private drawSymbol(): string {
-    const totalWeight = SYMBOLS.reduce((sum, item) => sum + item.weight, 0);
-    let roll = randomInt(totalWeight);
-    for (const item of SYMBOLS) {
-      roll -= item.weight;
-      if (roll < 0) return item.symbol;
+  private stake(legacyAmount: number, denomination?: number, units?: number): Stake {
+    if (denomination === undefined && units === undefined) {
+      if ([1, 5, 10, 25].includes(legacyAmount)) return { denomination: legacyAmount, units: 1 };
+      if (legacyAmount === 50) return { denomination: 25, units: 2 };
+    } else if (denomination !== undefined && units !== undefined && denominations.includes(denomination) && betUnits.includes(units)) {
+      return { denomination, units };
     }
-    return SYMBOLS[0].symbol;
+    throw new BadRequestException('Érvénytelen tétegység vagy tét.');
   }
 
-  private evaluate(reels: string[]) {
-    if (reels.every(symbol => symbol === BONUS)) return { multiplier: 5, label: 'BONUS ROUND — 5 FREE SPINS' };
-    if (reels.every(symbol => symbol === WILD)) return { multiplier: 50, label: 'TRIPLE WILD — MEGA WIN!' };
+  private record(playerId: number, delta: number, type: 'SLOT_BET' | 'SLOT_WIN', description: string) {
+    const sqlite = this.database.sqlite;
+    sqlite.prepare('UPDATE players SET token_balance = token_balance + ? WHERE id = ?').run(delta, playerId);
+    const balance = this.player(playerId)!.tokenBalance;
+    sqlite.prepare('INSERT INTO token_transactions (player_id, amount, balance_after, type, description) VALUES (?, ?, ?, ?, ?)')
+      .run(playerId, delta, balance, type, description);
+  }
 
-    const regular = SYMBOLS.filter(item => item.payout > 0).map(item => item.symbol);
-    const counts = new Map<string, number>();
-    for (const symbol of reels) counts.set(symbol, (counts.get(symbol) ?? 0) + 1);
+  private jackpots() {
+    return this.database.sqlite.prepare('SELECT grand, major FROM slot_jackpots WHERE id = 1').get() as Progressives;
+  }
 
-    for (const symbol of regular) {
-      const count = counts.get(symbol) ?? 0;
-      const wildCount = counts.get(WILD) ?? 0;
-      if (count + wildCount === 3 && count > 0) {
-        const item = SYMBOLS.find(entry => entry.symbol === symbol)!;
-        return { multiplier: item.payout, label: `THREE OF A KIND — ${item.name.toUpperCase()}` };
-      }
-    }
+  private player(id: number) {
+    return this.database.sqlite.prepare('SELECT id, name, token_balance AS tokenBalance FROM players WHERE id = ?').get(id) as Player | undefined;
+  }
 
-    // Two matching regular symbols or one regular symbol plus one Wild.
-    for (const symbol of regular) {
-      const count = counts.get(symbol) ?? 0;
-      if (count >= 2 || (count === 1 && (counts.get(WILD) ?? 0) >= 1)) {
-        return { multiplier: Math.max(1, Math.floor(SYMBOLS.find(entry => entry.symbol === symbol)!.payout / 2)), label: `PAIR — ${SYMBOLS.find(entry => entry.symbol === symbol)!.name.toUpperCase()}` };
-      }
-    }
-    return { multiplier: 0, label: 'NO WIN — TRY AGAIN' };
+  private playerSlot(id: number) {
+    return this.database.sqlite.prepare('SELECT free_spins AS freeSpins, free_stake AS freeStake, bonus_state AS bonusState FROM slot_player_state WHERE player_id = ?')
+      .get(id) as PlayerSlot | undefined;
+  }
+
+  private decode<T>(value?: string | null) {
+    return value ? JSON.parse(value) as T : null;
   }
 }

@@ -150,9 +150,9 @@ onUnmounted(()=>{
         </section>
 
         <section v-else class="tv-game-content tv-slots-screen">
-          <p class="tv-game-eyebrow">PARTY CASINO ORIGINAL · 3 REEL SLOT</p><h2>LUCKY <span>7</span></h2>
+          <p class="tv-game-eyebrow">PARTY CASINO · 5 TÁRCSA</p><h2>Midnight Mint</h2>
           <div class="tv-art-stage">
-          <div class="tv-slot-machine"><div class="tv-slot-marquee">★ &nbsp; LUCKY 7 &nbsp; ★</div><div class="tv-slot-reels"><span>🍒</span><span>🔔</span><span>💎</span></div><div class="tv-slot-payline">★ &nbsp; GOOD LUCK &nbsp; ★</div></div>
+          <div class="tv-slot-machine"><div class="tv-slot-marquee">Midnight Mint</div><div class="tv-slot-reels"><span class="mint-symbol symbol-cherry"></span><span class="mint-symbol symbol-coin"></span><span class="mint-symbol symbol-scatter"></span></div><div class="tv-slot-payline">★ &nbsp; GOOD LUCK &nbsp; ★</div></div>
           </div>
           <p class="tv-game-caption">A slot gép a játékosok saját telefonján játszható.</p>
         </section>

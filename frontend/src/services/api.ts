@@ -1,4 +1,4 @@
-import type { Player, RouletteBetType, RouletteState } from '../types';
+import type { Player, RouletteBetType, RouletteState, SlotSpin, SlotStake, SlotState } from '../types';
 
 export type CommunityEvent = {id:number;title:string;description:string;targetAmount:number;currentAmount:number;repeatMode:'ONCE'|'REPEATABLE'|'COOLDOWN';isSecret:number;unlocked?:number;nextAvailableAt:string|null;contributorCount:number};
 export type CommunityEventAdmin = CommunityEvent & {cooldownMinutes:number;minContribution:number;maxContribution:number|null;active:number;completed:number;activationCount:number};
@@ -80,5 +80,6 @@ export const api = {
   getRouletteState: () => request<RouletteState>('/api/roulette'),
   placeRouletteBet: (playerId: number, betType: RouletteBetType, betValue: string | number, amount: number) =>
     request<RouletteState>('/api/roulette/bets', { method: 'POST', body: JSON.stringify({ playerId, betType, betValue, amount }) }),
-  spinSlots: (playerId: number, betAmount: number) => request<{ playerId: number; playerName: string; reels: string[]; isWin: boolean; multiplier: number; betAmount: number; payoutAmount: number; tokenBalance: number; winLabel: string; freeSpinsAwarded: number; freeSpins: number; usedFreeSpin: boolean; paytable: { combination: string; multiplier: number; bonusSpins?: number }[] }>('/api/slots/spin', { method: 'POST', body: JSON.stringify({ playerId, betAmount }) }),
+  getSlots: (playerId?: number) => request<SlotState>(`/api/slots${playerId ? '?playerId=' + playerId : ''}`),
+  spinSlots: (playerId: number, stake: SlotStake) => request<SlotSpin>('/api/slots/spin', { method: 'POST', body: JSON.stringify({ playerId, ...stake }) }),
 };

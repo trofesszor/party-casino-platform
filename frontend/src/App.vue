@@ -29,6 +29,6 @@ onUnmounted(() => window.removeEventListener('party-player-changed', updatePlaye
 <template>
   <CasinoHeader v-if="showCasinoHeader" />
   <router-view />
-  <PlayerWallet v-if="route.path !== '/roulette'" />
+  <PlayerWallet v-if="route.path !== '/roulette' && route.path !== '/slots'" />
   <PartyNotification v-if="showPlayerNotifications" />
 </template>

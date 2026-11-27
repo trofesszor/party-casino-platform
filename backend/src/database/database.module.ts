@@ -1,3 +1,4 @@
+import { jackpotStarts } from '../slots/slots-game';
 import { Global, Module } from '@nestjs/common';
 import { DatabaseSync } from 'node:sqlite';
 import { drizzle } from 'drizzle-orm/node-sqlite';
@@ -24,7 +25,14 @@ export const DATABASE = Symbol('DATABASE');
         );
         CREATE TABLE IF NOT EXISTS slot_player_state (
         player_id INTEGER PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
-        free_spins INTEGER NOT NULL DEFAULT 0 CHECK(free_spins >= 0)
+        free_spins INTEGER NOT NULL DEFAULT 0 CHECK(free_spins >= 0),
+        free_stake TEXT,
+        bonus_state TEXT
+      );
+      CREATE TABLE IF NOT EXISTS slot_jackpots (
+        id INTEGER PRIMARY KEY CHECK(id = 1),
+        grand INTEGER NOT NULL,
+        major INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS casino_roulette_rounds (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -290,6 +298,10 @@ export const DATABASE = Symbol('DATABASE');
       if (!wheelColumns.some(column => column.name === 'spinner_player_id')) {
         sqlite.exec("ALTER TABLE lucky_wheel_state ADD COLUMN spinner_player_id INTEGER REFERENCES players(id) ON DELETE SET NULL");
       }
+      const slotColumns = sqlite.prepare('PRAGMA table_info(slot_player_state)').all() as Array<{ name: string }>;
+      if (!slotColumns.some(column => column.name === 'free_stake')) sqlite.exec('ALTER TABLE slot_player_state ADD COLUMN free_stake TEXT');
+      if (!slotColumns.some(column => column.name === 'bonus_state')) sqlite.exec('ALTER TABLE slot_player_state ADD COLUMN bonus_state TEXT');
+      sqlite.prepare('INSERT OR IGNORE INTO slot_jackpots (id, grand, major) VALUES (1, ?, ?)').run(jackpotStarts.grand, jackpotStarts.major);
       return { sqlite, db: drizzle({ client: sqlite }) };
     },
   }],
