@@ -53,6 +53,20 @@ const jackpotCards = computed<Array<{ tier: SlotTier; amount: number; progressiv
     { tier: 'mini', amount: effectiveStake.value.denomination * rules.value.jackpotMultipliers.mini, progressive: false },
   ];
 });
+const bonusPayout = computed(() => {
+  const spin = last.value;
+  if (!spin?.finishedBonus) return [];
+  const regular = spin.finishedBonus.coins.flatMap(coin => coin && !coin.tier ? [coin] : []);
+  const rows = [{ label: 'Normál harangok', count: regular.length, amount: regular.reduce((sum, coin) => sum + coin.value, 0) }];
+  const byTier = new Map<SlotTier, { label: string; count: number; amount: number }>();
+  for (const win of spin.jackpotWins) {
+    const row = byTier.get(win.tier) ?? { label: tierTitle(win.tier), count: 0, amount: 0 };
+    row.count++;
+    row.amount += win.amount;
+    byTier.set(win.tier, row);
+  }
+  return [...rows, ...byTier.values()].filter(row => row.count > 0);
+});
 const spinLabel = computed(() => busy.value ? 'Pörgetés…' : bonus.value ? 'Ingyenes újrapörgetés' : freeSpins.value ? 'Ingyenpörgetés' : 'Pörgetés');
 
 function bonusGrid(state: SlotBonus): SlotTile[] {
@@ -213,6 +227,8 @@ onUnmounted(() => {
             <div v-for="column in columns" :key="column" class="mint-reel" :class="{ rolling: rolling[column] }">
               <div v-for="row in rows" :key="row" :class="['mint-cell', reel[row * 5 + column].coin?.tier, { 'mint-winning': !displayedBonus && winningPositions.has(row * 5 + column), 'mint-held': displayedBonus?.coins[row * 5 + column], 'mint-new-bell': newBells.includes(row * 5 + column), 'mint-captioned': reel[row * 5 + column].coin || reel[row * 5 + column].symbol === 'wild' }]" role="img" :aria-label="displayTile(reel[row * 5 + column])"
                 :style="{ '--mint-fall-delay': Math.max(0, newBells.indexOf(row * 5 + column)) * bellStaggerMs + 'ms', '--mint-fall-duration': bellFallMs + 'ms' }">
+                <span v-if="bonus && rolling[column] && !bonus.coins[row * 5 + column]" class="mint-respin-ghost"
+                  :style="{ '--mint-respin-delay': row * 35 + column * 12 + 'ms' }" aria-hidden="true"></span>
                 <span :class="['mint-symbol', 'symbol-' + reel[row * 5 + column].symbol]" aria-hidden="true"></span>
                 <strong v-if="reel[row * 5 + column].coin" class="mint-tile-caption mint-coin-value">
                   <small v-if="reel[row * 5 + column].coin?.tier">{{ reel[row * 5 + column].coin?.tier }}</small>
@@ -227,11 +243,19 @@ onUnmounted(() => {
               <strong>{{ last.winLabel }}</strong>
               <span v-if="bonus && newBellCount">+{{ newBellCount }} harang · {{ rules.bellBonus.respins }} kör</span>
               <span v-else-if="bonus">Nem érkezett új harang.</span>
-              <span v-if="last.payoutAmount">+{{ format(last.payoutAmount) }} CR</span>
-              <span v-if="last.jackpotWins.length">{{ last.jackpotWins.map(win => tierTitle(win.tier) + ' ' + format(win.amount) + ' CR').join(' · ') }}</span>
+              <span v-if="last.payoutAmount && !last.finishedBonus">+{{ format(last.payoutAmount) }} CR</span>
+              
             </template>
             <span v-else>{{ busy ? 'A tárcsák forognak…' : bonus ? 'A gyűjtött harangok a helyükön maradnak.' : 'Pörgetésre kész' }}</span>
           </div>
+
+          <dl v-if="last?.finishedBonus" class="mint-payout-details" aria-label="A bónusznyeremény bontása">
+            <div v-for="row in bonusPayout" :key="row.label">
+              <dt>{{ row.label }} <small v-if="row.count > 1">×{{ row.count }}</small></dt>
+              <dd>{{ format(row.amount) }} CR</dd>
+            </div>
+            <div class="mint-payout-total"><dt>Jóváírva összesen</dt><dd>{{ format(last.payoutAmount) }} CR</dd></div>
+          </dl>
 
           <form class="mint-controls" @submit.prevent="spin">
             <div v-if="available !== null" class="mint-balance"><span>Egyenleg</span><strong>{{ format(available) }} CR</strong></div>

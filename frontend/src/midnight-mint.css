@@ -164,6 +164,26 @@
   font-size: .84rem;
 }
 .mint-result strong, .mint-result strong + span { color: var(--mint-gold); }
+.mint-payout-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 124px), 1fr));
+  gap: 5px 12px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--mint-edge);
+  border-radius: 8px;
+  background: #101c26;
+  font-size: .84rem;
+}
+.mint-payout-details > div { display: grid; gap: 2px; }
+.mint-payout-details dt { color: var(--mint-muted); }
+.mint-payout-details dd {
+  margin: 0;
+  color: var(--mint-text);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.mint-payout-details .mint-payout-total dd { color: var(--mint-gold); }
 .mint-controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr));
@@ -342,6 +362,21 @@
 }
 .mint-respin-meter .mint-respin-lit { background: oklch(81% .126 164); color: #10221d; font-weight: 800; }
 .mint-respin-refill .mint-respin-lit { animation: mint-bell-arrival 420ms cubic-bezier(.18,.78,.25,1); }
+.mint-respin-ghost {
+  position: absolute;
+  inset-block-start: 5%;
+  inset-inline-start: 17%;
+  inline-size: 66%;
+  block-size: 88%;
+  background: url('./assets/mint-bell.webp') center / contain no-repeat;
+  pointer-events: none;
+  animation: mint-respin-fall 340ms var(--mint-respin-delay) linear infinite both;
+}
+@keyframes mint-respin-fall {
+  0% { transform: translateY(-115%); opacity: 0; }
+  25%, 65% { opacity: .72; }
+  100% { transform: translateY(115%); opacity: 0; }
+}
 .mint-bonus .mint-cell.mint-new-bell .mint-symbol {
   animation: mint-bell-drop var(--mint-fall-duration) var(--mint-fall-delay) both;
 }
@@ -366,4 +401,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .mint-respin-refill .mint-respin-lit, .mint-bonus .mint-new-bell :is(.mint-symbol, .mint-tile-caption) { animation: none; }
+  .mint-respin-ghost { display: none; }
 }
