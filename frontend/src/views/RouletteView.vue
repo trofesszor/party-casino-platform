@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import { socket } from '../services/socket';
 import type { RouletteBet, RouletteBetType, RouletteState } from '../types';
 import PlayerWallet from '../components/PlayerWallet.vue';
+import RouletteBetChip from '../components/RouletteBetChip.vue';
 import RouletteWheel from '../components/RouletteWheel.vue';
 
 const route = useRoute();
@@ -13,14 +14,15 @@ const playerId = Number(localStorage.getItem('party-player-id')) || 0;
 const state = ref<RouletteState | null>(null);
 const now = ref(Date.now());
 const error = ref('');
-const busy = ref(false);
+const queued = ref<QueuedBet[]>([]);
+let sending = false;
 const balance = ref(0);
 const chip = ref(1);
-const selection = ref<Choice | null>(null);
 const landedRound = ref<number | null>(null);
 let clock: ReturnType<typeof setInterval> | undefined;
 
 type Choice = { type: RouletteBetType; value: string; label: string; color?: string };
+type QueuedBet = { choice: Choice; amount: number; roundId: number };
 type Combination = Choice & { type: 'SPLIT' | 'STREET' | 'CORNER' | 'SIX_LINE'; x: number; y: number };
 const names: Record<RouletteBetType, string> = {
   NUMBER: 'Szám', SPLIT: 'Két szám', STREET: 'Három szám', CORNER: 'Négy szám', SIX_LINE: 'Hat szám',
@@ -70,11 +72,31 @@ const secondsLeft = computed(() => Math.max(0, Math.ceil((Date.parse(round.value
 const accepting = computed(() => round.value?.status === 'BETTING' && secondsLeft.value > 0);
 const resultVisible = computed(() => round.value?.status === 'COMPLETED' && round.value.roundNumber === landedRound.value);
 const remaining = computed(() => Math.max(0, Math.min(100, secondsLeft.value * 100 / (state.value?.bettingSeconds || 20))));
-const selectedNumbers = computed(() => {
-  const choice = selection.value;
-  if (!choice || standardChoices.some(item => item.type === choice.type)) return [];
-  return choice.value.split(',').map(Number);
+const boardStakes = computed(() => {
+  const stakes = new Map<string, { amount: number; pending: boolean }>();
+  for (const { betType, betValue, amount } of myBets.value) {
+    const key = betKey(betType, betValue);
+    stakes.set(key, { amount: (stakes.get(key)?.amount ?? 0) + amount, pending: false });
+  }
+  for (const bet of queued.value) {
+    if (bet.roundId !== round.value?.id) continue;
+    const key = betKey(bet.choice.type, bet.choice.value);
+    const stake = stakes.get(key);
+    if (stake) {
+      stake.pending = true;
+    } else {
+      stakes.set(key, { amount: bet.amount, pending: true });
+    }
+  }
+  return stakes;
 });
+
+function betKey(type: RouletteBetType, value: string) {
+  return type + ':' + value;
+}
+function boardStake(choice: Choice) {
+  return boardStakes.value.get(betKey(choice.type, choice.value));
+}
 
 function combination(type: Combination['type'], numbers: number[], column: number, row: number): Combination {
   return { type, value: numbers.join(','), label: numbers.join(' + '), x: column * 100 / 12, y: row * 100 / 3 };
@@ -87,12 +109,6 @@ function describe(bet: RouletteBet) {
   const standard = standardChoices.find(choice => choice.type === bet.betType && choice.value === bet.betValue);
   return `${names[bet.betType]} · ${standard?.label ?? bet.betValue.split(',').join(' + ')}`;
 }
-function clearSelection() {
-  selection.value = null;
-}
-function selected(choice: Choice) {
-  return selection.value?.type === choice.type && selection.value.value === choice.value;
-}
 async function refreshBalance() {
   if (playerId) balance.value = (await api.getPlayerBalance(playerId)).tokenBalance;
 }
@@ -100,18 +116,30 @@ function onState(payload: RouletteState) {
   state.value = payload;
   refreshBalance().catch(() => {});
 }
-async function submit() {
-  const choice = selection.value;
-  if (!choice || !accepting.value || !playerId || busy.value) return;
-  busy.value = true;
+function placeBet(choice: Choice) {
+  if (!accepting.value || !playerId || !round.value) return;
   error.value = '';
+  queued.value.push({ choice, amount: chip.value, roundId: round.value.id });
+  void sendBets();
+}
+async function sendBets() {
+  if (sending) return;
+  sending = true;
   try {
-    onState(await api.placeRouletteBet(playerId, choice.type, choice.value, chip.value));
-    clearSelection();
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'A tét elhelyezése sikertelen.';
+    while (queued.value.length) {
+      const bet = queued.value[0];
+      try {
+        if (!accepting.value || round.value?.id !== bet.roundId) throw new Error('Ez a rulettkör már véget ért.');
+        const result = await api.placeRouletteBet(playerId, bet.choice.type, bet.choice.value, bet.amount, bet.roundId);
+        if (round.value?.id === bet.roundId && round.value.status === 'BETTING' && result.bets.length >= (state.value?.bets.length ?? 0)) onState(result);
+      } catch (cause) {
+        error.value = cause instanceof Error ? cause.message : 'A tét elhelyezése sikertelen.';
+      } finally {
+        queued.value.shift();
+      }
+    }
   } finally {
-    busy.value = false;
+    sending = false;
   }
 }
 function loadState() {
@@ -158,63 +186,55 @@ onUnmounted(() => {
 
         <section v-if="!isDisplay" class="studio-console" aria-label="Fogadóasztal">
           <div class="studio-console-heading"><h2>Fogadóasztal</h2><span>{{ myBets.length }} tét · {{ totalStake }} CR</span></div>
-          <fieldset class="studio-fields" :disabled="busy || !accepting">
+          <div class="studio-chipline" role="group" aria-label="Zsetonérték">
+            <span>Zseton</span>
+            <button v-for="value in chips" :key="value" type="button" :aria-pressed="value === chip" :aria-label="value + ' CR'"
+              @click="chip = value">{{ value }}</button>
+            <RouterLink v-if="!playerId" class="studio-cta" to="/">Csatlakozás</RouterLink>
+          </div>
+          <p v-if="error" class="error studio-error" role="alert">{{ error }}</p>
+          <fieldset class="studio-fields" :disabled="!accepting || !playerId">
             <legend class="layout-visually-hidden">Fogadás kiválasztása</legend>
             <p class="studio-instruction" id="roulette-board-help">
-              A mező közepe egy szám, a határ két szám, a sarok négy szám. Az alsó jelölők három- és hatszámos tétek.
+              A kiválasztott zseton a mezőre koppintva azonnal felkerül. A határokon és a jelölőkön kombinációkra tehetsz.
             </p>
-            <p class="studio-board-pan">A teljes asztal oldalra húzható.</p>
-            <div class="studio-board-scroll" role="region" tabindex="0" aria-label="Európai rulettasztal" aria-describedby="roulette-board-help">
+            <div class="studio-board-frame" role="region" tabindex="0" aria-label="Európai rulettasztal" aria-describedby="roulette-board-help">
               <div class="studio-table">
-                <button class="studio-board-cell studio-zero green" type="button" :aria-pressed="selected(zero)" @click="selection = zero">0</button>
+                <button class="studio-board-cell studio-zero green" type="button" @click="placeBet(zero)">0<RouletteBetChip :stake="boardStake(zero)" /></button>
                 <div class="studio-inner-bets">
                   <div class="studio-number-board" aria-label="Számmezők">
                     <button v-for="number in numberList" :key="number.value" type="button" class="studio-board-cell"
-                      :class="[number.color, { 'studio-covered-number': selectedNumbers.includes(Number(number.value)) }]"
-                      :style="{ gridColumn: number.column, gridRow: number.row }"
-                      :aria-pressed="selected(number)" @click="selection = number">{{ number.label }}</button>
+                      :class="number.color"
+                      :style="{ '--table-column': number.column, '--table-row': number.row, '--vertical-column': 4 - number.row }"
+                      @click="placeBet(number)">{{ number.label }}<RouletteBetChip :stake="boardStake(number)" /></button>
                   </div>
                   <button v-for="mark in combinations" :key="mark.type + mark.value" type="button" class="studio-bet-marker"
-                    :class="mark.type.toLowerCase()" :style="{ left: mark.x + '%', top: mark.y + '%' }"
+                    :class="mark.type.toLowerCase()" :style="{ '--table-x': mark.x + '%', '--table-y': mark.y + '%', '--vertical-x': 100 - mark.y + '%' }"
                     :aria-label="names[mark.type] + ' · ' + mark.label" :title="names[mark.type] + ' · ' + mark.label"
-                    :aria-pressed="selected(mark)" @click="selection = mark"><span aria-hidden="true"></span></button>
+                    @click="placeBet(mark)"><span v-if="!boardStake(mark)" class="studio-marker-dot" aria-hidden="true"></span><RouletteBetChip :stake="boardStake(mark)" /></button>
                 </div>
                 <div class="studio-column-bets" role="group" aria-label="Oszlopfogadások">
                   <button v-for="choice in columns" :key="choice.value" type="button" class="studio-board-cell"
-                    :aria-pressed="selected(choice)" @click="selection = choice">{{ choice.label }}</button>
+                    :style="{ '--vertical-column': Number(choice.value) }" @click="placeBet(choice)">{{ choice.label }}<RouletteBetChip :stake="boardStake(choice)" /></button>
                 </div>
                 <div class="studio-edge-bets" role="group" aria-label="Három és hat szám">
                   <button v-for="mark in edge" :key="mark.type + mark.value" type="button" class="studio-bet-marker"
-                    :class="mark.type.toLowerCase()" :style="{ left: mark.x + '%' }"
+                    :class="mark.type.toLowerCase()" :style="{ '--table-x': mark.x + '%' }"
                     :aria-label="names[mark.type] + ' · ' + mark.label" :title="names[mark.type] + ' · ' + mark.label"
-                    :aria-pressed="selected(mark)" @click="selection = mark"><span aria-hidden="true">{{ mark.type === 'STREET' ? '3' : '6' }}</span></button>
+                    @click="placeBet(mark)"><span v-if="!boardStake(mark)" class="studio-marker-dot" aria-hidden="true">{{ mark.type === 'STREET' ? '3' : '6' }}</span><RouletteBetChip :stake="boardStake(mark)" /></button>
                 </div>
                 <div class="studio-dozen-bets" role="group" aria-label="Tucatfogadások">
                   <button v-for="choice in dozens" :key="choice.value" type="button" class="studio-board-cell"
-                    :aria-pressed="selected(choice)" @click="selection = choice">{{ choice.label }}</button>
+                    @click="placeBet(choice)">{{ choice.label }}<RouletteBetChip :stake="boardStake(choice)" /></button>
                 </div>
                 <div class="studio-outside-bets" role="group" aria-label="Külső fogadások">
                   <button v-for="choice in outside" :key="choice.value" type="button" class="studio-board-cell" :class="choice.color"
-                    :aria-pressed="selected(choice)" @click="selection = choice">{{ choice.label }}</button>
+                    @click="placeBet(choice)">{{ choice.label }}<RouletteBetChip :stake="boardStake(choice)" /></button>
                 </div>
               </div>
             </div>
           </fieldset>
 
-          <div class="studio-ticket">
-            <div class="studio-chipline" role="group" aria-label="Zsetonérték">
-              <span>Tét</span>
-              <button v-for="value in chips" :key="value" type="button" :aria-pressed="value === chip" :aria-label="value + ' CR'"
-                :disabled="busy" @click="chip = value">{{ value }}</button>
-            </div>
-            <div class="studio-submit">
-              <div class="studio-selection"><small>Kijelölés</small><strong>{{ selection ? names[selection.type] + ' · ' + selection.label : 'Válassz fogadást' }}</strong></div>
-              <button v-if="selection" type="button" class="studio-clear" :disabled="busy" @click="clearSelection">Törlés</button>
-              <RouterLink v-if="!playerId" class="studio-cta" to="/">Csatlakozás</RouterLink>
-              <button v-else class="studio-cta" type="button" :disabled="busy || !accepting || !selection" @click="submit">{{ busy ? 'Elhelyezés…' : chip + ' CR elhelyezése' }}</button>
-            </div>
-            <p v-if="error" class="error studio-error" role="alert">{{ error }}</p>
-          </div>
         </section>
       </div>
 

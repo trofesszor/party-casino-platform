@@ -51,12 +51,16 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     return { currentRound, bets, winners, history, bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds };
   }
 
-  placeBet(playerId: number, input: { betType: string; betValue: string | number; amount?: number }) {
+  placeBet(playerId: number, input: { betType: string; betValue: string | number; amount?: number; roundId?: number }) {
     const player = this.database.sqlite.prepare('SELECT id FROM players WHERE id = ?').get(playerId);
     if (!player) throw new NotFoundException('A játékos nem található. Lépj be újra a neveddel.');
     const round = this.latestRound();
     if (!round || round.status !== 'BETTING' || Date.parse(round.bettingEndsAt) <= Date.now()) {
       throw new BadRequestException('A fogadási időszak lezárult.');
+    }
+
+    if (input.roundId !== undefined && input.roundId !== round.id) {
+      throw new BadRequestException('Ez a rulettkör már véget ért.');
     }
 
     const betType = String(input?.betType ?? '').toUpperCase();

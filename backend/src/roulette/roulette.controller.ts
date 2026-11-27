@@ -11,7 +11,7 @@ export class RouletteController {
   }
 
   @Post('bets')
-  placeBet(@Body() body: { playerId: number; betType: string; betValue: string | number }) {
+  placeBet(@Body() body: { playerId: number; betType: string; betValue: string | number; amount?: number; roundId?: number }) {
     return this.roulette.placeBet(Number(body.playerId), body);
   }
 }
