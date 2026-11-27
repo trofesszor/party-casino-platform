@@ -35,6 +35,6 @@ onUnmounted(() => {
 <template>
   <CasinoHeader v-if="showCasinoHeader" />
   <router-view />
-  <PlayerWallet v-if="route.path !== '/roulette' && route.path !== '/slots' && route.path !== '/blackjack'" />
+  <PlayerWallet v-if="route.path !== '/display' && route.path !== '/roulette' && route.path !== '/slots' && route.path !== '/blackjack'" />
   <PartyNotification v-if="showPlayerNotifications" />
 </template>

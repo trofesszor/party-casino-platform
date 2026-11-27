@@ -1,19 +1,15 @@
 <script setup lang="ts">
-import GameAudioControl from '../components/GameAudioControl.vue';
-import { useRouletteAudio, useWheelAudio } from '../services/game-audio';
+import { activateGameAudio, useGameAudio } from '../services/game-audio';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { socket } from '../services/socket';
-import { api, type CommunityEvent } from '../services/api';
+import { api } from '../services/api';
 import type { RouletteState } from '../types';
 import RouletteWheel from '../components/RouletteWheel.vue';
 
-type PublicNotification = {id:number;type:string;title:string|null;message:string;createdAt:string};
-type ScreenMode = 'roulette'|'wheel'|'slots';
+type ScreenMode = 'roulette' | 'wheel';
 const state = ref<RouletteState|null>(null);
 const visibleRouletteRound = ref<number | null>(null);
 const players = ref<{id:number;name:string}[]>([]);
-const notifications = ref<PublicNotification[]>([]);
-const events = ref<CommunityEvent[]>([]);
 type DisplayWheelState = Awaited<ReturnType<typeof api.getLuckyWheel>> & { spinnerPlayerId?: number|null };
 const wheel = ref<DisplayWheelState|null>(null);
 const wheelRotation = ref(0);
@@ -22,18 +18,39 @@ const now = ref(Date.now());
 let animatedWheelSpinId: string|null = null;
 let wheelClock: ReturnType<typeof setInterval>|undefined;
 const activeScreen = ref<ScreenMode>('roulette');
-const rouletteAudio = useRouletteAudio();
-const wheelAudio = useWheelAudio();
-watch(activeScreen, mode => {
-  if (mode !== 'roulette') rouletteAudio.stop();
-  if (mode !== 'wheel') wheelAudio.stop();
-});
-const loading = ref(true);
-let refreshTimer: ReturnType<typeof setInterval>|undefined;
+const soundOn = ref(false);
+const tvAudio = useGameAudio(() => soundOn.value);
+let refreshTimer: ReturnType<typeof setInterval> | undefined;
+let rouletteVersion = 0;
+let wheelVersion = 0;
+let liveRouletteRound: number | null = null;
 
-const fmt = (value:number) => value.toLocaleString('hu-HU');
-const eventPercent = (event:CommunityEvent) => Math.min(100,Math.round(event.currentAmount/Math.max(1,event.targetAmount)*100));
-const screenLabel = computed(()=>activeScreen.value==='roulette'?'KÖZÖS RULETTASZTAL':activeScreen.value==='wheel'?'SZERENCSEKERÉK':'SLOT GÉP');
+const screenLabel = computed(() => activeScreen.value === 'roulette' ? 'Közös rulettasztal' : 'Szerencsekerék');
+const redNumbers = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+const latestNumbers = computed(() => {
+  const current = state.value?.currentRound;
+  const history = state.value?.history ?? [];
+  if (current?.status !== 'COMPLETED' || current.roundNumber !== visibleRouletteRound.value || current.resultNumber === null) {
+    return history.slice(0, 10);
+  }
+  return [
+    { roundNumber: current.roundNumber, resultNumber: current.resultNumber },
+    ...history.filter(item => item.roundNumber !== current.roundNumber),
+  ].slice(0, 10);
+});
+const numberColor = (number: number) => number === 0 ? 'green' : redNumbers.has(number) ? 'red' : 'black';
+const colorLabels = { green: 'zöld', red: 'piros', black: 'fekete' };
+
+function toggleSound() {
+  soundOn.value = !soundOn.value;
+  if (soundOn.value) {
+    void activateGameAudio().then(() => tvAudio.effect('start'));
+    tvAudio.announce('A tévé hangja bekapcsolva.');
+  } else tvAudio.stopSpeech();
+}
+
+watch(activeScreen, () => tvAudio.stopSpeech());
+
 const wheelSlices = computed(() => {
   const segments = wheel.value?.segments ?? []; const count = segments.length || 1;
   return segments.map((segment,index) => {
@@ -62,46 +79,74 @@ async function animateDisplayWheel(s:DisplayWheelState){
   wheelRotation.value=current+360*9+delta;
 }
 function settleDisplayWheel(s:DisplayWheelState){const target=wheelTargetRotation(s);if(target===null)return;wheelTransitionMs.value=0;wheelRotation.value=Math.floor(wheelRotation.value/360)*360+target;}
-async function applyWheelState(next:DisplayWheelState){wheelAudio.changed(wheel.value, next, activeScreen.value === 'wheel');const newSpin=next.status==='SPINNING'&&next.spinId!==wheel.value?.spinId;wheel.value=next;if(newSpin)await animateDisplayWheel(next);else if(next.status!=='SPINNING')settleDisplayWheel(next);}
+function applyWheelState(next: DisplayWheelState) {
+  const previous = wheel.value;
+  wheel.value = next;
+  if (next.status === 'SPINNING' && (previous?.status !== 'SPINNING' || next.spinId !== previous.spinId)) {
+    void animateDisplayWheel(next);
+    if (activeScreen.value === 'wheel') {
+      tvAudio.effect('start');
+      tvAudio.announce('Indul a szerencsekerék.');
+    }
+  } else if (next.status !== 'SPINNING') {
+    settleDisplayWheel(next);
+    if (activeScreen.value === 'wheel' && previous?.status === 'SPINNING' && next.status === 'RESULT' && previous.spinId === next.spinId) {
+      tvAudio.effect('win');
+      if (next.winner) tvAudio.announce('A szerencsekerék eredménye: ' + next.winner.label + '.');
+    }
+  }
+}
 
-async function refreshData(){
-  const results=await Promise.allSettled([
+async function refreshData() {
+  const rouletteAtRequest = rouletteVersion;
+  const wheelAtRequest = wheelVersion;
+  const [roulette, playersResult, wheelResult] = await Promise.allSettled([
     api.getRouletteState(),
     api.getPlayers(),
-    api.getPartyNotifications(),
-    api.getCommunityEvents(),
-    api.getLuckyWheel()
+    api.getLuckyWheel(),
   ]);
-  if(results[0].status==='fulfilled') onRouletteChanged(results[0].value);
-  if(results[1].status==='fulfilled') players.value=results[1].value;
-  if(results[2].status==='fulfilled') notifications.value=results[2].value.slice(0,30);
-  if(results[3].status==='fulfilled') events.value=results[3].value.events;
-  if(results[4].status==='fulfilled') await applyWheelState(results[4].value as DisplayWheelState);
-  loading.value=false;
+  if (roulette.status === 'fulfilled' && rouletteAtRequest === rouletteVersion) onRouletteChanged(roulette.value);
+  if (playersResult.status === 'fulfilled') players.value = playersResult.value;
+  if (wheelResult.status === 'fulfilled' && wheelAtRequest === wheelVersion) onWheelChanged(wheelResult.value);
 }
 function onRouletteChanged(next: RouletteState) {
-  rouletteAudio.changed(state.value?.currentRound, next.currentRound, activeScreen.value === 'roulette');
+  rouletteVersion++;
+  const previous = state.value?.currentRound;
+  const current = next.currentRound;
+  if (previous?.id !== current?.id) visibleRouletteRound.value = null;
   state.value = next;
+  if (!previous || !current) return;
+  if (current.status === 'BETTING' && previous.id !== current.id && activeScreen.value === 'roulette') {
+    tvAudio.effect('start');
+    tvAudio.announce('Új rulettkör. A tétek megtehetők.', true);
+  }
+  if (current.status === 'COMPLETED' && previous.id === current.id && previous.status === 'BETTING') {
+    liveRouletteRound = current.roundNumber;
+  }
 }
 function onRouletteLanded(round: number) {
+  const current = state.value?.currentRound;
+  if (current?.status !== 'COMPLETED' || current.roundNumber !== round) return;
   visibleRouletteRound.value = round;
-  rouletteAudio.landed(state.value?.currentRound, round);
+  if (liveRouletteRound !== round) return;
+  liveRouletteRound = null;
+  if (activeScreen.value === 'roulette' && current.resultNumber !== null) {
+    tvAudio.effect('win');
+    tvAudio.announce('A nyerőszám ' + current.resultNumber + '. ' + colorLabels[numberColor(current.resultNumber)] + '.', true);
+  }
 }
-function onPlayersChanged(next:{id:number;name:string}[]){players.value=next;}
-function onWheelChanged(next:DisplayWheelState){void applyWheelState(next);}
-function onPublicNotification(next:PublicNotification){
-  // The TV is a public surface. Never render targeted/private player messages.
-  if((next as any).audiencePlayerId || (next as any).playerId) return;
-  if(!next.message) return;
-  if(!notifications.value.some(item=>item.id===next.id)) notifications.value=[next,...notifications.value].slice(0,30);
+function onPlayersChanged(next: { id: number; name: string }[]) {
+  players.value = next;
 }
-function formatTime(value:string){const date=new Date(value.includes('Z')?value:value.replace(' ','T')+'Z');return Number.isNaN(date.getTime())?'':date.toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'});}
+function onWheelChanged(next: DisplayWheelState) {
+  wheelVersion++;
+  applyWheelState(next);
+}
 onMounted(()=>{
   void refreshData();
   refreshTimer=setInterval(()=>void refreshData(),5000);
   socket.on('roulette:changed',onRouletteChanged);
   socket.on('players:online',onPlayersChanged);
-  socket.on('party:notification',onPublicNotification);
   socket.on('lucky-wheel:changed',onWheelChanged);
   wheelClock=setInterval(()=>now.value=Date.now(),250);
 });
@@ -109,7 +154,6 @@ onUnmounted(()=>{
   if(refreshTimer)clearInterval(refreshTimer);
   socket.off('roulette:changed',onRouletteChanged);
   socket.off('players:online',onPlayersChanged);
-  socket.off('party:notification',onPublicNotification);
   socket.off('lucky-wheel:changed',onWheelChanged);
   if(wheelClock)clearInterval(wheelClock);
 });
@@ -126,29 +170,38 @@ onUnmounted(()=>{
     <div class="tv-layout">
       <section class="tv-main-screen">
         <div class="tv-screen-toolbar">
-          <div class="tv-toolbar-title"><h1>{{screenLabel}}</h1><GameAudioControl compact /></div>
+          <h1>{{ screenLabel }}</h1>
+          <button type="button" class="tv-sound" aria-label="TV-hang" :aria-pressed="soundOn" @click="toggleSound">
+            {{ soundOn ? 'Hang be' : 'Hang indítása' }}
+          </button>
           <nav class="tv-screen-switcher" aria-label="Kijelző tartalma">
-            <button :class="{active:activeScreen==='roulette'}" @click="activeScreen='roulette'">◉ Rulett</button>
-            <button :class="{active:activeScreen==='wheel'}" @click="activeScreen='wheel'">◎ Szerencsekerék</button>
-            <button :class="{active:activeScreen==='slots'}" @click="activeScreen='slots'">▥ Slot</button>
+            <button type="button" :aria-pressed="activeScreen === 'roulette'" :class="{active:activeScreen==='roulette'}" @click="activeScreen='roulette'">Rulett</button>
+            <button type="button" :aria-pressed="activeScreen === 'wheel'" :class="{active:activeScreen==='wheel'}" @click="activeScreen='wheel'">Szerencsekerék</button>
           </nav>
         </div>
 
         <section v-if="activeScreen==='roulette'" class="tv-game-content tv-roulette-screen">
           <template v-if="state?.currentRound">
-            <p class="tv-game-eyebrow">KÖZÖS RULETTASZTAL · {{state.currentRound.status==='BETTING'?'FOGADÁS':'EREDMÉNY'}}</p>
             <h2>{{state.currentRound.status==='BETTING'?'Tétek leadása folyamatban':visibleRouletteRound === state.currentRound.roundNumber ? 'A kör eredménye' : 'A golyó pályán van'}}</h2>
             <div class="tv-art-stage tv-roulette-art">
               <RouletteWheel :result-number="state.currentRound.resultNumber" :previous-result-number="state.history[0]?.resultNumber??null" :spinning="state.currentRound.status==='COMPLETED'" :round-number="state.currentRound.roundNumber" :completed-at="state.currentRound.completedAt" :result-seconds="state.resultSeconds" @landed="onRouletteLanded"/>
             </div>
-            <div class="tv-game-stats"><span><b>{{players.length}}</b> online játékos</span><span><b>{{state.bets.length}}</b> leadott tét</span></div>
-            <div class="tv-bet-list"><div v-for="bet in state.bets" :key="bet.id" class="tv-bet-row"><strong>{{bet.playerName}}</strong><span>{{bet.betType==='NUMBER'?bet.betValue:bet.betValue==='red'?'Piros':'Fekete'}}</span><b v-if="state.currentRound.status==='COMPLETED' && visibleRouletteRound === state.currentRound.roundNumber" :class="{winner:state.winners.some(w=>w.id===bet.id)}">{{state.winners.some(w=>w.id===bet.id)?'NYERT':'—'}}</b></div></div>
+            <section class="tv-results" aria-label="Nyerőszám-előzmények">
+              <h3>Legutóbbi nyerőszámok</h3>
+              <ol v-if="latestNumbers.length" aria-live="polite">
+                <li v-for="item in latestNumbers" :key="item.roundNumber" :class="numberColor(item.resultNumber)"
+                  :aria-label="item.roundNumber + '. kör, ' + item.resultNumber + ', ' + colorLabels[numberColor(item.resultNumber)]">
+                  {{ item.resultNumber }}
+                </li>
+              </ol>
+              <p v-else>Még nincs lezárt kör.</p>
+            </section>
           </template>
           <div v-else class="tv-empty-game"><span>◉</span><h2>Hamarosan indul az első rulettkör</h2><p>A játékosok a telefonjukról csatlakozhatnak az asztalhoz.</p></div>
         </section>
 
-        <section v-else-if="activeScreen==='wheel'" class="tv-game-content tv-wheel-screen">
-          <p class="tv-game-eyebrow">PARTY CHALLENGE · KÖZÖS PÖRGETÉS</p><h2>Szerencsekerék</h2>
+        <section v-else class="tv-game-content tv-wheel-screen">
+          <h2>Szerencsekerék</h2>
           <div class="tv-art-stage">
           <div class="tv-wheel-stage">
             <div class="tv-wheel-pointer"></div>
@@ -164,40 +217,7 @@ onUnmounted(()=>{
           <p class="tv-game-caption">{{wheel?.status==='SPINNING'?'A kerék forog…':wheel?.status==='RESULT'?'A pörgetés véget ért.':'A játékosok telefonjukról indíthatják a pörgetést.'}}</p>
         </section>
 
-        <section v-else class="tv-game-content tv-slots-screen">
-          <p class="tv-game-eyebrow">PARTY CASINO · 5 TÁRCSA</p><h2>Midnight Mint</h2>
-          <div class="tv-art-stage">
-          <div class="tv-slot-machine"><div class="tv-slot-marquee">Midnight Mint</div><div class="tv-slot-reels"><span class="mint-symbol symbol-cherry"></span><span class="mint-symbol symbol-coin"></span><span class="mint-symbol symbol-scatter"></span></div><div class="tv-slot-payline">★ &nbsp; GOOD LUCK &nbsp; ★</div></div>
-          </div>
-          <p class="tv-game-caption">A slot gép a játékosok saját telefonján játszható.</p>
-        </section>
-        <footer class="tv-footer"><span>PARTY CASINO</span><strong>VÁLASSZ JÁTÉKOT. CSATLAKOZZ. JÁTSSZ.</strong></footer>
       </section>
-      <aside class="tv-sidebar">
-        <section class="tv-panel tv-notification-panel">
-          <header class="tv-panel-heading"><div><small>LIVE FEED</small><h2>Értesítések</h2></div><span class="tv-live-pill"><i></i> LIVE</span></header>
-          <div class="tv-notification-list">
-            <article v-for="item in notifications" :key="item.id" class="tv-notification-item" :class="'tv-notice-'+item.type">
-              <span class="tv-notice-icon">{{item.type==='wheel'?'◎':item.type==='event'?'✦':item.type==='duel'?'⚔':item.type==='slots'?'🎰':item.type==='roulette'?'🎯':item.type==='leaderboard'?'♛':'◆'}}</span>
-              <div><small>{{item.title||'PARTY CASINO'}} <time>{{formatTime(item.createdAt)}}</time></small><strong>{{item.message}}</strong></div>
-            </article>
-            <p v-if="!notifications.length" class="tv-panel-empty">{{loading?'Értesítések betöltése…':'Még nincs új értesítés.'}}</p>
-          </div>
-        </section>
-
-        <section class="tv-panel tv-events-panel">
-          <header class="tv-panel-heading"><div><small>WORK TOGETHER</small><h2>Közösségi események</h2></div><span class="tv-event-count">{{events.length}}</span></header>
-          <div class="tv-event-list">
-            <article v-for="event in events" :key="event.id" class="tv-event-item">
-              <div class="tv-event-title"><div><span v-if="event.isSecret" class="tv-secret-tag">✦ TITKOS</span><small v-else>{{event.repeatMode==='ONCE'?'EGYSZERI':event.repeatMode==='COOLDOWN'?'COOLDOWN':'ISMÉTELHETŐ'}}</small><h3>{{event.isSecret?'Rejtett esemény':event.title}}</h3></div><b>{{eventPercent(event)}}%</b></div>
-              <p>{{event.isSecret?'A részletek egyelőre titkosak.':event.description}}</p>
-              <div class="tv-progress"><span :style="{width:eventPercent(event)+'%'}"></span></div>
-              <div class="tv-event-meta"><strong>{{fmt(event.currentAmount)}} <small>/ {{fmt(event.targetAmount)}} CR</small></strong><span>{{event.contributorCount}} támogató</span></div>
-            </article>
-            <p v-if="!events.length" class="tv-panel-empty">{{loading?'Események betöltése…':'Jelenleg nincs aktív közösségi esemény.'}}</p>
-          </div>
-        </section>
-      </aside>
     </div>
   </main>
 </template>
@@ -225,7 +245,7 @@ onUnmounted(()=>{
 .tv-topbar { min-height: 0; height: clamp(36px, 7.5dvh, 76px); gap: 8px; }
 .tv-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, clamp(195px, 25vw, 330px));
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   height: auto;
   min-height: 0;
@@ -236,7 +256,7 @@ onUnmounted(()=>{
 
 .tv-main-screen {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   order: 0;
   height: auto;
   min-height: 0;
@@ -253,8 +273,18 @@ onUnmounted(()=>{
   gap: 4px 10px;
   padding-bottom: clamp(3px, 1vmin, 12px);
 }
-.tv-toolbar-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
-.tv-screen-toolbar h1 { margin: 0; font-size: clamp(.8rem, 2.15vmin, 1.3rem); }
+.tv-screen-toolbar h1 { flex: 1; margin: 0; font-size: clamp(.8rem, 2.15vmin, 1.3rem); }
+.tv-sound {
+  min-height: 44px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: clamp(.73rem, 1.6vmin, .9rem);
+}
+.tv-sound[aria-pressed='true'] { color: var(--accent); }
+.tv-screen-toolbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .tv-screen-switcher { width: auto; max-width: 100%; padding: 2px; gap: 2px; overflow: clip; }
 .tv-screen-switcher button {
   min-height: clamp(27px, 6vmin, 44px);
@@ -273,16 +303,13 @@ onUnmounted(()=>{
   min-height: 0;
   overflow: clip;
 }
-.tv-game-eyebrow { display: none; }
 .tv-game-content > h2 {
   margin: 0;
   font-size: clamp(.95rem, 3.2vmin, 2rem);
   line-height: 1.14;
 }
-.tv-game-content > h2, .tv-game-stats, .tv-game-caption, .tv-wheel-player, .tv-wheel-result, .tv-bet-list { flex: none; }
-.tv-game-caption, .tv-game-stats, .tv-wheel-player, .tv-wheel-result { margin: 0; }
-.tv-game-stats { gap: clamp(7px, 2vmin, 24px); }
-.tv-game-stats b { font-size: 1em; }
+.tv-game-content > h2, .tv-game-caption, .tv-wheel-player, .tv-wheel-result, .tv-results { flex: none; }
+.tv-game-caption, .tv-wheel-player, .tv-wheel-result { margin: 0; }
 .tv-art-stage {
   container-type: size;
   display: grid;
@@ -304,65 +331,47 @@ onUnmounted(()=>{
 .tv-wheel-player { padding: 3px 10px; gap: 1px; }
 .tv-wheel-player strong, .tv-wheel-result strong { font-size: clamp(.8rem, 2.5vmin, 1.35rem); line-height: 1.1; }
 .tv-wheel-result { gap: 1px; }
-.tv-slot-machine {
-  width: min(92cqi, 620px, 220cqb);
-  padding: min(1.5cqb, 14px);
-  border-width: min(2cqb, 8px);
-}
-.tv-slot-marquee { font-size: min(6cqi, 10cqb, 36px); margin: 0 0 min(2cqb, 14px); }
-.tv-slot-reels { padding: min(1cqb, 10px); gap: min(1cqb, 10px); border-width: min(1cqb, 4px); }
-.tv-slot-reels span { aspect-ratio: 2; font-size: min(10cqi, 22cqb, 65px); }
-.tv-slot-payline { margin-top: min(2cqb, 12px); font-size: min(5cqb, 10px); }
-
-.tv-bet-list { display: grid; gap: 2px; overflow: clip; }
-.tv-bet-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; padding-block: 2px; }
-.tv-bet-row > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tv-bet-row:nth-child(n+3) { display: none; }
-
-.tv-footer { padding-top: clamp(3px, 1vmin, 9px); }
-.tv-sidebar {
+.tv-results {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: var(--tv-gap);
-  height: auto;
+  justify-items: center;
+  gap: 5px;
+  width: 100%;
   min-width: 0;
-  min-height: 0;
-  overflow: clip;
+  padding: clamp(3px, 1.4vmin, 14px) 0;
+  border-top: 1px solid var(--line);
 }
-.tv-panel { container-type: size; height: auto; max-height: none; min-width: 0; }
-.tv-panel-heading { padding: clamp(4px, 1.2vmin, 12px); gap: 4px; }
-.tv-panel-heading h2 { margin: 0; font-size: clamp(.72rem, 2vmin, 1.15rem); }
-.tv-notification-list, .tv-event-list { padding: 3px clamp(4px, 1vmin, 10px); overflow: clip; }
-.tv-notification-item, .tv-event-item { padding: clamp(3px, 1.1vmin, 10px) 2px; }
-.tv-notification-item strong, .tv-event-item > p, .tv-event-title h3 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
+.tv-results h3, .tv-results p { margin: 0; }
+.tv-results h3 { color: var(--text); font-size: clamp(.79rem, 2.1vmin, 1.35rem); }
+.tv-results p { color: var(--muted); font-size: .85rem; }
+.tv-results ol {
+  display: flex;
+  justify-content: center;
+  gap: clamp(3px, .9vmin, 12px);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.tv-notification-item:nth-child(n+4), .tv-event-item:nth-child(n+3) { display: none; }
-.tv-panel-empty { margin: 0; padding: 5px 2px; }
-@container (max-height: 210px) {
-  .tv-notification-item:nth-child(n+3), .tv-event-item:nth-child(n+2), .tv-event-item > p { display: none; }
+.tv-results li {
+  display: grid;
+  place-items: center;
+  flex: 0 1 clamp(23px, 6vmin, 64px);
+  min-width: 0;
+  aspect-ratio: 1;
+  border: 1px solid oklch(93% .04 88 / .32);
+  border-radius: 50%;
+  color: white;
+  font-size: clamp(.77rem, 2.9vmin, 1.9rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
-@container (max-height: 135px) {
-  .tv-notification-item:nth-child(n+2), .tv-event-meta { display: none; }
-}
+.tv-results li:first-child { border-color: var(--accent); }
+.tv-results .red { background-color: oklch(43% .157 21); }
+.tv-results .black { background-color: oklch(19% .023 260); }
+.tv-results .green { background-color: oklch(40% .115 155); }
 
-@media (max-width: 650px) and (orientation: portrait) {
-  .tv-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) min(24dvh, 170px); }
-  .tv-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
-  .tv-live { letter-spacing: 0; }
-}
-
-@media (max-height: 540px) {
-  .tv-bet-list { display: none; }
-}
-
-@media (max-height: 400px) {
-  .tv-footer { display: none; }
-  .tv-main-screen { grid-template-rows: auto minmax(0, 1fr); }
+@media (max-width: 420px) {
+  .tv-screen-switcher { flex-basis: 100%; }
+  .tv-screen-switcher button { min-height: 38px; }
 }
 </style>

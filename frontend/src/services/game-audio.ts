@@ -7,9 +7,9 @@ let audio: AudioContext | undefined;
 let output: GainNode | undefined;
 let voiceOwner: symbol | undefined;
 
-function unlock() {
+export async function activateGameAudio() {
   const Audio = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!audioEnabled.value || !Audio) return;
+  if (!Audio) return;
   try {
     if (!audio) {
       audio = new Audio();
@@ -17,14 +17,14 @@ function unlock() {
       output.connect(audio.destination);
     }
     if (output) output.gain.value = 1;
-    if (audio.state !== 'running') void audio.resume().catch(() => undefined);
+    if (audio.state !== 'running') await audio.resume();
   } catch { /* Web Audio is optional on this device. */ }
 }
 
 export function setAudioEnabled(enabled: boolean) {
   audioEnabled.value = enabled;
   localStorage.setItem(preferenceKey, enabled ? 'voice' : 'off');
-  if (enabled) unlock();
+  if (enabled) void activateGameAudio();
   else {
     window.speechSynthesis?.cancel();
     if (output) output.gain.value = 0;
@@ -32,13 +32,16 @@ export function setAudioEnabled(enabled: boolean) {
 }
 
 export function unlockGameAudio() {
-  window.addEventListener('pointerdown', unlock);
-  window.addEventListener('pointerup', unlock);
-  window.addEventListener('keydown', unlock);
+  const onInteraction = () => {
+    if (audioEnabled.value) void activateGameAudio();
+  };
+  window.addEventListener('pointerdown', onInteraction);
+  window.addEventListener('pointerup', onInteraction);
+  window.addEventListener('keydown', onInteraction);
   return () => {
-    window.removeEventListener('pointerdown', unlock);
-    window.removeEventListener('pointerup', unlock);
-    window.removeEventListener('keydown', unlock);
+    window.removeEventListener('pointerdown', onInteraction);
+    window.removeEventListener('pointerup', onInteraction);
+    window.removeEventListener('keydown', onInteraction);
   };
 }
 
@@ -56,16 +59,17 @@ function tone(ctx: AudioContext, at: number, duration: number, from: number, to 
   oscillator.stop(at + duration);
 }
 
-export function useGameAudio() {
+export function useGameAudio(canPlay = () => audioEnabled.value) {
   const owner = Symbol();
   const scheduled = new Set<ReturnType<typeof setTimeout>>();
   let disposed = false;
   let clip: Promise<AudioBuffer | undefined> | undefined;
 
   function prepareClip(url: string) {
-    unlock();
+    if (!canPlay()) return;
+    void activateGameAudio();
     const ctx = audio;
-    if (!audioEnabled.value || !ctx || clip) return;
+    if (!ctx || clip) return;
     clip = fetch(url).then(response => {
       if (!response.ok) throw new Error('A hangfájl nem érhető el.');
       return response.arrayBuffer();
@@ -76,9 +80,9 @@ export function useGameAudio() {
   }
 
   async function playClip() {
-    if (!audioEnabled.value || document.hidden) return;
+    if (!canPlay() || document.hidden) return;
     const buffer = await clip;
-    if (disposed || !buffer || !audioEnabled.value || document.hidden || audio?.state !== 'running') return;
+    if (disposed || !buffer || !canPlay() || document.hidden || audio?.state !== 'running') return;
     const source = audio.createBufferSource();
     source.buffer = buffer;
     source.connect(output ?? audio.destination);
@@ -86,7 +90,7 @@ export function useGameAudio() {
   }
 
   function effect(cue: Cue) {
-    if (!audioEnabled.value || document.hidden || audio?.state !== 'running') return;
+    if (!canPlay() || document.hidden || audio?.state !== 'running') return;
     const t = audio.currentTime;
     switch (cue) {
       case 'start':
@@ -108,7 +112,7 @@ export function useGameAudio() {
   }
 
   function announce(message: string, queue = false) {
-    if (!audioEnabled.value || document.hidden || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    if (!canPlay() || document.hidden || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
     const speech = window.speechSynthesis;
     const voice = speech.getVoices().find(item => /^hu(?:[-_]|$)/i.test(item.lang));
     if (!queue) speech.cancel();
