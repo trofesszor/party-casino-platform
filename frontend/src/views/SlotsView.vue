@@ -207,11 +207,12 @@ async function spin() {
     } else if (reply.finishedBonus) {
       audio.effect(payout ? 'win' : 'end');
       audio.announce('A harangeső véget ért. Nyeremény: ' + payout + ' kredit.', true);
-    } else if (!reply.bonus) {
-      audio.effect(payout || reply.freeSpinsAwarded ? 'win' : 'end');
-      const result = payout ? ' Nyertél ' + payout + ' kreditet.' : '';
-      const free = reply.freeSpinsAwarded ? ' Kaptál ' + reply.freeSpinsAwarded + ' ingyenpörgetést.' : '';
-      audio.announce('Pörgetés vége.' + result + free, true);
+    } else if (!reply.bonus && (payout || reply.freeSpinsAwarded)) {
+      audio.effect('win');
+      const announcements = [];
+      if (payout) announcements.push('Nyertél ' + payout + ' kreditet.');
+      if (reply.freeSpinsAwarded) announcements.push('Kaptál ' + reply.freeSpinsAwarded + ' ingyenpörgetést.');
+      audio.announce(announcements.join(' '), true);
     }
   } catch (cause) {
     if (!mounted) return;

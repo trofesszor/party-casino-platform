@@ -44,4 +44,4 @@ For phones on the same Wi-Fi, open `http://<HOST-LAN-IP>:5173`. The Vite dev ser
 - Browser access to the Vite dev server is suitable for development. For camera features later, mobile browser security requirements may require local HTTPS.
 
 ## Audio credits
-- Slot dog bark: [George vuf 1996](https://commons.wikimedia.org/wiki/File:George_vuf_1996.ogg) by Broadbeer, released into the public domain. Converted to mono MP3 with a small volume adjustment.
+- Slot dog bark: [Single Dog Bark](https://freesound.org/people/kwahmah_02/sounds/277058/) by kwahmah_02 (CC0 1.0). Converted to mono MP3 and processed for clarity.
