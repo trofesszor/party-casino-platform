@@ -12,12 +12,13 @@ type Hand = {
 };
 type Seat = {
   position: number;
-  occupant: { name: string; mine: boolean; bet: number | null; skipped: boolean } | null;
+  occupant: { name: string; mine: boolean; bet: number | null; skipped: boolean; nextRound: boolean } | null;
   hand: Hand | null;
 };
 type Table = {
   phase: 'betting' | 'playing' | 'results';
   round: number;
+  activeSeat: number | null;
   allowedBets: number[];
   balance: number | null;
   nextRoundAt: number | null;
@@ -43,8 +44,10 @@ const dealerCards = computed(() => {
   const state = table.value;
   return state ? [...state.dealer, ...(state.dealerHidden ? [null] : [])] : [];
 });
-const unfinished = computed(() => table.value?.seats.filter(seat => seat.hand && !seat.hand.finished).length ?? 0);
-const preparing = computed(() => table.value?.seats.filter(seat => seat.occupant && !seat.occupant.bet && !seat.occupant.skipped).length ?? 0);
+const active = computed(() => table.value?.seats.find(seat => seat.position === table.value?.activeSeat));
+const myTurn = computed(() => table.value?.phase === 'playing' ? active.value?.hand?.mine : active.value?.occupant?.mine);
+const turnName = computed(() => active.value?.hand?.name ?? active.value?.occupant?.name);
+const busy = computed(() => !connected.value || !active.value || waiting.value.has(active.value.position));
 const occupied = computed(() => table.value?.seats.filter(seat => seat.occupant).length ?? 0);
 const format = (amount: number) => amount.toLocaleString('hu-HU') + ' CR';
 
@@ -59,7 +62,17 @@ function onDisconnect() { connected.value = false; waiting.value = new Set(); }
 function onConnectError() { error.value = 'Az asztal átmenetileg nem érhető el.'; }
 function closeTable() { socket.disconnect(); }
 function reopenTable() { if (!socket.connected) socket.connect(); }
+function showSeat(seat: number) {
+  document.getElementById('bj-seat-' + seat)?.scrollIntoView({ block: 'nearest' });
+}
 function stake(seat: number) { return choices.value[seat] ?? table.value?.allowedBets[0] ?? 2; }
+
+function seatStatus(seat: Seat) {
+  if (seat.occupant?.nextRound || table.value?.phase !== 'betting') return 'A következő körben játszik';
+  if (seat.occupant?.skipped) return 'Kihagyja a kört';
+  if (seat.occupant?.bet) return format(seat.occupant.bet) + ' tét rögzítve';
+  return seat.position === active.value?.position ? 'Most tesz tétet' : 'Sorra vár';
+}
 
 async function act(action: Command, seat: number) {
   if (!connected.value || waiting.value.has(seat)) return;
@@ -111,20 +124,50 @@ onUnmounted(() => {
             <small>{{ table.round }}. kör</small>
           </div>
           <BlackjackCards v-if="dealerCards.length" :cards="dealerCards" />
-          <p class="bj-table-status" role="status">
-            <template v-if="table.phase === 'betting'">
-              {{ occupied ? (preparing ? `${preparing} szék döntésére várunk. Válassz tétet vagy hagyd ki a kört.` : 'Tétre várunk.') : 'Foglalj egy szabad széket.' }}
+        </div>
+
+        <div class="bj-turn" :class="{ 'bj-turn-mine': myTurn }">
+          <div class="bj-turn-copy" role="status" aria-atomic="true">
+            <template v-if="active">
+              <span class="bj-turn-phase">{{ table.phase === 'betting' ? 'Tétválasztás' : 'Játékos köre' }}</span>
+              <button class="bj-current-link" type="button" @click="showSeat(active.position)">{{ active.position }}. szék · {{ myTurn ? 'Te következel' : turnName }} <span aria-hidden="true">↓</span></button>
+              <span v-if="active.hand">Kézérték {{ active.hand.total }}</span>
             </template>
-            <template v-else-if="table.phase === 'playing'">{{ unfinished }} kéz még játszik. Az osztó utána húz.</template>
-            <template v-else>Következő kör {{ remaining }} mp múlva</template>
-          </p>
+            <template v-else-if="table.phase === 'results'">
+              <span class="bj-turn-phase">Eredmények</span>
+              <strong>Következő kör {{ remaining }} mp múlva</strong>
+            </template>
+            <strong v-else>Foglalj egy szabad széket.</strong>
+          </div>
+          <div v-if="active && myTurn" :key="active.position" class="bj-actions">
+            <template v-if="table.phase === 'betting'">
+              <select aria-label="Tét összege" :value="stake(active.position)" :disabled="busy"
+                @change="choices[active.position] = Number(($event.target as HTMLSelectElement).value)">
+                <option v-for="amount in table.allowedBets" :key="amount" :value="amount">{{ format(amount) }}</option>
+              </select>
+              <button class="primary" type="button" :disabled="busy || (table.balance ?? 0) < stake(active.position)" @click="act('bet', active.position)">Tétet teszek</button>
+              <button class="ghost" type="button" :disabled="busy" @click="act('skip', active.position)">Kihagyom</button>
+            </template>
+            <template v-else>
+              <button class="primary" type="button" :disabled="busy" @click="act('hit', active.position)">Kérek lapot</button>
+              <button class="ghost" type="button" :disabled="busy" @click="act('stand', active.position)">Megállok</button>
+              <button class="ghost" type="button" :disabled="busy || !active.hand?.canDouble" @click="act('double', active.position)">Duplázok</button>
+            </template>
+          </div>
         </div>
 
         <div class="bj-seats">
-          <article v-for="seat in table.seats" :key="seat.position" class="bj-seat"
-            :class="{ 'bj-seat-owned': seat.occupant?.mine, 'bj-seat-empty': !seat.occupant && !seat.hand }">
+          <article v-for="seat in table.seats" :key="seat.position" class="bj-seat" :id="'bj-seat-' + seat.position"
+            :class="{ 'bj-seat-active': seat.position === active?.position, 'bj-seat-owned': seat.occupant?.mine, 'bj-seat-empty': !seat.occupant && !seat.hand }">
             <header class="bj-seat-head">
-              <div><small>{{ seat.position }}. szék</small><h3>{{ seat.occupant?.name || 'Szabad' }}</h3></div>
+              <div class="bj-seat-identity">
+                <span class="bj-seat-number" :aria-label="seat.position + '. szék'">{{ seat.position }}</span>
+                <div class="bj-seat-name">
+                  <small v-if="seat.position === active?.position">Soron</small>
+                  <small v-else-if="seat.occupant?.mine">Saját szék</small>
+                  <h3>{{ seat.occupant?.name || 'Szabad' }}</h3>
+                </div>
+              </div>
               <button v-if="seat.occupant?.mine" class="bj-link" type="button" :disabled="!connected || waiting.has(seat.position)" @click="act('leave', seat.position)">Felállok</button>
               <button v-else-if="!seat.occupant" class="bj-link" type="button" :disabled="!playerId || !connected || waiting.has(seat.position)" @click="act('sit', seat.position)">Leülök</button>
             </header>
@@ -141,27 +184,10 @@ onUnmounted(() => {
               </div>
               <p v-else-if="seat.hand.left" class="bj-seat-status">A kéz automatikusan megállt.</p>
               <p v-else-if="seat.hand.finished" class="bj-seat-status">Döntés kész</p>
-              <div v-else-if="seat.hand.mine" class="bj-actions">
-                <button class="primary" type="button" :disabled="!connected || waiting.has(seat.position)" @click="act('hit', seat.position)">Kérek lapot</button>
-                <button class="ghost" type="button" :disabled="!connected || waiting.has(seat.position)" @click="act('stand', seat.position)">Megállok</button>
-                <button v-if="seat.hand.canDouble" class="ghost" type="button" :disabled="!connected || waiting.has(seat.position)" @click="act('double', seat.position)">Duplázok</button>
-              </div>
-              <p v-else class="bj-seat-status">Játékos döntésére várunk</p>
+              <p v-else class="bj-seat-status">{{ seat.position === active?.position ? 'Most játszik' : 'Sorra vár' }}</p>
             </div>
 
-            <template v-else-if="seat.occupant">
-              <div v-if="table.phase === 'betting' && seat.occupant.mine && !seat.occupant.bet && !seat.occupant.skipped" class="bj-wager">
-                <label>Tét<select :value="stake(seat.position)" @change="choices[seat.position] = Number(($event.target as HTMLSelectElement).value)">
-                  <option v-for="amount in table.allowedBets" :key="amount" :value="amount">{{ format(amount) }}</option>
-                </select></label>
-                <div class="bj-actions">
-                  <button class="primary" type="button" :disabled="!connected || waiting.has(seat.position) || (table.balance ?? 0) < stake(seat.position)" @click="act('bet', seat.position)">Tétet teszek</button>
-                  <button class="ghost" type="button" :disabled="!connected || waiting.has(seat.position)" @click="act('skip', seat.position)">Kihagyom</button>
-                </div>
-              </div>
-              <p v-else-if="table.phase !== 'betting'" class="bj-seat-status">A következő körre foglalva</p>
-              <p v-else class="bj-seat-status">{{ seat.occupant.skipped ? 'Kihagyja ezt a kört' : seat.occupant.bet ? format(seat.occupant.bet) + ' tét rögzítve' : 'Tétre várunk' }}</p>
-            </template>
+            <p v-else-if="seat.occupant" class="bj-seat-status">{{ seatStatus(seat) }}</p>
           </article>
         </div>
       </section>
@@ -169,7 +195,7 @@ onUnmounted(() => {
       <PlayerWallet inline class="bj-wallet" />
       <details class="bj-rules">
         <summary>Asztalszabályok</summary>
-        <p>Minden szék külön tétet és lapokat kap. Az osztó 17-nél megáll. A blackjack 3:2-t fizet, döntetlennél a tét visszajár. Duplázáskor egy lapot kapsz, majd megállsz.</p>
+        <p>A foglalt székek számsorrendben teszik meg a tétet és játsszák le a kezüket. Minden szék külön tétet és lapokat kap. Az osztó 17-nél megáll. A blackjack 3:2-t fizet, döntetlennél a tét visszajár. Duplázáskor egy lapot kapsz, majd megállsz.</p>
         <p>Osztás előtt felállva visszakapod a téted. Osztás után a kezed megáll és a kör végén elszámoljuk. Ugyanez történik, ha bezárod az oldalt.</p>
       </details>
     </div>

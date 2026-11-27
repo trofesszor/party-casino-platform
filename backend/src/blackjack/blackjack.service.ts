@@ -9,7 +9,7 @@ const bets = [2, 4, 10, 20, 50, 100];
 const resultsMs = 6000;
 type Person = { playerId: number; name: string; owner: string };
 type HeldBet = { id: number; playerId: number; amount: number };
-type Seat = Person & { bet: HeldBet | null; skipped: boolean };
+type Seat = Person & { bet: HeldBet | null; skipped: boolean; nextRound: boolean };
 type Hand = Person & {
   position: number;
   bet: HeldBet;
@@ -28,6 +28,7 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
   private deck: Card[] = [];
   private phase: TablePhase = 'betting';
   private round = 1;
+  private lastBettingPosition = 0;
   private nextRoundAt: number | null = null;
   private timer?: ReturnType<typeof setTimeout>;
   onChange?: () => void;
@@ -48,6 +49,7 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
     return {
       phase: this.phase,
       round: this.round,
+      activeSeat: this.activePosition,
       allowedBets: bets,
       balance: player?.balance ?? null,
       nextRoundAt: this.nextRoundAt,
@@ -60,12 +62,12 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
         const hand = this.hands.find(entry => entry.position === position);
         return {
           position,
-          occupant: seat ? { name: seat.name, mine: seat.owner === owner, bet: seat.bet?.amount ?? null, skipped: seat.skipped } : null,
+          occupant: seat ? { name: seat.name, mine: seat.owner === owner, bet: seat.bet?.amount ?? null, skipped: seat.skipped, nextRound: seat.nextRound } : null,
           hand: hand ? {
             name: hand.name, mine: hand.owner === owner && !hand.left, left: hand.left,
             cards: hand.cards, total: total(hand.cards), stake: hand.bet.amount,
             finished: hand.finished, result: hand.outcome?.result ?? null, payout: hand.outcome?.payout ?? null,
-            canDouble: !hand.finished && hand.owner === owner && hand.cards.length === 2 && (player?.balance ?? 0) >= hand.bet.amount,
+            canDouble: position === this.activePosition && !hand.finished && hand.owner === owner && hand.cards.length === 2 && (player?.balance ?? 0) >= hand.bet.amount,
           } : null,
         };
       }),
@@ -77,7 +79,8 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
     const player = this.player(playerId);
     if (!player) throw new BadRequestException('A székfoglaláshoz lépj be a neveddel.');
     if (this.seats.has(position)) throw new BadRequestException('Ez a szék foglalt.');
-    this.seats.set(position, { owner, playerId, name: player.name, skipped: false, bet: null });
+    const nextRound = this.phase !== 'betting' || position <= this.lastBettingPosition;
+    this.seats.set(position, { owner, playerId, name: player.name, skipped: false, bet: null, nextRound });
   }
 
   leave(owner: string, position?: number) {
@@ -90,6 +93,10 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
         if (seat.bet) this.release(seat.bet, seat.bet.amount, 'Blackjack · tét visszatérítve');
       }
     });
+    const activePosition = this.activePosition;
+    if (this.phase === 'betting' && activePosition !== null && leaving.some(([number]) => number === activePosition)) {
+      this.lastBettingPosition = activePosition;
+    }
     for (const [number] of leaving) {
       this.seats.delete(number);
       const hand = this.hands.find(entry => entry.position === number && entry.owner === owner);
@@ -111,12 +118,14 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
       return Number(this.database.sqlite.prepare('INSERT INTO blackjack_holds (player_id, amount) VALUES (?, ?)').run(seat.playerId, amount).lastInsertRowid);
     });
     seat.bet = { id, playerId: seat.playerId, amount };
+    this.lastBettingPosition = position;
     this.maybeDeal();
   }
 
   skip(owner: string, position: number) {
     const seat = this.openSeat(owner, position);
     seat.skipped = true;
+    this.lastBettingPosition = position;
     this.maybeDeal();
   }
 
@@ -124,6 +133,7 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
     if (this.phase !== 'playing') throw new BadRequestException('Most nincs játszható kéz.');
     const hand = this.hands.find(entry => entry.position === position && entry.owner === owner && !entry.left);
     if (!hand || hand.finished) throw new BadRequestException('Ennél a kéznél már nincs teendő.');
+    if (this.activePosition !== position) throw new BadRequestException('Még egy másik szék van soron.');
     if (action === 'double') {
       if (hand.cards.length !== 2) throw new BadRequestException('Duplázni csak két lappal lehet.');
       const extra = hand.bet.amount;
@@ -146,22 +156,35 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
     this.openBetting();
   }
 
+  private get activePosition(): number | null {
+    if (this.phase === 'playing') return this.hands.find(hand => !hand.finished)?.position ?? null;
+    if (this.phase === 'betting') {
+      for (let position = this.lastBettingPosition + 1; position <= seatCount; position++) {
+        const seat = this.seats.get(position);
+        if (seat && !seat.nextRound && !seat.bet && !seat.skipped) return position;
+      }
+    }
+    return null;
+  }
+
   private openSeat(owner: string, position: number) {
     if (this.phase !== 'betting') throw new BadRequestException('A következő kör elején tehetsz tétet.');
     const seat = this.seats.get(position);
     if (!seat || seat.owner !== owner) throw new BadRequestException('Ez a szék nem a tiéd.');
     if (seat.bet || seat.skipped) throw new BadRequestException('Erre a körre már döntöttél ennél a széknél.');
+    if (seat.nextRound) throw new BadRequestException('Ez a szék a következő körben játszik.');
+    if (this.activePosition !== position) throw new BadRequestException('Még egy másik szék van soron.');
     return seat;
   }
 
   private maybeDeal() {
     const occupied = [...this.seats].sort(([a], [b]) => a - b);
-    if (occupied.some(([, seat]) => !seat.bet && !seat.skipped)) return;
+    if (this.activePosition !== null) return;
     this.hands = occupied.flatMap(([position, seat]) => seat.bet
       ? [{ position, owner: seat.owner, playerId: seat.playerId, name: seat.name, bet: seat.bet, cards: [], finished: false, left: false }]
       : []);
     if (!this.hands.length) {
-      for (const [, seat] of occupied) seat.skipped = false;
+      this.resetBettingOrder();
       return;
     }
     this.phase = 'playing';
@@ -199,11 +222,17 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
     this.hands = [];
     this.dealer = [];
     this.deck = [];
+    this.resetBettingOrder();
+    this.onChange?.();
+  }
+
+  private resetBettingOrder() {
+    this.lastBettingPosition = 0;
     for (const seat of this.seats.values()) {
+      seat.nextRound = false;
       seat.bet = null;
       seat.skipped = false;
     }
-    this.onChange?.();
   }
 
   private draw() {
