@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
-  creditScale, duelReward, partyCoupons, photoRewardDefaults, questSkipPrice, rouletteRoundLimit,
+  creditScale, duelReward, partyCoupons, photoRewardDefaults, questSkipPrice,
   scratchOdds, scratchTicketPrice, startingCredits, wheelSpinPrice,
 } from './economy';
 
@@ -75,7 +75,6 @@ function applyPartyCredits(sqlite: DatabaseSync) {
   const gameSetting = sqlite.prepare('UPDATE casino_settings SET setting_value=? WHERE setting_key=?');
   gameSetting.run(String(startingCredits), 'default_player_tokens');
   gameSetting.run(String(wheelSpinPrice), 'wheel_spin_cost');
-  gameSetting.run(String(rouletteRoundLimit), 'roulette_max_bet');
   gameSetting.run(String(duelReward), 'duel_reward');
   const oddsKeys = ['scratch_loss_percent', 'scratch_10_percent', 'scratch_25_percent', 'scratch_50_percent', 'scratch_100_percent'];
   oddsKeys.forEach((key, index) => gameSetting.run(String(scratchOdds[index]), key));

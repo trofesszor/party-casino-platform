@@ -136,7 +136,7 @@ onMounted(refresh);
       <summary><strong>Kreditek és tétlimitek</strong><span>Egyenleg {{ number(balance) }} CR</span></summary>
       <dl>
         <div><dt>Kezdőegyenleg</dt><dd>{{ number(economy.startingCredits) }} CR</dd></div>
-        <div><dt>Rulett</dt><dd>{{ number(economy.rouletteMinBet) }}–{{ number(economy.rouletteRoundLimit) }} CR körönként</dd></div>
+        <div><dt>Rulett</dt><dd>1 CR-tól a teljes egyenlegig</dd></div>
         <div><dt>Slot</dt><dd>500–{{ number(economy.slotStakeLimit) }} CR pörgetésenként</dd></div>
         <div><dt>Blackjack</dt><dd>{{ economy.blackjackBets.map(number).join(', ') }} CR alaptét</dd></div>
         <div><dt>Szerencsekerék</dt><dd>{{ number(economy.wheelSpinCost) }} CR pörgetésenként</dd></div>

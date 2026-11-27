@@ -1,5 +1,5 @@
 import { migratePartyCredits } from '../casino/credit-migration';
-import { partyCoupons, questSkipPrice, rouletteRoundLimit, scratchTicketPrice, startingCredits, wheelSpinPrice } from '../casino/economy';
+import { partyCoupons, questSkipPrice, scratchTicketPrice, startingCredits, wheelSpinPrice } from '../casino/economy';
 import { jackpotStarts } from '../slots/slots-game';
 import { Global, Module } from '@nestjs/common';
 import { DatabaseSync } from 'node:sqlite';
@@ -250,7 +250,6 @@ export const DATABASE = Symbol('DATABASE');
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('wheel_spin_duration_ms','7000')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_betting_seconds','20')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_result_seconds','5')").run();
-      sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('roulette_max_bet',?)").run(String(rouletteRoundLimit));
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('duel_reward','10')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('max_active_side_quests','2')").run();
       sqlite.prepare("INSERT OR IGNORE INTO casino_settings (setting_key,setting_value) VALUES ('quest_pin_expiry_seconds','90')").run();
@@ -275,7 +274,6 @@ export const DATABASE = Symbol('DATABASE');
       try {
         const migration = sqlite.prepare("INSERT OR IGNORE INTO casino_settings VALUES ('party_economy_v1','1')").run();
         if (migration.changes) {
-          sqlite.prepare("UPDATE casino_settings SET setting_value=? WHERE setting_key='roulette_max_bet' AND setting_value='100'").run(String(rouletteRoundLimit));
           const reprice = sqlite.prepare('UPDATE shop_items SET price=? WHERE item_key=? AND price=?');
           reprice.run(questSkipPrice, 'QUEST_SKIP', 25);
           reprice.run(scratchTicketPrice, 'SCRATCH_TICKET', 20);

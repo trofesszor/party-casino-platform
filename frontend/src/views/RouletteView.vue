@@ -23,7 +23,8 @@ let sending = false;
 const balance = ref<number | null>(null);
 let balanceRevision = 0;
 let refreshAfterBets = false;
-const chip = ref(500);
+const chip = ref<number | 'all-in' | 'custom'>(500);
+const customStake = ref<number | string>('');
 const formatCredits = (amount: number) => amount.toLocaleString('hu-HU');
 const landedRound = ref<number | null>(null);
 let clock: ReturnType<typeof setInterval> | undefined;
@@ -78,10 +79,11 @@ const visibleBalance = computed(() => balance.value === null ? null : Math.max(0
   balance.value - queued.value.reduce((sum, bet) => sum + bet.amount, 0)));
 watch(visibleBalance, value => { rouletteDisplayBalance.value = value; }, { immediate: true });
 
-const maxBet = computed(() => state.value?.maxBet ?? 10_000);
-const minBet = computed(() => state.value?.minBet ?? 500);
-const chips = computed(() => chipValues.filter(value => value >= minBet.value && value <= maxBet.value));
-watch(chips, values => { if (!values.includes(chip.value)) chip.value = values[0] ?? minBet.value; });
+const selectedStake = computed(() => {
+  if (chip.value === 'all-in') return visibleBalance.value ?? 0;
+  if (chip.value === 'custom') return Number(customStake.value);
+  return chip.value;
+});
 const totalStake = computed(() => myBets.value.reduce((sum, bet) => sum + bet.amount, 0));
 const secondsLeft = computed(() => Math.max(0, Math.ceil((Date.parse(round.value?.bettingEndsAt ?? '') - now.value) / 1000)));
 const accepting = computed(() => round.value?.status === 'BETTING' && secondsLeft.value > 0);
@@ -157,13 +159,19 @@ function onLanded(number: number) {
 }
 function placeBet(choice: Choice) {
   if (!accepting.value || !playerId || !round.value) return;
-  if (totalStake.value + chip.value > maxBet.value) {
-    error.value = 'A teljes tét egy körben legfeljebb ' + formatCredits(maxBet.value) + ' CR lehet.';
+  const amount = selectedStake.value;
+  if (!Number.isSafeInteger(amount) || amount < 1) {
+    error.value = chip.value === 'all-in' ? 'Nincs feltehető CR az egyenlegeden.' : 'Adj meg pozitív egész CR-tétet.';
+    return;
+  }
+  if (visibleBalance.value === null || amount > visibleBalance.value) {
+    error.value = 'Nincs elegendő CR az egyenlegeden.';
     return;
   }
   error.value = '';
   balanceRevision++;
-  queued.value.push({ choice, amount: chip.value, roundId: round.value.id });
+  queued.value.push({ choice, amount, roundId: round.value.id });
+  if (chip.value === 'all-in') chip.value = chipValues[0];
   void sendBets();
 }
 async function sendBets() {
@@ -239,18 +247,29 @@ onUnmounted(() => {
         </section>
 
         <section v-if="!isDisplay" class="studio-console" aria-label="Fogadóasztal">
-          <div class="studio-console-heading"><h2>Fogadóasztal</h2><span>{{ myBets.length }} tét · {{ formatCredits(totalStake) }} / {{ formatCredits(maxBet) }} CR</span></div>
+          <div class="studio-console-heading"><h2>Fogadóasztal</h2><span>{{ myBets.length }} tét · {{ formatCredits(totalStake) }} CR</span></div>
           <div class="studio-chipline" role="group" aria-label="Zsetonérték">
             <span>Zseton</span>
-            <button v-for="value in chips" :key="value" type="button" :aria-pressed="value === chip" :aria-label="value + ' CR'"
+            <button v-for="value in chipValues" :key="value" type="button" :aria-pressed="value === chip" :aria-label="value + ' CR'"
               @click="chip = value">{{ value < 1000 ? value : (value / 1000).toLocaleString('hu-HU') + 'k' }}</button>
+            <button v-if="playerId" class="studio-all-in" type="button" :aria-pressed="chip === 'all-in'"
+              :disabled="!accepting || !visibleBalance" @click="chip = 'all-in'">
+              All-in <span>{{ formatCredits(visibleBalance ?? 0) }} CR</span>
+            </button>
+            <label v-if="playerId" class="studio-custom-bet">
+              <span>Egyéni tét (CR)</span>
+              <input v-model.number="customStake" type="number" inputmode="numeric" min="1" step="1"
+                placeholder="Egyéni tét" @focus="chip = 'custom'" @input="chip = 'custom'">
+            </label>
             <RouterLink v-if="!playerId" class="studio-cta" to="/">Csatlakozás</RouterLink>
           </div>
           <p v-if="error" class="error studio-error" role="alert">{{ error }}</p>
           <fieldset class="studio-fields" :disabled="!accepting || !playerId">
             <legend class="layout-visually-hidden">Fogadás kiválasztása</legend>
             <p class="studio-instruction" id="roulette-board-help">
-              A kiválasztott zseton a mezőre koppintva azonnal felkerül. A határokon és a jelölőkön kombinációkra tehetsz.
+              {{ chip === 'all-in'
+                ? 'All-in kiválasztva. A következő koppintással a teljes szabad egyenlegedet felteszed arra a mezőre.'
+                : 'A kiválasztott tét a mezőre koppintva azonnal felkerül. A határokon és a jelölőkön kombinációkra tehetsz.' }}
             </p>
             <div class="studio-board-frame" role="region" tabindex="0" aria-label="Európai rulettasztal" aria-describedby="roulette-board-help">
               <div class="studio-table">

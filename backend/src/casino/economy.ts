@@ -1,9 +1,6 @@
 export const creditScale = 1000;
 export const startingCredits = 100_000;
 export const wheelSpinPrice = 2500;
-export const rouletteMinBet = 500;
-export const rouletteRoundLimit = 10_000;
-export const rouletteAdminLimit = 100_000;
 export const slotStakeLimit = 7500;
 export const blackjackBets = [1000, 2000, 3500, 5000];
 export const duelReward = 5000;

@@ -20,7 +20,7 @@ const sideQuestSaving = ref(false);
 type AdminShopItem = { itemKey:string; name:string; description:string; price:number; enabled:number };
 const shopItems = ref<AdminShopItem[]>([]);
 const shopSavingKey = ref('');
-const gameSettings=ref({wheelSpinCost:2500,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:10000,duelReward:5000,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:62,scratch10Percent:22,scratch25Percent:11,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1});
+const gameSettings=ref({wheelSpinCost:2500,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,duelReward:5000,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:62,scratch10Percent:22,scratch25Percent:11,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1});
 const gameSettingsSaving=ref(false);
 const tokenPhotoSettings=ref({enabled:true,balanceThreshold:15000,rewardAmount:7500,cooldownMinutes:30,dailyLimit:2});
 const tokenPhotoSaving=ref(false);
@@ -486,7 +486,6 @@ onMounted(async () => {
           <label>Szerencsekerék animáció (ms)<input v-model.number="gameSettings.wheelSpinDurationMs" type="number" min="1000" max="60000" step="500"></label>
           <label>Rulett fogadási idő (mp)<input v-model.number="gameSettings.rouletteBettingSeconds" type="number" min="5" max="120"></label>
           <label>Rulett eredményidő (mp)<input v-model.number="gameSettings.rouletteResultSeconds" type="number" min="1" max="30"></label>
-          <label>Rulett tétlimit játékosonként és körönként (CR)<input v-model.number="gameSettings.rouletteMaxBet" type="number" min="500" max="100000"></label>
           <label>Párbaj győzelmi jutalom (CR)<input v-model.number="gameSettings.duelReward" type="number" min="0" max="1000000"></label>
           <label>Max. aktív side quest / játékos<input v-model.number="gameSettings.maxActiveSideQuests" type="number" min="1" max="10"></label>
           <label>PIN érvényesség (mp)<input v-model.number="gameSettings.questPinExpirySeconds" type="number" min="15" max="600"></label>

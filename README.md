@@ -48,7 +48,7 @@ For phones on the same Wi-Fi, open `http://<HOST-LAN-IP>:5173`. The Vite dev ser
 | Item | Default |
 | --- | ---: |
 | Starting balance | 100,000 CR |
-| Roulette | 500 CR minimum bet, 10,000 CR total per player per round |
+| Roulette | 1 CR minimum bet, up to the player’s available credits (all-in) |
 | Slot | 500 CR minimum, 7,500 CR maximum per paid spin |
 | Blackjack | 1,000 / 2,000 / 3,500 / 5,000 CR initial stake, up to 10,000 CR when doubled |
 | Lucky Wheel | 2,500 CR per spin |
