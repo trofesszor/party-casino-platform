@@ -1,37 +1,24 @@
-import { BadRequestException, Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type { DatabaseSync } from 'node:sqlite';
 import { DATABASE } from '../database/database.module';
 import { isBlackjack, scoreHand, shuffledShoe, total } from './blackjack-rules';
 import type { Card } from './blackjack-rules';
 
-const seatCount = 6;
 const bets = [2, 4, 10, 20, 50, 100];
-const resultsMs = 6000;
-type Person = { playerId: number; name: string; owner: string };
 type HeldBet = { id: number; playerId: number; amount: number };
-type Seat = Person & { bet: HeldBet | null; skipped: boolean; nextRound: boolean };
-type Hand = Person & {
-  position: number;
+type Hand = {
+  round: number;
+  revision: number;
   bet: HeldBet;
   cards: Card[];
-  finished: boolean;
-  left: boolean;
+  dealer: Card[];
+  deck: Card[];
   outcome?: ReturnType<typeof scoreHand>;
 };
-type TablePhase = 'betting' | 'playing' | 'results';
 
 @Injectable()
-export class BlackjackService implements OnModuleInit, OnModuleDestroy {
-  private readonly seats = new Map<number, Seat>();
-  private hands: Hand[] = [];
-  private dealer: Card[] = [];
-  private deck: Card[] = [];
-  private phase: TablePhase = 'betting';
-  private round = 1;
-  private lastBettingPosition = 0;
-  private nextRoundAt: number | null = null;
-  private timer?: ReturnType<typeof setTimeout>;
-  onChange?: () => void;
+export class BlackjackService implements OnModuleInit {
+  private readonly tables = new Map<number, Hand>();
 
   constructor(@Inject(DATABASE) private readonly database: { sqlite: DatabaseSync }) {}
 
@@ -42,211 +29,95 @@ export class BlackjackService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  onModuleDestroy() { clearTimeout(this.timer); }
-
-  snapshot(owner: string, playerId: number) {
+  snapshot(playerId?: number) {
     const player = this.player(playerId);
+    const hand = player && this.tables.get(playerId!);
     return {
-      phase: this.phase,
-      round: this.round,
-      activeSeat: this.activePosition,
+      phase: hand ? hand.outcome ? 'results' : 'playing' : 'betting',
+      round: hand?.round ?? 0,
+      revision: hand?.revision ?? 0,
       allowedBets: bets,
       balance: player?.balance ?? null,
-      nextRoundAt: this.nextRoundAt,
-      dealer: this.phase === 'playing' ? this.dealer.slice(0, 1) : this.dealer,
-      dealerHidden: this.phase === 'playing',
-      dealerTotal: this.phase === 'results' ? total(this.dealer) : null,
-      seats: Array.from({ length: seatCount }, (_, index) => {
-        const position = index + 1;
-        const seat = this.seats.get(position);
-        const hand = this.hands.find(entry => entry.position === position);
-        return {
-          position,
-          occupant: seat ? { name: seat.name, mine: seat.owner === owner, bet: seat.bet?.amount ?? null, skipped: seat.skipped, nextRound: seat.nextRound } : null,
-          hand: hand ? {
-            name: hand.name, mine: hand.owner === owner && !hand.left, left: hand.left,
-            cards: hand.cards, total: total(hand.cards), stake: hand.bet.amount,
-            finished: hand.finished, result: hand.outcome?.result ?? null, payout: hand.outcome?.payout ?? null,
-            canDouble: position === this.activePosition && !hand.finished && hand.owner === owner && hand.cards.length === 2 && (player?.balance ?? 0) >= hand.bet.amount,
-          } : null,
-        };
-      }),
+      dealer: hand ? hand.outcome ? hand.dealer : hand.dealer.slice(0, 1) : [],
+      dealerHidden: Boolean(hand && !hand.outcome),
+      dealerTotal: hand?.outcome ? total(hand.dealer) : null,
+      hand: hand ? {
+        cards: hand.cards, total: total(hand.cards), stake: hand.bet.amount,
+        result: hand.outcome?.result ?? null, payout: hand.outcome?.payout ?? null,
+        canDouble: !hand.outcome && hand.cards.length === 2 && (player?.balance ?? 0) >= hand.bet.amount,
+      } : null,
     };
   }
 
-  sit(owner: string, playerId: number, position: number) {
-    this.checkPosition(position);
-    const player = this.player(playerId);
-    if (!player) throw new BadRequestException('A székfoglaláshoz lépj be a neveddel.');
-    if (this.seats.has(position)) throw new BadRequestException('Ez a szék foglalt.');
-    const nextRound = this.phase !== 'betting' || position <= this.lastBettingPosition;
-    this.seats.set(position, { owner, playerId, name: player.name, skipped: false, bet: null, nextRound });
-  }
-
-  leave(owner: string, position?: number) {
-    if (position !== undefined) this.checkPosition(position);
-    const leaving = [...this.seats].filter(([number, seat]) => seat.owner === owner && (position === undefined || position === number));
-    if (position !== undefined && !leaving.length) throw new BadRequestException('Ez a szék nem a tiéd.');
-    if (!leaving.length) return false;
-    if (this.phase === 'betting' && leaving.some(([, seat]) => seat.bet)) this.transaction(() => {
-      for (const [, seat] of leaving) {
-        if (seat.bet) this.release(seat.bet, seat.bet.amount, 'Blackjack · tét visszatérítve');
-      }
-    });
-    const activePosition = this.activePosition;
-    if (this.phase === 'betting' && activePosition !== null && leaving.some(([number]) => number === activePosition)) {
-      this.lastBettingPosition = activePosition;
-    }
-    for (const [number] of leaving) {
-      this.seats.delete(number);
-      const hand = this.hands.find(entry => entry.position === number && entry.owner === owner);
-      if (hand) {
-        hand.left = true;
-        hand.finished = true;
-      }
-    }
-    if (this.phase === 'betting') this.maybeDeal();
-    else if (this.phase === 'playing') this.maybeSettle();
-    return true;
-  }
-
-  wager(owner: string, position: number, amount: number) {
-    const seat = this.openSeat(owner, position);
+  deal(playerId: number | undefined, previousRound: number | undefined, amount: number) {
+    if (!playerId || !this.player(playerId)) throw new BadRequestException('A blackjackhez lépj be a neveddel.');
+    const previous = this.tables.get(playerId);
+    if (previous && !previous.outcome) throw new BadRequestException('Előbb fejezd be a folyamatban lévő kezet.');
+    if (previousRound !== (previous?.round ?? 0)) throw new BadRequestException('Az asztal állapota közben megváltozott.');
     if (!bets.includes(amount)) throw new BadRequestException('Válassz érvényes CR-tétet.');
-    const id = this.transaction(() => {
-      this.changeBalance(seat.playerId, -amount, 'BLACKJACK_BET', 'Blackjack · tét');
-      return Number(this.database.sqlite.prepare('INSERT INTO blackjack_holds (player_id, amount) VALUES (?, ?)').run(seat.playerId, amount).lastInsertRowid);
+
+    const deck = shuffledShoe();
+    const cards = [deck.pop()!];
+    const dealer = [deck.pop()!];
+    cards.push(deck.pop()!);
+    dealer.push(deck.pop()!);
+    const hand = this.transaction(() => {
+      this.changeBalance(playerId, -amount, 'BLACKJACK_BET', 'Blackjack · tét');
+      const id = Number(this.database.sqlite.prepare('INSERT INTO blackjack_holds (player_id, amount) VALUES (?, ?)').run(playerId, amount).lastInsertRowid);
+      const next: Hand = { round: (previous?.round ?? 0) + 1, revision: 1, bet: { id, playerId, amount }, cards, dealer, deck };
+      if (isBlackjack(cards) || isBlackjack(dealer)) this.finish(next);
+      return next;
     });
-    seat.bet = { id, playerId: seat.playerId, amount };
-    this.lastBettingPosition = position;
-    this.maybeDeal();
+    this.tables.set(playerId, hand);
   }
 
-  skip(owner: string, position: number) {
-    const seat = this.openSeat(owner, position);
-    seat.skipped = true;
-    this.lastBettingPosition = position;
-    this.maybeDeal();
-  }
-
-  play(owner: string, position: number, action: string) {
-    if (this.phase !== 'playing') throw new BadRequestException('Most nincs játszható kéz.');
-    const hand = this.hands.find(entry => entry.position === position && entry.owner === owner && !entry.left);
-    if (!hand || hand.finished) throw new BadRequestException('Ennél a kéznél már nincs teendő.');
-    if (this.activePosition !== position) throw new BadRequestException('Még egy másik szék van soron.');
-    if (action === 'double') {
-      if (hand.cards.length !== 2) throw new BadRequestException('Duplázni csak két lappal lehet.');
-      const extra = hand.bet.amount;
-      this.transaction(() => {
-        this.changeBalance(hand.playerId, -extra, 'BLACKJACK_BET', 'Blackjack · duplázás');
-        this.database.sqlite.prepare('UPDATE blackjack_holds SET amount = amount + ? WHERE id = ?').run(extra, hand.bet.id);
-      });
-      hand.bet.amount += extra;
+  play(playerId: number | undefined, round: number | undefined, revision: number | undefined, action: 'hit' | 'stand' | 'double') {
+    const hand = playerId ? this.tables.get(playerId) : undefined;
+    if (!playerId || !hand || hand.outcome || round !== hand.round || revision !== hand.revision) throw new BadRequestException('Most nincs játszható kéz.');
+    if (action === 'hit') {
+      const card = hand.deck[hand.deck.length - 1];
+      const cards = [...hand.cards, card];
+      if (total(cards) < 21) {
+        hand.deck.pop();
+        hand.cards.push(card);
+        hand.revision++;
+        return;
+      }
     }
-    if (action === 'hit' || action === 'double') hand.cards.push(this.draw());
-    else if (action !== 'stand') throw new BadRequestException('Ismeretlen blackjackművelet.');
-    hand.finished = action !== 'hit' || total(hand.cards) >= 21;
-    this.maybeSettle();
+    if (action === 'double' && hand.cards.length !== 2) throw new BadRequestException('Duplázni csak két lappal lehet.');
+    const next: Hand = { ...hand, revision: hand.revision + 1, bet: { ...hand.bet }, cards: [...hand.cards], dealer: [...hand.dealer], deck: [...hand.deck] };
+    if (action !== 'stand') next.cards.push(next.deck.pop()!);
+    this.transaction(() => {
+      if (action === 'double') {
+        this.changeBalance(playerId, -hand.bet.amount, 'BLACKJACK_BET', 'Blackjack · duplázás');
+        this.database.sqlite.prepare('UPDATE blackjack_holds SET amount = amount + ? WHERE id = ?').run(hand.bet.amount, hand.bet.id);
+        next.bet.amount *= 2;
+      }
+      this.finish(next);
+    });
+    this.tables.set(playerId, next);
+  }
+
+  finishOnExit(playerId: number) {
+    const hand = this.tables.get(playerId);
+    if (hand && !hand.outcome) this.play(playerId, hand.round, hand.revision, 'stand');
   }
 
   reset() {
-    clearTimeout(this.timer);
-    this.seats.clear();
-    this.round = 1;
-    this.openBetting();
+    this.tables.clear();
   }
 
-  private get activePosition(): number | null {
-    if (this.phase === 'playing') return this.hands.find(hand => !hand.finished)?.position ?? null;
-    if (this.phase === 'betting') {
-      for (let position = this.lastBettingPosition + 1; position <= seatCount; position++) {
-        const seat = this.seats.get(position);
-        if (seat && !seat.nextRound && !seat.bet && !seat.skipped) return position;
-      }
+  private finish(hand: Hand) {
+    if (total(hand.cards) <= 21 && !isBlackjack(hand.cards)) {
+      while (total(hand.dealer) < 17) hand.dealer.push(hand.deck.pop()!);
     }
-    return null;
+    const outcome = scoreHand(hand.cards, hand.dealer, hand.bet.amount);
+    this.release(hand.bet, outcome.payout, 'Blackjack · kifizetés');
+    hand.outcome = outcome;
   }
 
-  private openSeat(owner: string, position: number) {
-    if (this.phase !== 'betting') throw new BadRequestException('A következő kör elején tehetsz tétet.');
-    const seat = this.seats.get(position);
-    if (!seat || seat.owner !== owner) throw new BadRequestException('Ez a szék nem a tiéd.');
-    if (seat.bet || seat.skipped) throw new BadRequestException('Erre a körre már döntöttél ennél a széknél.');
-    if (seat.nextRound) throw new BadRequestException('Ez a szék a következő körben játszik.');
-    if (this.activePosition !== position) throw new BadRequestException('Még egy másik szék van soron.');
-    return seat;
-  }
-
-  private maybeDeal() {
-    const occupied = [...this.seats].sort(([a], [b]) => a - b);
-    if (this.activePosition !== null) return;
-    this.hands = occupied.flatMap(([position, seat]) => seat.bet
-      ? [{ position, owner: seat.owner, playerId: seat.playerId, name: seat.name, bet: seat.bet, cards: [], finished: false, left: false }]
-      : []);
-    if (!this.hands.length) {
-      this.resetBettingOrder();
-      return;
-    }
-    this.phase = 'playing';
-    this.deck = shuffledShoe();
-    this.dealer = [];
-    for (let pass = 0; pass < 2; pass++) {
-      for (const hand of this.hands) hand.cards.push(this.draw());
-      this.dealer.push(this.draw());
-    }
-    for (const hand of this.hands) hand.finished = isBlackjack(hand.cards);
-    this.maybeSettle();
-  }
-
-  private maybeSettle() {
-    if (this.hands.some(hand => !hand.finished)) return;
-    if (this.hands.some(hand => total(hand.cards) <= 21)) {
-      while (total(this.dealer) < 17) this.dealer.push(this.draw());
-    }
-    const outcomes = this.hands.map(hand => scoreHand(hand.cards, this.dealer, hand.bet.amount));
-    this.transaction(() => this.hands.forEach((hand, index) => {
-      this.release(hand.bet, outcomes[index].payout, 'Blackjack · kifizetés');
-    }));
-    this.hands.forEach((hand, index) => { hand.outcome = outcomes[index]; });
-    this.phase = 'results';
-    this.nextRoundAt = Date.now() + resultsMs;
-    this.timer = setTimeout(() => {
-      this.round++;
-      this.openBetting();
-    }, resultsMs);
-  }
-
-  private openBetting() {
-    this.phase = 'betting';
-    this.nextRoundAt = null;
-    this.hands = [];
-    this.dealer = [];
-    this.deck = [];
-    this.resetBettingOrder();
-    this.onChange?.();
-  }
-
-  private resetBettingOrder() {
-    this.lastBettingPosition = 0;
-    for (const seat of this.seats.values()) {
-      seat.nextRound = false;
-      seat.bet = null;
-      seat.skipped = false;
-    }
-  }
-
-  private draw() {
-    const card = this.deck.pop();
-    if (!card) throw new Error('A blackjackpakli elfogyott.');
-    return card;
-  }
-
-  private checkPosition(position: number) {
-    if (!Number.isInteger(position) || position < 1 || position > seatCount) throw new BadRequestException('Érvénytelen szék.');
-  }
-
-  private player(id: number) {
-    if (!Number.isSafeInteger(id) || id < 1) return undefined;
+  private player(id?: number) {
+    if (!id || !Number.isSafeInteger(id) || id < 1) return undefined;
     return this.database.sqlite.prepare('SELECT name, token_balance AS balance FROM players WHERE id = ?').get(id) as { name: string; balance: number } | undefined;
   }
 

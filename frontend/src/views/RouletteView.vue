@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import GameAudioControl from '../components/GameAudioControl.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { useRouletteAudio } from '../services/game-audio';
 import { api } from '../services/api';
 import { rouletteDisplayBalance } from '../services/roulette-balance';
 import { socket } from '../services/socket';
@@ -9,6 +11,7 @@ import PlayerWallet from '../components/PlayerWallet.vue';
 import RouletteBetChip from '../components/RouletteBetChip.vue';
 import RouletteWheel from '../components/RouletteWheel.vue';
 
+const audio = useRouletteAudio();
 const route = useRoute();
 const isDisplay = computed(() => route.query.display === '1');
 const playerId = Number(localStorage.getItem('party-player-id')) || 0;
@@ -132,6 +135,7 @@ function onState(payload: RouletteState) {
   const previous = round.value;
   state.value = payload;
   const current = payload.currentRound;
+  audio.changed(previous, current);
   if (current?.status !== 'COMPLETED' || (previous?.id === current.id && previous.status === 'COMPLETED')) return;
   void refreshBalance();
   if (previous?.id === current.id && previous.status === 'BETTING' && !isDisplay.value) {
@@ -142,10 +146,15 @@ function onState(payload: RouletteState) {
     });
   }
 }
+function onLanded(number: number) {
+  landedRound.value = number;
+  audio.landed(round.value, number, state.value?.winners.some(bet => bet.playerId === playerId));
+}
 function placeBet(choice: Choice) {
   if (!accepting.value || !playerId || !round.value) return;
   error.value = '';
   balanceRevision++;
+  audio.effect('bet');
   queued.value.push({ choice, amount: chip.value, roundId: round.value.id });
   void sendBets();
 }
@@ -199,6 +208,7 @@ onUnmounted(() => {
     <div v-if="round" class="roulette-studio-shell">
       <header class="studio-heading">
         <div><p>Party Casino / Játékterem</p><h1>Európai rulett</h1></div>
+        <GameAudioControl />
         <div class="studio-clock" :class="{ 'studio-closing': accepting && secondsLeft <= 5 }">
           <div><span>{{ accepting ? 'Fogadás nyitva' : resultVisible ? 'Eredmény' : 'Tétek lezárva' }}</span><small>Kör {{ round.roundNumber }}</small></div>
           <strong>{{ accepting ? secondsLeft + ' mp' : '–' }}</strong>
@@ -210,7 +220,7 @@ onUnmounted(() => {
         <section class="studio-observation" aria-label="Kerék és eredmények">
           <RouletteWheel :result-number="round.resultNumber" :previous-result-number="state?.history[0]?.resultNumber"
             :round-number="round.roundNumber" :spinning="round.status === 'COMPLETED'" :completed-at="round.completedAt"
-            :result-seconds="state?.resultSeconds" @landed="landedRound = $event" />
+            :result-seconds="state?.resultSeconds" @landed="onLanded" />
           <div class="studio-history">
             <h2>Előző körök</h2>
             <ol v-if="state?.history.length">

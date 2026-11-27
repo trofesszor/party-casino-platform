@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import { unlockGameAudio } from './services/game-audio';
 import { identifyPlayer } from './services/socket';
 import CasinoHeader from './components/CasinoHeader.vue';
 import PlayerWallet from './components/PlayerWallet.vue';
@@ -19,12 +20,17 @@ function updatePlayer() {
 
 const showPlayerNotifications = computed(() => route.path !== '/display');
 
+let detachAudio: (() => void) | undefined;
 onMounted(() => {
+  detachAudio = unlockGameAudio();
   updatePlayer();
   identifyPlayer(playerId.value || null);
   window.addEventListener('party-player-changed', updatePlayer);
 });
-onUnmounted(() => window.removeEventListener('party-player-changed', updatePlayer));
+onUnmounted(() => {
+  detachAudio?.();
+  window.removeEventListener('party-player-changed', updatePlayer);
+});
 </script>
 <template>
   <CasinoHeader v-if="showCasinoHeader" />

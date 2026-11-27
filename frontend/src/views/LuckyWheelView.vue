@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import GameAudioControl from '../components/GameAudioControl.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import { useWheelAudio } from '../services/game-audio';
 import { api } from '../services/api';
 import { socket } from '../services/socket';
 
 type Segment = { id: number; label: string; position: number; enabled: number };
 type WheelState = { status: 'IDLE'|'SPINNING'|'RESULT'; spinId: string|null; startedAt: number|null; endsAt: number|null; winner: {id:number;label:string;position:number}|null; segments: Segment[]; durationMs: number; spinCost: number; tokenBalance?: number };
+const audio = useWheelAudio();
 const route = useRoute();
 const isDisplay = computed(() => route.query.display === '1');
 const state = ref<WheelState|null>(null);
@@ -71,21 +74,21 @@ function showWinner(s: WheelState) {
   transitionMs.value = 0;
   rotation.value = Math.floor(rotation.value / 360) * 360 + target;
 }
-async function refresh(){ state.value=await api.getLuckyWheel(); if (state.value.status === 'SPINNING') await animateSpin(state.value); else showWinner(state.value); }
+async function refresh() { onChanged(await api.getLuckyWheel()); }
 async function spin(){
   if(busy.value||isSpinning.value)return;
   busy.value=true;error.value='';
   try{
     if (!playerId.value) throw new Error('A pörgetéshez előbb lépj be a játékosneveddel.');
     const next=await api.spinLuckyWheel(playerId.value);
-    state.value=next;
+    onChanged(next);
     window.dispatchEvent(new Event('party-player-changed'));
-    await animateSpin(next);
   }
   catch(e:any){error.value=e.message;}
   finally{busy.value=false;}
 }
 function onChanged(next:WheelState){
+  audio.changed(state.value, next);
   const newSpin=next.status==='SPINNING'&&next.spinId!==state.value?.spinId;
   state.value=next;
   if(newSpin) void animateSpin(next);
@@ -99,7 +102,7 @@ onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInter
 <template>
  <main class="lucky-wheel-page">
   <section class="lucky-wheel-content">
-   <header class="wheel-room-heading"><h1>Szerencsekerék</h1><p class="muted wheel-subtitle">Egy pörgetés, közös eredmény.</p></header>
+   <header class="wheel-room-heading"><h1>Szerencsekerék</h1><p class="muted wheel-subtitle">Egy pörgetés, közös eredmény.</p><GameAudioControl /></header>
    <div class="wheel-room-grid">
    <section class="wheel-stage panel" aria-label="Szerencsekerék">
     <div class="wheel-pointer"></div>

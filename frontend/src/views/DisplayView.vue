@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import GameAudioControl from '../components/GameAudioControl.vue';
+import { useRouletteAudio, useWheelAudio } from '../services/game-audio';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { socket } from '../services/socket';
 import { api, type CommunityEvent } from '../services/api';
 import type { RouletteState } from '../types';
@@ -20,6 +22,12 @@ const now = ref(Date.now());
 let animatedWheelSpinId: string|null = null;
 let wheelClock: ReturnType<typeof setInterval>|undefined;
 const activeScreen = ref<ScreenMode>('roulette');
+const rouletteAudio = useRouletteAudio();
+const wheelAudio = useWheelAudio();
+watch(activeScreen, mode => {
+  if (mode !== 'roulette') rouletteAudio.stop();
+  if (mode !== 'wheel') wheelAudio.stop();
+});
 const loading = ref(true);
 let refreshTimer: ReturnType<typeof setInterval>|undefined;
 
@@ -54,7 +62,7 @@ async function animateDisplayWheel(s:DisplayWheelState){
   wheelRotation.value=current+360*9+delta;
 }
 function settleDisplayWheel(s:DisplayWheelState){const target=wheelTargetRotation(s);if(target===null)return;wheelTransitionMs.value=0;wheelRotation.value=Math.floor(wheelRotation.value/360)*360+target;}
-async function applyWheelState(next:DisplayWheelState){const newSpin=next.status==='SPINNING'&&next.spinId!==wheel.value?.spinId;wheel.value=next;if(newSpin)await animateDisplayWheel(next);else if(next.status!=='SPINNING')settleDisplayWheel(next);}
+async function applyWheelState(next:DisplayWheelState){wheelAudio.changed(wheel.value, next, activeScreen.value === 'wheel');const newSpin=next.status==='SPINNING'&&next.spinId!==wheel.value?.spinId;wheel.value=next;if(newSpin)await animateDisplayWheel(next);else if(next.status!=='SPINNING')settleDisplayWheel(next);}
 
 async function refreshData(){
   const results=await Promise.allSettled([
@@ -64,14 +72,21 @@ async function refreshData(){
     api.getCommunityEvents(),
     api.getLuckyWheel()
   ]);
-  if(results[0].status==='fulfilled') state.value=results[0].value;
+  if(results[0].status==='fulfilled') onRouletteChanged(results[0].value);
   if(results[1].status==='fulfilled') players.value=results[1].value;
   if(results[2].status==='fulfilled') notifications.value=results[2].value.slice(0,30);
   if(results[3].status==='fulfilled') events.value=results[3].value.events;
   if(results[4].status==='fulfilled') await applyWheelState(results[4].value as DisplayWheelState);
   loading.value=false;
 }
-function onRouletteChanged(next:RouletteState){state.value=next;}
+function onRouletteChanged(next: RouletteState) {
+  rouletteAudio.changed(state.value?.currentRound, next.currentRound, activeScreen.value === 'roulette');
+  state.value = next;
+}
+function onRouletteLanded(round: number) {
+  visibleRouletteRound.value = round;
+  rouletteAudio.landed(state.value?.currentRound, round);
+}
 function onPlayersChanged(next:{id:number;name:string}[]){players.value=next;}
 function onWheelChanged(next:DisplayWheelState){void applyWheelState(next);}
 function onPublicNotification(next:PublicNotification){
@@ -111,7 +126,7 @@ onUnmounted(()=>{
     <div class="tv-layout">
       <section class="tv-main-screen">
         <div class="tv-screen-toolbar">
-          <div><small>NOW SHOWING</small><h1>{{screenLabel}}</h1></div>
+          <div class="tv-toolbar-title"><h1>{{screenLabel}}</h1><GameAudioControl compact /></div>
           <nav class="tv-screen-switcher" aria-label="Kijelző tartalma">
             <button :class="{active:activeScreen==='roulette'}" @click="activeScreen='roulette'">◉ Rulett</button>
             <button :class="{active:activeScreen==='wheel'}" @click="activeScreen='wheel'">◎ Szerencsekerék</button>
@@ -124,7 +139,7 @@ onUnmounted(()=>{
             <p class="tv-game-eyebrow">KÖZÖS RULETTASZTAL · {{state.currentRound.status==='BETTING'?'FOGADÁS':'EREDMÉNY'}}</p>
             <h2>{{state.currentRound.status==='BETTING'?'Tétek leadása folyamatban':visibleRouletteRound === state.currentRound.roundNumber ? 'A kör eredménye' : 'A golyó pályán van'}}</h2>
             <div class="tv-art-stage tv-roulette-art">
-              <RouletteWheel :result-number="state.currentRound.resultNumber" :previous-result-number="state.history[0]?.resultNumber??null" :spinning="state.currentRound.status==='COMPLETED'" :round-number="state.currentRound.roundNumber" :completed-at="state.currentRound.completedAt" :result-seconds="state.resultSeconds" @landed="visibleRouletteRound = $event"/>
+              <RouletteWheel :result-number="state.currentRound.resultNumber" :previous-result-number="state.history[0]?.resultNumber??null" :spinning="state.currentRound.status==='COMPLETED'" :round-number="state.currentRound.roundNumber" :completed-at="state.currentRound.completedAt" :result-seconds="state.resultSeconds" @landed="onRouletteLanded"/>
             </div>
             <div class="tv-game-stats"><span><b>{{players.length}}</b> online játékos</span><span><b>{{state.bets.length}}</b> leadott tét</span></div>
             <div class="tv-bet-list"><div v-for="bet in state.bets" :key="bet.id" class="tv-bet-row"><strong>{{bet.playerName}}</strong><span>{{bet.betType==='NUMBER'?bet.betValue:bet.betValue==='red'?'Piros':'Fekete'}}</span><b v-if="state.currentRound.status==='COMPLETED' && visibleRouletteRound === state.currentRound.roundNumber" :class="{winner:state.winners.some(w=>w.id===bet.id)}">{{state.winners.some(w=>w.id===bet.id)?'NYERT':'—'}}</b></div></div>
@@ -238,6 +253,7 @@ onUnmounted(()=>{
   gap: 4px 10px;
   padding-bottom: clamp(3px, 1vmin, 12px);
 }
+.tv-toolbar-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
 .tv-screen-toolbar h1 { margin: 0; font-size: clamp(.8rem, 2.15vmin, 1.3rem); }
 .tv-screen-switcher { width: auto; max-width: 100%; padding: 2px; gap: 2px; overflow: clip; }
 .tv-screen-switcher button {

@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import GameAudioControl from '../components/GameAudioControl.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useGameAudio } from '../services/game-audio';
 import { api } from '../services/api';
 import { socket } from '../services/socket';
 import PlayerWallet from '../components/PlayerWallet.vue';
 import type { SlotBonus, SlotCoin, SlotProgressives, SlotSpin, SlotStake, SlotState, SlotTier, SlotTile } from '../types';
 
+const audio = useGameAudio();
 const playerId = Number(localStorage.getItem('party-player-id')) || 0;
 const rules = ref<SlotState>();
 const jackpots = ref<SlotProgressives>();
@@ -100,6 +103,7 @@ function openStakePicker() {
 }
 function chooseStake(nextDenomination: number, nextUnits: number) {
   if (stakesLocked.value) return;
+  audio.effect('bet');
   denomination.value = nextDenomination;
   units.value = nextUnits;
   stakeDialog.value?.close();
@@ -119,19 +123,32 @@ function displayTile(tile: SlotTile) {
 function tierTitle(tier: SlotTier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
-async function animate(grid: SlotTile[], held: readonly boolean[]) {
+function barkForBells(count: number) {
+  for (let bell = 0; bell < count; bell++) {
+    if (bell === 0) audio.effect('bark');
+    else audio.after(85 * bell, () => audio.effect('bark'));
+  }
+}
+async function animate(grid: SlotTile[], held: readonly boolean[], wasBonus: boolean) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     reel.value = grid;
+    if (!wasBonus) barkForBells(grid.filter(tile => tile.symbol === 'coin').length);
     return;
   }
   for (const column of columns) {
     await wait(column === 0 ? 290 : 115);
     if (!mounted) return;
     rolling.value[column] = false;
+    audio.effect('click');
+    let bells = 0;
     for (const row of rows) {
       const index = row * 5 + column;
-      if (!held[index]) reel.value[index] = grid[index];
+      if (!held[index]) {
+        reel.value[index] = grid[index];
+        if (grid[index].symbol === 'coin') bells++;
+      }
     }
+    if (!wasBonus) barkForBells(bells);
   }
 }
 async function spin() {
@@ -143,6 +160,9 @@ async function spin() {
   error.value = '';
   last.value = null;
   newBells.value = [];
+  audio.effect('start');
+  audio.announce(wasBonus ? 'Harangeső. Újrapörgetés.' : freeSpins.value ? 'Indul az ingyenpörgetés.' : 'Indul a pörgetés.');
+  audio.roll('slot');
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
     rolling.value = columns.map(() => true);
     ticker = setInterval(() => {
@@ -159,10 +179,16 @@ async function spin() {
     const feature = reply.bonus ?? reply.finishedBonus;
     const incoming = feature?.coins.flatMap((coin, index) => coin && !held[index] ? [index] : []) ?? [];
     const stagingGrid: SlotTile[] = reply.grid.map((tile, index) => incoming.includes(index) ? { symbol: 'empty' } : tile);
-    await animate(stagingGrid, held);
+    await animate(stagingGrid, held, wasBonus);
+    audio.stopRoll();
     if (!mounted) return;
     reel.value = feature ? bonusGrid(feature) : reply.grid;
     newBells.value = incoming;
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    for (const [index] of incoming.entries()) {
+      audio.after((reducedMotion ? 55 : bellFallMs - 110) + index * (reducedMotion ? 85 : bellStaggerMs),
+        () => audio.effect(wasBonus ? 'bell' : 'bark'));
+    }
     bonus.value = reply.bonus;
     freeSpins.value = reply.freeSpins;
     freeStake.value = reply.freeStake;
@@ -170,14 +196,30 @@ async function spin() {
     jackpots.value = pendingJackpots ?? reply.jackpots;
     last.value = reply;
     window.dispatchEvent(new Event('party-player-changed'));
-    if (incoming.length && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      await wait(bellFallMs + (incoming.length - 1) * bellStaggerMs);
+    if (incoming.length && !reducedMotion) await wait(bellFallMs + (incoming.length - 1) * bellStaggerMs);
+    if (!mounted) return;
+    const payout = reply.payoutAmount;
+    if (!wasBonus && reply.bonus) {
+      audio.effect('bonus');
+      audio.announce('Harangeső indul. Újrapörgetések száma: ' + reply.bonus.remaining + '.', true);
+    } else if (reply.finishedBonus) {
+      audio.effect(payout ? 'win' : 'end');
+      audio.announce('A harangeső véget ért. Nyeremény: ' + payout + ' kredit.', true);
+    } else if (reply.bonus) {
+      audio.effect('end');
+      audio.announce('Pörgetés vége. Hátralévő újrapörgetések: ' + reply.bonus.remaining + '.', true);
+    } else {
+      audio.effect(payout || reply.freeSpinsAwarded ? 'win' : 'end');
+      const result = payout ? ' Nyertél ' + payout + ' kreditet.' : '';
+      const free = reply.freeSpinsAwarded ? ' Kaptál ' + reply.freeSpinsAwarded + ' ingyenpörgetést.' : '';
+      audio.announce('Pörgetés vége.' + result + free, true);
     }
   } catch (cause) {
     if (!mounted) return;
     reel.value = before;
     error.value = cause instanceof Error ? cause.message : 'A pörgetés sikertelen.';
   } finally {
+    audio.stopRoll();
     clearInterval(ticker);
     rolling.value = columns.map(() => false);
     if (pendingJackpots) jackpots.value = pendingJackpots;
@@ -205,7 +247,7 @@ onUnmounted(() => {
     <div class="mint-shell">
       <header class="mint-top">
         <div><h1>Midnight <em>Mint</em></h1><p>5 tárcsa · {{ rules?.lines.length ?? 9 }} nyerővonal · CR</p></div>
-        
+        <GameAudioControl />
       </header>
 
       <p v-if="!rules && !error" class="mint-loading" role="status">Játék betöltése…</p>
