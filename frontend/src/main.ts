@@ -14,7 +14,12 @@ import CommunityEventsView from './views/CommunityEventsView.vue';
 import AdminCommunityEventsView from './views/AdminCommunityEventsView.vue';
 import './style.css';
 import './casino-theme.css';
-const router = createRouter({ history: createWebHistory(), routes: [
+import './casino-layout.css';
+const router = createRouter({ history: createWebHistory(), scrollBehavior(to, from, saved) {
+  if (saved) return saved;
+  if (to.hash) return { el: to.hash };
+  if (to.path !== from.path) return { top: 0 };
+}, routes: [
   { path: '/', component: HomeView },
   { path: '/display', component: DisplayView },
   { path: '/roulette', component: RouletteView },

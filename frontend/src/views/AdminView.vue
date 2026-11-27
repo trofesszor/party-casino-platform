@@ -61,6 +61,21 @@ const players = ref<AdminPlayer[]>([]);
 const error = ref('');
 const busy = ref(false);
 const authenticated = ref(false);
+const adminSections = [
+  { id: 'players', label: 'Játékosok' },
+  { id: 'stats', label: 'Statisztikák' },
+  { id: 'wheel', label: 'Szerencsekerék' },
+  { id: 'shop', label: 'Bolt' },
+  { id: 'quests', label: 'Küldetések' },
+  { id: 'settings', label: 'Beállítások' },
+] as const;
+type AdminSection = typeof adminSections[number]['id'];
+const activeSection = ref<AdminSection>('players');
+function showSection(section: AdminSection) {
+  if (activeSection.value === section) return;
+  activeSection.value = section;
+  window.scrollTo({ top: 0 });
+}
 const restoringSession = ref(!!token.value);
 
 async function loadCasinoStatistics(){
@@ -335,13 +350,8 @@ onMounted(async () => {
 
     <div v-else class="admin-shell">
     <nav class="admin-navigation" aria-label="Admin menü">
-      <a href="#jatekosok">Játékosok</a>
-      <a href="#statisztikak">Statisztikák</a>
-      <a href="/admin/community-events">Közösségi események <span aria-hidden="true">↗︎</span></a>
-      <a href="#szerencsekerek">Szerencsekerék</a>
-      <a href="#bolt">Bolt</a>
-      <a href="#kuldetesek">Küldetések</a>
-      <a href="#beallitasok">Beállítások</a>
+      <button v-for="section in adminSections" :key="section.id" type="button" :aria-pressed="activeSection === section.id" @click="showSection(section.id)">{{ section.label }}</button>
+      <RouterLink to="/admin/community-events">Közösségi események <span aria-hidden="true">→</span></RouterLink>
     </nav>
     <section class="admin-content">
       <div class="admin-heading">
@@ -349,12 +359,12 @@ onMounted(async () => {
         <div class="admin-heading-actions"><button class="ghost" @click="logout">Kilépés</button></div>
       </div>
 
-      <div class="admin-stat-grid">
+      <div v-show="activeSection === 'players'" class="admin-stat-grid">
         <article class="panel admin-stat"><span>Összes játékos</span><strong>{{ players.length }}</strong></article>
         <article class="panel admin-stat"><span>Online játékos</span><strong>{{ players.filter(p => p.online).length }}</strong></article>
       </div>
 
-      <section id="jatekosok" class="panel admin-players">
+      <section v-show="activeSection === 'players'" id="jatekosok" class="panel admin-players">
         <div class="admin-section-heading"><div><h2>Játékosok</h2></div><button class="ghost" @click="loadPlayers">Frissítés</button></div>
         <div v-if="!players.length" class="muted admin-empty">Még nincs regisztrált játékos.</div>
         <div v-else class="admin-table-wrap">
@@ -376,7 +386,7 @@ onMounted(async () => {
           </table>
         </div>
       </section>
-      <section id="statisztikak" class="panel admin-wheel-editor admin-statistics-editor">
+      <section v-show="activeSection === 'stats'" id="statisztikak" class="panel admin-wheel-editor admin-statistics-editor">
         <div class="admin-section-heading"><div><h2>Kaszinó statisztikák</h2><p class="muted">A legutóbbi újraindítás óta gyűjtött adatok. A lezárt buli statisztikái újraindítás után is megmaradnak.</p></div><button class="ghost" :disabled="statsLoading" @click="loadCasinoStatistics">{{statsLoading?'Frissítés…':'Frissítés'}}</button></div>
         <div class="stats-mode-row"><button class="ghost" :class="{active:statsMode==='current'}" @click="statsMode='current'">Jelenlegi buli</button><button class="ghost" :class="{active:statsMode==='last'}" :disabled="!casinoStats.lastCompleted" @click="statsMode='last'">Előző buli</button></div>
         <div class="stats-group-photo-editor">
@@ -424,12 +434,12 @@ onMounted(async () => {
           <button class="primary stats-export-button" :disabled="statsExporting" @click="exportStatisticsImage">{{statsExporting?'Kép készítése…':'Statisztika exportálása PNG-ként'}}</button>
         </template>
       </section>
-      <section id="szerencsekerek" class="panel admin-wheel-editor">
+      <section v-show="activeSection === 'wheel'" id="szerencsekerek" class="panel admin-wheel-editor">
         <div class="admin-section-heading"><div><h2>Szerencsekerék mezői</h2><p class="muted">A módosítások azonnal megjelennek minden telefonon és a TV-n.</p></div><button class="ghost" @click="addWheelSegment" :disabled="wheelSegments.length>=24">+ Új mező</button></div>
         <div v-for="(segment,index) in wheelSegments" :key="index" class="admin-wheel-row"><span class="admin-wheel-index">{{ index+1 }}</span><input v-model="segment.label" maxlength="48" placeholder="Mező felirata" :aria-label="'Mező felirata: ' + (index + 1)"><label><input v-model="segment.enabled" type="checkbox"> Aktív</label><button class="ghost" aria-label="Mező mozgatása fel" @click="moveWheelSegment(index,-1)" :disabled="index===0">↑</button><button class="ghost" aria-label="Mező mozgatása le" @click="moveWheelSegment(index,1)" :disabled="index===wheelSegments.length-1">↓</button><button class="ghost danger" @click="removeWheelSegment(index)">Törlés</button></div>
         <button class="primary" :disabled="wheelSaving||wheelSegments.length<2" @click="saveWheel">{{wheelSaving?'Mentés…':'Kerék mentése'}}</button>
       </section>
-      <section id="bolt" class="panel admin-wheel-editor admin-shop-editor">
+      <section v-show="activeSection === 'shop'" id="bolt" class="panel admin-wheel-editor admin-shop-editor">
         <div class="admin-section-heading"><div><h2>Shop termékek</h2><p class="muted">Itt módosíthatod a termékek nevét, leírását, árát és elérhetőségét.</p></div></div>
         <div v-for="item in shopItems" :key="item.itemKey" class="side-quest-admin-row shop-admin-edit-row">
           <div class="shop-admin-edit-fields">
@@ -445,7 +455,7 @@ onMounted(async () => {
           </div>
         </div>
       </section>
-      <section id="kuldetesek" class="panel admin-wheel-editor admin-side-quest-editor">
+      <section v-show="activeSection === 'quests'" id="kuldetesek" class="panel admin-wheel-editor admin-side-quest-editor">
         <div class="admin-section-heading"><div><h2>Side quest pool</h2><p class="muted">A játékosok véletlenszerűen kapnak egy küldetést ebből a listából. Egy játékosnak legfeljebb 2 aktív küldetése lehet.</p></div></div>
         <form class="side-quest-admin-form" @submit.prevent="addSideQuest">
           <input v-model="newQuestTitle" maxlength="120" placeholder="Side quest címe" required>
@@ -462,14 +472,14 @@ onMounted(async () => {
           <button class="ghost danger" @click="deleteSideQuest(quest.id)">Törlés</button>
         </div>
       </section>
-      <section id="beallitasok" class="panel admin-wheel-editor">
+      <section v-show="activeSection === 'settings'" id="beallitasok" class="panel admin-wheel-editor">
         <div class="admin-section-heading"><div><h2>Értesítések beállításai</h2><p class="muted">Minden kategória külön kapcsolható. A kikapcsolt értesítések nem jelennek meg felugróként, és az előzményekbe sem kerülnek be.</p></div></div>
         <div class="notification-settings-grid">
           <label v-for="item in [{key:'wheel',label:'Szerencsekerék eredmények'},{key:'event',label:'Közösségi események'},{key:'duel',label:'Párbajok és kihívások'},{key:'roulette',label:'Nagy rulettnyeremények'},{key:'slots',label:'Slot jackpotok / nagy nyeremények'},{key:'leaderboard',label:'Leaderboard vezetőváltás'},{key:'system',label:'Egyéb rendszerüzenetek'}]" :key="item.key" class="admin-photo-quest-option"><input type="checkbox" v-model="notificationSettings[item.key]">{{item.label}}</label>
         </div>
         <button class="primary" :disabled="notificationSaving" @click="saveNotificationSettings">{{notificationSaving?'Mentés…':'Értesítési beállítások mentése'}}</button>
       </section>
-      <section class="panel admin-wheel-editor admin-game-settings-editor">
+      <section v-show="activeSection === 'settings'" class="panel admin-wheel-editor admin-game-settings-editor">
         <div class="admin-section-heading"><div><h2>Játékmenet beállításai</h2><p class="muted">A módosítások mentés után a backend által futtatott játékszabályokra érvényesek. A már folyamatban lévő körök és párbajok a korábban rögzített adatokkal zárulnak.</p></div></div>
         <div class="game-settings-grid">
           <label>Szerencsekerék ára (CR)<input v-model.number="gameSettings.wheelSpinCost" type="number" min="0" max="100000"></label>
@@ -509,14 +519,14 @@ onMounted(async () => {
         </details>
         <button class="primary" :disabled="gameSettingsSaving" @click="saveCasinoGameSettings">{{gameSettingsSaving?'Mentés…':'Játékszabályok mentése'}}</button>
       </section>
-      <section class="panel admin-wheel-editor admin-default-tokens-editor">
+      <section v-show="activeSection === 'settings'" class="panel admin-wheel-editor admin-default-tokens-editor">
         <div class="admin-section-heading"><div><h2>Kezdő tokenegyenleg</h2><p class="muted">Ennyi tokent kap minden újonnan regisztráló játékos. A módosítás csak a később csatlakozó játékosokra érvényes, a meglévő egyenlegeket nem változtatja meg.</p></div></div>
         <div class="token-photo-admin-settings">
           <label>Alapértelmezett tokenmennyiség (CR)<input v-model.number="defaultPlayerTokens" type="number" min="0" max="2000000000" step="1"></label>
         </div>
         <button class="primary" :disabled="defaultTokensSaving || !Number.isSafeInteger(defaultPlayerTokens) || defaultPlayerTokens<0 || defaultPlayerTokens>2000000000" @click="saveDefaultPlayerTokens">{{defaultTokensSaving?'Mentés…':'Kezdő tokenegyenleg mentése'}}</button>
       </section>
-      <section class="panel admin-wheel-editor admin-token-photo-editor">
+      <section v-show="activeSection === 'settings'" class="panel admin-wheel-editor admin-token-photo-editor">
         <div class="admin-section-heading"><div><h2>Fotófeltöltés tokenekért</h2><p class="muted">Automatikus jutalom Snappin-fotó sikeres feltöltése után. A limitet a szerver ellenőrzi.</p></div></div>
         <div class="token-photo-admin-settings">
           <label class="admin-photo-quest-option"><input v-model="tokenPhotoSettings.enabled" type="checkbox"> Jutalomrendszer aktív</label>
@@ -528,7 +538,7 @@ onMounted(async () => {
         <p class="muted">A játékos csak a küszöbérték alatti egyenleggel jogosult. Egyidejűleg egy aktív feltöltése lehet; az indított feltöltés a napi limitbe beleszámít, akkor is, ha nem fejezi be.</p>
         <button class="primary" :disabled="tokenPhotoSaving" @click="saveTokenPhotoSettings">{{tokenPhotoSaving?'Mentés…':'Fotójutalom beállításainak mentése'}}</button>
       </section>
-      <section class="panel admin-wheel-editor admin-reset-editor">
+      <section v-show="activeSection === 'settings'" class="panel admin-wheel-editor admin-reset-editor">
         <div class="admin-section-heading"><div><h2>Kaszinó újraindítása</h2><p class="muted">Törli az összes játékost, egyenleget, tranzakciót, fogadást, párbajt, sorsjegyet, készletet és játékoshoz tartozó küldetéselőzményt. A side quest pool, kerékmezők, shop termékek és admin beállítások megmaradnak.</p></div></div>
         <p class="error">Figyelem: ez a művelet végleges, és minden játékosadatot töröl.</p>
         <button class="ghost danger" :disabled="resetBusy" @click="resetPlayerData">{{resetBusy?'Visszaállítás…':'Játékosadatok törlése és új játék indítása'}}</button>

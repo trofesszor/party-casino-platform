@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CasinoHeader from '../components/CasinoHeader.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { api, type CommunityEvent, type CommunityActivation } from '../services/api';
 
@@ -43,7 +42,6 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
 
 <template>
   <main class="community-page">
-    <CasinoHeader />
     <section class="community-hero"><h1>Community <span>Events</span></h1><p class="muted">A közösség együtt gyűjti össze a tokeneket, hogy feloldja a következő közös élményt.</p></section>
     <p v-if="message" class="community-message success">{{message}}</p><p v-if="error" class="community-message error">{{error}}</p>
     <section class="community-section"><div class="community-section-heading"><div><h2>Aktív események</h2></div><span>{{events.length}} AKTÍV</span></div>

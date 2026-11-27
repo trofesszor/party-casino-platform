@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { api, type Duel } from '../services/api';
 import type { Player } from '../types';
-import CasinoHeader from '../components/CasinoHeader.vue';
 import { identifyPlayer } from '../services/socket';
 
-const router = useRouter();
 const player = ref<Player | null>(null);
 const tokenBalance = ref(0);
 type SideQuest = { id:number; title:string; description:string; status:'ACTIVE'|'COMPLETED'|'SKIPPED'; assignedAt:string; completedAt:string|null; photoEnabled?:number; completionMethod?:string|null; approvedByName?:string|null; approvedAt?:string|null };
@@ -281,76 +278,47 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
   </main>
 
   <main v-else class="casino-lobby">
-    <CasinoHeader />
 
-    <section class="lobby-shell">
-      <aside class="lobby-rail">
-        <div class="rail-label">Kaszinó</div>
-        <button class="rail-item active" @click="router.push('/')"><span>⌂</span><strong>Előtér</strong></button>
-        <div class="rail-label rail-label-games">JÁTÉKOK</div>
-        <button class="rail-item" @click="router.push('/roulette')"><span>◉</span><strong>Rulett</strong></button>
-        <button class="rail-item" @click="router.push('/slots')"><span>✦</span><strong>Slots</strong></button>
-        <button class="rail-item" @click="router.push('/lucky-wheel')"><span>◎</span><strong>Szerencsekerék</strong></button>
-        <div class="rail-divider"></div>
-        <div class="rail-label">EXTRÁK</div>
-        <a class="rail-item" href="/verify-quest"><span>✓</span><strong>Quest PIN</strong></a>
-      </aside>
+    <div class="floor-shell">
+      <header class="floor-intro">
+        <div>
+          <h1>Játékterem</h1>
+          <p>Válassz asztalt, vagy intézd a kihívásaidat.</p>
+        </div>
+        <RouterLink class="floor-balance" to="/leaderboard"><span>Egyenleged</span><strong>{{ tokenBalance.toLocaleString('hu-HU') }} <small>CR</small></strong></RouterLink>
+      </header>
 
-      <div class="lobby-main">
-        <section class="lobby-hero-card">
+      <section class="floor-games" aria-label="Kaszinójátékok">
+        <RouterLink class="floor-featured" to="/roulette">
+          <div class="floor-featured-copy">
+            <h2>Európai<br>rulett</h2>
+            <p>Egy közös asztal, élő körökkel.</p>
+            <span class="floor-button">Az asztalhoz <span aria-hidden="true">→</span></span>
+          </div>
           <div class="hero-art" aria-hidden="true">
             <div class="hero-wheel-art"><span>0</span></div>
             <div class="hero-chip hero-chip-red">25</div>
             <div class="hero-chip hero-chip-gold">100</div>
           </div>
-          <div class="lobby-hero-copy">
-            <span class="hero-kicker"><i></i> A kaszinó nyitva</span>
-            <h1>Üdv a <span>kaszinóban!</span></h1>
-            <p>Ülj a rulettasztalhoz, vagy hívd ki a többieket egy párbajra.</p>
-            <div class="hero-actions">
-              <button class="primary hero-primary" @click="router.push('/roulette')">Rulett megnyitása <span>→</span></button>
-              <button class="hero-secondary" @click="router.push('/leaderboard')">Ranglista <span aria-hidden="true">↗︎</span></button>
-            </div>
-          </div>
-          <div class="hero-stats">
-            <div><small>Egyenleg</small><strong>{{ tokenBalance.toLocaleString('hu-HU') }}</strong><span>CR</span></div>
-            <div><small>Aktív párbaj</small><strong>{{ duels.filter(d=>['PENDING','CHOOSE_TYPE','IN_PROGRESS','AWAITING_CONFIRMATION'].includes(d.status)).length }}</strong></div>
-            <div><small>Küldetés</small><strong>{{ activeSideQuests.length }}/2</strong></div>
-          </div>
-        </section>
+        </RouterLink>
 
-        <section class="lobby-section">
-          <div class="lobby-section-head">
-            <div><h2>Válassz játékot</h2></div>
-      
-          </div>
-          <div class="lobby-game-grid">
-            <button class="lobby-game-card roulette-card" @click="router.push('/roulette')">
-        
-              <div class="game-art roulette-art"><span>0</span><b>R</b></div>
-              <div class="game-card-copy"><h3>Európai rulett</h3><p>Közös asztal · mindenki ugyanazt az eredményt látja.</p><strong>Játék →</strong></div>
-            </button>
-            <button class="lobby-game-card slots-card" @click="router.push('/slots')">
-        
-              <div class="game-art slots-art"><span>7</span><span>★</span><span>7</span></div>
-              <div class="game-card-copy"><h3>Lucky Slots</h3><p>Pörgess saját gépet, és próbáld megütni a nagy nyereményt.</p><strong>Játék →</strong></div>
-            </button>
-            <button class="lobby-game-card wheel-card" @click="router.push('/lucky-wheel')">
-        
-              <div class="game-art wheel-art"><span>✦</span></div>
-              <div class="game-card-copy"><h3>Szerencsekerék</h3><p>Egy pörgetés, egy eredmény, mindenki együtt nézi.</p><strong>Kerék megnyitása →</strong></div>
-            </button>
-          </div>
-        </section>
+        <RouterLink class="floor-game floor-slot" to="/slots">
+          <div class="floor-game-art" aria-hidden="true"><span>7</span><span>✦</span><span>7</span></div>
+          <div><h2>Lucky Slots</h2><p>Saját gép és ingyenpörgetések.</p></div>
+          <span class="floor-arrow" aria-hidden="true">→</span>
+        </RouterLink>
+        <RouterLink class="floor-game floor-wheel" to="/lucky-wheel">
+          <div class="floor-game-art" aria-hidden="true"><span>✦</span></div>
+          <div><h2>Szerencsekerék</h2><p>Közös pörgetés a többiekkel.</p></div>
+          <span class="floor-arrow" aria-hidden="true">→</span>
+        </RouterLink>
+      </section>
 
-        <section class="lobby-feature-row">
-          <button class="feature-tile events-tile" @click="router.push('/community-events')">
-            <div class="feature-tile-art">✦</div><div><h3>Közösségi események</h3><p>Közösen gyűjtitek össze a tokeneket a következő party unlockhoz.</p><strong>Felfedezés →</strong></div>
-          </button>
-          <button class="feature-tile shop-tile" @click="router.push('/shop')">
-            <div class="feature-tile-art">◇</div><div><h3>Kaszinóbolt</h3><p>Quest skip, kaparós sorsjegy és további tárgyak CR-ért.</p><strong>Shop megnyitása →</strong></div>
-          </button>
-        </section>
+      <nav class="floor-utilities" aria-label="További lehetőségek">
+        <RouterLink to="/community-events">Közösségi események <span aria-hidden="true">→</span></RouterLink>
+        <RouterLink to="/shop">Kaszinóbolt <span aria-hidden="true">→</span></RouterLink>
+        <RouterLink to="/verify-quest">PIN ellenőrzése <span aria-hidden="true">→</span></RouterLink>
+      </nav>
 
         <section v-if="tokenPhotoStatus?.enabled && (tokenPhotoStatus.eligible || tokenPhotoStatus.pending || tokenPhotoSession || tokenPhotoMessage)" class="token-photo-reward panel lobby-reward-card">
           <div class="reward-icon">✦</div>
@@ -409,8 +377,7 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
             </section>
           </div>
         </section>
-      </div>
-    </section>
+    </div>
 
     <div v-if="tokenPhotoSession" class="quest-qr-overlay" @click.self="tokenPhotoSession=null">
       <section class="quest-qr-modal panel photo-quest-modal camera-embed-modal">
@@ -433,6 +400,5 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
         <button class="ghost" @click="closePhotoSession">Bezárás</button>
       </section>
     </div>
-    <footer class="casino-footer">PARTY CASINO <span>•</span> A party minden játékosa ugyanabban a kaszinóban játszik</footer>
   </main>
 </template>

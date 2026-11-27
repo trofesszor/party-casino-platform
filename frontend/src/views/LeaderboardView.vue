@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CasinoHeader from '../components/CasinoHeader.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { api } from '../services/api';
 
@@ -31,18 +30,18 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
 
 <template>
   <main class="leaderboard-page">
-    <CasinoHeader />
 
     <section class="leaderboard-content">
-      <div class="leaderboard-intro">
+      <header class="leaderboard-intro">
         
-        <h1>Token <span>Leaderboard</span></h1>
-        <p class="muted">A játékosok aktuális tokenegyenlege, legtöbbtől a legkevesebbig.</p>
-      </div>
+        <h1>Ranglista</h1>
+        <p class="muted">A játékosok sorrendje az aktuális egyenleg alapján.</p>
+        <div v-if="currentPlayerRank" class="leaderboard-own-rank"><span>Helyezésed</span><strong>#{{ currentPlayerRank }}</strong></div>
+      </header>
 
       <section class="leaderboard-panel panel">
         <header class="leaderboard-panel-heading">
-          <div><h2>Ranglista</h2></div>
+          <h2>Játékosok</h2>
           <span class="leaderboard-count">{{ players.length }} játékos</span>
         </header>
         <div v-if="loading" class="leaderboard-empty">Ranglista betöltése…</div>
@@ -60,7 +59,6 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
         </div>
         <footer class="leaderboard-footer">
           <span><i></i> Automatikusan frissül</span>
-          <span v-if="currentPlayerRank">Helyezésed: <strong>#{{ currentPlayerRank }}</strong></span>
         </footer>
       </section>
     </section>

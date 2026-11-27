@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import CasinoHeader from '../components/CasinoHeader.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { api } from '../services/api';
 import { socket } from '../services/socket';
 import type { RouletteBetType, RouletteState } from '../types';
+import PlayerWallet from '../components/PlayerWallet.vue';
 import RouletteWheel from '../components/RouletteWheel.vue';
 
 const route = useRoute();
@@ -24,11 +24,25 @@ let clock: ReturnType<typeof setInterval> | undefined;
 const redNumbers = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
 const myBets = computed(() => state.value?.bets.filter(b => b.playerId === playerId) ?? []);
 const secondsLeft = computed(() => Math.max(0, Math.ceil((Date.parse(state.value?.currentRound?.bettingEndsAt ?? '') - now.value) / 1000)));
-const resultColor = computed(() => {
- const n = state.value?.currentRound?.resultNumber;
- if (n === null || n === undefined || n === 0) return 'green';
- return redNumbers.has(n) ? 'red' : 'black';
-});
+const acceptingBets = computed(() => state.value?.currentRound?.status === 'BETTING' && secondsLeft.value > 0);
+const insideTypes = [
+  { type: 'NUMBER', label: 'Egy szám' },
+  { type: 'SPLIT', label: 'Két szám' },
+  { type: 'STREET', label: 'Három szám' },
+  { type: 'CORNER', label: 'Négy szám' },
+  { type: 'SIX_LINE', label: 'Hat szám' },
+] as const;
+const outsideBets = [
+  { type: 'LOW_HIGH', value: 'low', label: '1–18' },
+  { type: 'ODD_EVEN', value: 'even', label: 'Páros' },
+  { type: 'COLOR', value: 'red', label: 'Piros' },
+  { type: 'COLOR', value: 'black', label: 'Fekete' },
+  { type: 'ODD_EVEN', value: 'odd', label: 'Páratlan' },
+  { type: 'LOW_HIGH', value: 'high', label: '19–36' },
+] as const;
+function pocketColor(number: number) {
+  return number === 0 ? 'green' : redNumbers.has(number) ? 'red' : 'black';
+}
 const requiredNumbers = computed(() => ({ NUMBER:1, SPLIT:2, STREET:3, CORNER:4, SIX_LINE:6 }[selectedType.value as 'NUMBER'|'SPLIT'|'STREET'|'CORNER'|'SIX_LINE'] ?? 0));
 type BetSpot = { type: RouletteBetType; value: string; left: string; top: string; label: string };
 const betSpots = computed<BetSpot[]>(() => {
@@ -59,12 +73,18 @@ const betSpots = computed<BetSpot[]>(() => {
      spots.push({ type:'SIX_LINE', value:Array.from({length:6},(_,i)=>n+i).join(','), left:`${((col+1)/12)*100}%`, top:'50%', label:'6' });
    }
  }
- return spots;
+ return spots.map(spot => ({
+   ...spot,
+   top: `${100 - Number.parseFloat(spot.top)}%`,
+ }));
 });
 const isNumberBet = computed(() => requiredNumbers.value > 0);
 const selectedDescription = computed(() => isNumberBet.value
  ? (selectedNumbers.value.length ? selectedNumbers.value.slice().sort((a,b)=>a-b).join(' / ') : 'Válassz mezőket az asztalon')
- : selectedValue.value || 'Válassz egy fogadást');
+ : selectedValue.value ? labelBet({ betType: selectedType.value, betValue: selectedValue.value }) : 'Válassz egy fogadást');
+const hasSelection = computed(() => isNumberBet.value
+  ? selectedNumbers.value.length === requiredNumbers.value
+  : selectedValue.value !== '');
 
 async function refresh() { state.value = await api.getRouletteState(); }
 function toggleNumber(number: number) {
@@ -77,10 +97,13 @@ function selectBetSpot(spot: BetSpot) {
  selectedNumbers.value = spot.value.split(',').map(Number);
  selectedValue.value = '';
 }
-function chooseType(type: RouletteBetType) {
- selectedType.value = type;
+function clearSelection() {
  selectedNumbers.value = [];
  selectedValue.value = '';
+}
+function chooseType(type: RouletteBetType) {
+ selectedType.value = type;
+ clearSelection();
 }
 function chooseOutside(type: RouletteBetType, value: string) {
  selectedType.value = type;
@@ -96,8 +119,7 @@ async function submitBet() {
  try {
    state.value = await api.placeRouletteBet(playerId, selectedType.value, value, chip.value);
    tokenBalance.value = (await api.getPlayerBalance(playerId)).tokenBalance;
-   selectedNumbers.value = [];
-   selectedValue.value = '';
+   clearSelection();
  } catch (e: any) { error.value = e.message; }
  finally { busy.value = false; }
 }
@@ -112,58 +134,113 @@ onUnmounted(() => { socket.off('roulette:changed', onChanged); if (clock) clearI
 </script>
 
 <template>
- <main class="roulette-page">
-  <CasinoHeader />
-  <section v-if="state?.currentRound" class="roulette-content">
-   <h1>Rulettasztal</h1><p v-if="!isDisplay" class="roulette-token-balance">Egyenleg: <strong>{{ tokenBalance }} CR</strong></p>
-   <div class="roulette-round panel"><span class="eyebrow">KÖR #{{ state.currentRound.roundNumber }}</span><h2>{{ state.currentRound.status === 'BETTING' ? secondsLeft + ' mp' : 'Eredmény' }}</h2><p class="muted">{{ state.currentRound.status === 'BETTING' ? 'Helyezd el a zsetonjaidat az asztalon.' : 'A következő kör automatikusan indul.' }}</p></div>
-   <RouletteWheel :result-number="state.currentRound.resultNumber" :previous-result-number="state.history[0]?.resultNumber ?? null" :spinning="state.currentRound.status === 'COMPLETED'" :round-number="state.currentRound.roundNumber" />
+  <main class="roulette-page roulette-room">
+    <section v-if="state?.currentRound" class="roulette-content roulette-room-layout">
+      <header class="roulette-stage">
+        <div class="roulette-stage-title">
+          <h1>Európai<br>rulett</h1>
+          <p>Kör #{{ state.currentRound.roundNumber }}</p>
+          <div class="roulette-round-clock" :class="{ 'is-closing': acceptingBets && secondsLeft <= 5 }">
+            <strong v-if="acceptingBets">{{ secondsLeft }} mp</strong>
+            <strong v-else>Kör lezárva</strong>
+            <span>{{ acceptingBets ? 'Fogadás nyitva' : 'Hamarosan új kör indul' }}</span>
+          </div>
+        </div>
+        <RouletteWheel
+          :result-number="state.currentRound.resultNumber"
+          :previous-result-number="state.history[0]?.resultNumber ?? null"
+          :spinning="state.currentRound.status === 'COMPLETED'"
+          :round-number="state.currentRound.roundNumber"
+        />
+        <aside class="roulette-recent" aria-label="Korábbi nyerőszámok">
+          <h2>Legutóbbi számok</h2>
+          <ol v-if="state.history.length" class="roulette-history">
+            <li v-for="round in state.history.slice(0, 8)" :key="round.roundNumber" :class="pocketColor(round.resultNumber)" :title="`Kör #${round.roundNumber}`">{{ round.resultNumber }}</li>
+          </ol>
+          <p v-else>Még nincs lezárt kör.</p>
+        </aside>
+      </header>
 
-   <section v-if="!isDisplay && state.currentRound.status === 'BETTING'" class="panel roulette-bet">
-    <div class="bet-heading"><div><h2>Válaszd ki a fogadást</h2></div><div class="chip-picker"><button v-for="value in [1,5,10,25,100]" :key="value" :class="{active:chip===value}" @click="chip=value">{{ value }}</button></div></div>
-    <div class="roulette-bet-types">
-     <button v-for="item in [{type:'NUMBER',label:'Egy szám'},{type:'SPLIT',label:'Split'},{type:'STREET',label:'Street'},{type:'CORNER',label:'Corner'},{type:'SIX_LINE',label:'Six line'}]" :key="item.type" :class="{active:selectedType===item.type}" @click="chooseType(item.type as RouletteBetType)">{{ item.label }}</button>
-    </div>
-    <p class="bet-instruction">{{ selectedType === 'NUMBER' ? 'Koppints egy számra.' : ['SPLIT','STREET','CORNER','SIX_LINE'].includes(selectedType) ? 'Koppints egy jelölt pontra az asztalon a teljes kombináció kijelöléséhez.' : 'Válassz egy külső fogadást.' }}</p>
-    <div class="roulette-layout">
-     <p class="roulette-scroll-hint">Húzd oldalra az asztalt a többi számhoz.</p>
-     <div class="roulette-number-board" tabindex="0" aria-label="Rulett számmezők">
-      <button class="roulette-zero" :class="{selected:selectedNumbers.includes(0)}" :disabled="selectedType!=='NUMBER'" @click="toggleNumber(0)">0</button>
-      <div class="roulette-number-grid-shell">
-       <div class="roulette-number-grid">
-        <button v-for="n in 36" :key="n" :style="{ gridRow: String((n - 1) % 3 + 1), gridColumn: String(Math.floor((n - 1) / 3) + 1) }" :class="[redNumbers.has(n)?'red':'black',{selected:selectedNumbers.includes(n)}]" :disabled="selectedType!=='NUMBER'" @click="toggleNumber(n)">{{ n }}</button>
-       </div>
-       <button v-for="(spot,index) in betSpots" :key="spot.value+'-'+index" class="roulette-bet-spot" :class="{active:selectedNumbers.length===requiredNumbers&&selectedNumbers.slice().sort((a,b)=>a-b).join(',')===spot.value.split(',').map(Number).sort((a,b)=>a-b).join(',')}" :style="{left:spot.left,top:spot.top}" :aria-label="spot.type+' '+spot.value" @click="selectBetSpot(spot)">{{ spot.label }}</button>
-      </div>
-     </div>
-     <div class="roulette-outside">
-      <div class="outside-group"><strong>Külső fogadások</strong>
-       <button @click="chooseOutside('COLOR','red')" :class="{active:selectedType==='COLOR'&&selectedValue==='red'}">PIROS</button>
-       <button @click="chooseOutside('COLOR','black')" :class="{active:selectedType==='COLOR'&&selectedValue==='black'}">FEKETE</button>
-       <button @click="chooseOutside('ODD_EVEN','odd')" :class="{active:selectedType==='ODD_EVEN'&&selectedValue==='odd'}">PÁRATLAN</button>
-       <button @click="chooseOutside('ODD_EVEN','even')" :class="{active:selectedType==='ODD_EVEN'&&selectedValue==='even'}">PÁROS</button>
-       <button @click="chooseOutside('LOW_HIGH','low')" :class="{active:selectedType==='LOW_HIGH'&&selectedValue==='low'}">1–18</button>
-       <button @click="chooseOutside('LOW_HIGH','high')" :class="{active:selectedType==='LOW_HIGH'&&selectedValue==='high'}">19–36</button>
-      </div>
-      <div class="outside-group"><strong>Tucat</strong><button v-for="n in 3" :key="'d'+n" @click="chooseOutside('DOZEN',String(n))" :class="{active:selectedType==='DOZEN'&&selectedValue===String(n)}">{{ (n-1)*12+1 }}–{{ n*12 }}</button></div>
-      <div class="outside-group"><strong>Oszlop</strong><button v-for="n in 3" :key="'c'+n" @click="chooseOutside('COLUMN',String(n))" :class="{active:selectedType==='COLUMN'&&selectedValue===String(n)}">{{ n }}. oszlop</button></div>
-     </div>
-    </div>
-    <div class="bet-confirm"><div><span class="muted">Kijelölés</span><strong>{{ selectedDescription }}</strong><span class="muted">Zseton: {{ chip }}</span></div><button class="primary" :disabled="busy || secondsLeft<=0" @click="submitBet">{{ busy ? 'Zseton elhelyezése…' : 'Zseton elhelyezése' }}</button></div>
-    <p v-if="error" class="error">{{ error }}</p>
-   </section>
+      <section v-if="!isDisplay" class="felt-table" aria-label="Rulett fogadóasztal">
+        <fieldset :disabled="!acceptingBets || busy">
+          <legend class="layout-visually-hidden">Fogadás kiválasztása</legend>
+          <div class="felt-controls">
+            <div class="felt-types" aria-label="Belső fogadások">
+              <button v-for="item in insideTypes" :key="item.type" type="button" :aria-pressed="selectedType === item.type" @click="chooseType(item.type)">{{ item.label }}</button>
+            </div>
+            <span v-if="acceptingBets && selectedType !== 'NUMBER' && isNumberBet" class="felt-tip">Válassz egy jelölt pontot a számmezőkön.</span>
+          </div>
+          <p class="felt-scroll-note">A teljes asztal oldalra húzható.</p>
+          <div class="felt-scroller" role="region" tabindex="0" aria-label="Görgethető rulettasztal">
+            <div class="felt-board">
+              <button class="felt-zero green" type="button" :disabled="selectedType !== 'NUMBER'" :aria-pressed="selectedNumbers.includes(0)" @click="toggleNumber(0)">0</button>
+              <div class="felt-numbers-shell">
+                <div class="felt-numbers">
+                  <button v-for="n in 36" :key="n" type="button"
+                    :style="{ gridRow: 3 - (n - 1) % 3, gridColumn: Math.floor((n - 1) / 3) + 1 }"
+                    :class="pocketColor(n)" :aria-pressed="selectedNumbers.includes(n)"
+                    :disabled="selectedType !== 'NUMBER'" @click="toggleNumber(n)">{{ n }}</button>
+                </div>
+                <button v-for="spot in betSpots" :key="spot.type + spot.value" type="button" class="roulette-bet-spot"
+                  :class="{ active: selectedNumbers.length === requiredNumbers && selectedNumbers.every(n => spot.value.split(',').includes(String(n))) }"
+                  :style="{ left: spot.left, top: spot.top }" :aria-label="`Kombináció: ${spot.value}`" @click="selectBetSpot(spot)">{{ spot.label }}</button>
+              </div>
+              <div class="felt-columns" aria-label="Oszlopfogadások">
+                <button v-for="n in [3, 2, 1]" :key="n" type="button" :aria-pressed="selectedType === 'COLUMN' && selectedValue === String(n)"
+                  @click="chooseOutside('COLUMN', String(n))">{{ n }}. oszlop</button>
+              </div>
+              <div class="felt-dozens" aria-label="Tucatfogadások">
+                <button v-for="n in 3" :key="n" type="button" :aria-pressed="selectedType === 'DOZEN' && selectedValue === String(n)"
+                  @click="chooseOutside('DOZEN', String(n))">{{ (n - 1) * 12 + 1 }}–{{ n * 12 }}</button>
+              </div>
+              <div class="felt-outside" aria-label="Külső fogadások">
+                <button v-for="bet in outsideBets" :key="bet.value" type="button" :class="bet.type === 'COLOR' ? bet.value : ''"
+                  :aria-pressed="selectedType === bet.type && selectedValue === bet.value"
+                  @click="chooseOutside(bet.type, bet.value)">{{ bet.label }}</button>
+              </div>
+            </div>
+          </div>
+        </fieldset>
 
-   <section class="panel roulette-participants">
-    <h2>Asztalon lévő tétek <span>{{ state.bets.length }}</span></h2>
-    <p v-if="!state.bets.length" class="muted">Még nincsenek tétek ebben a körben.</p>
-    <div v-for="bet in state.bets" :key="bet.id" class="roulette-bet-row">
-     <strong>{{ bet.playerName }}</strong><span>{{ labelBet(bet) }}</span><b>{{ bet.amount }} zseton</b>
-     <b v-if="state.currentRound.status==='COMPLETED'" :class="{winner:state.winners.some(w=>w.id===bet.id)}">{{ state.winners.some(w=>w.id===bet.id)?'NYERT':'—' }}</b>
-    </div>
-   </section>
-   <section v-if="!isDisplay" class="panel roulette-participants"><h2>Saját téteim <span>{{ myBets.length }}</span></h2><p v-if="!myBets.length" class="muted">Még nem helyeztél el zsetont.</p><div v-for="bet in myBets" :key="'mine'+bet.id" class="roulette-bet-row"><strong>{{ labelBet(bet) }}</strong><span>{{ bet.amount }} zseton</span></div></section>
-  </section>
-  <p v-else-if="error" class="error">{{ error }}</p>
-  <footer>A rulett automatikusan működik, nincs szükség adminisztrátori indításra.</footer>
- </main>
+        <div class="felt-dock">
+          <div class="felt-selection">
+            <small>Kijelölt fogadás</small>
+            <strong>{{ selectedDescription }}</strong>
+          </div>
+          <div class="felt-chips" role="group" aria-label="Zsetonérték">
+            <button v-for="value in [1, 5, 10, 25, 100]" :key="value" type="button"
+              :aria-label="`${value} CR`" :aria-pressed="chip === value" :disabled="busy" @click="chip = value">{{ value }}</button>
+          </div>
+          <div class="felt-actions">
+            <button v-if="hasSelection" class="felt-clear" type="button" :disabled="busy" @click="clearSelection">Törlés</button>
+            <RouterLink v-if="!playerId" class="primary" to="/">Csatlakozás</RouterLink>
+            <button v-else class="primary" type="button" :disabled="busy || !acceptingBets || !hasSelection" @click="submitBet">{{ busy ? 'Elhelyezés…' : `Tét elhelyezése · ${chip} CR` }}</button>
+          </div>
+        </div>
+        <p v-if="error" class="felt-error error" role="alert">{{ error }}</p>
+      </section>
+
+      <div v-if="!isDisplay && playerId" class="roulette-account">
+        <p class="felt-balance">Egyenleg <strong>{{ tokenBalance.toLocaleString('hu-HU') }} CR</strong></p>
+        <PlayerWallet inline />
+      </div>
+
+      <div class="roulette-ledger">
+        <details class="roulette-ledger-panel">
+          <summary>Asztalon lévő tétek <span>{{ state.bets.length }}</span></summary>
+          <p v-if="!state.bets.length">Még nincsenek tétek ebben a körben.</p>
+          <div v-for="bet in state.bets" :key="bet.id" class="roulette-bet-row">
+            <strong>{{ bet.playerName }}</strong><span>{{ labelBet(bet) }}</span><b>{{ bet.amount }} CR</b>
+            <b v-if="state.winners.some(w => w.id === bet.id)" class="winner">Nyert</b>
+          </div>
+        </details>
+        <details v-if="!isDisplay" class="roulette-ledger-panel">
+          <summary>Saját téteim <span>{{ myBets.length }}</span></summary>
+          <p v-if="!myBets.length">Még nem helyeztél el zsetont.</p>
+          <div v-for="bet in myBets" :key="bet.id" class="roulette-bet-row"><strong>{{ labelBet(bet) }}</strong><span>{{ bet.amount }} CR</span></div>
+        </details>
+      </div>
+    </section>
+    <p v-else class="roulette-loading" :class="{ error }" role="status">{{ error || 'Rulettasztal betöltése…' }}</p>
+  </main>
 </template>

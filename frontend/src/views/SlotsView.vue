@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CasinoHeader from '../components/CasinoHeader.vue';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { api } from '../services/api';
 
@@ -86,7 +85,6 @@ async function spin() {
 
 <template>
   <main class="game-page slot-page">
-    <CasinoHeader />
 
     <section class="slot-machine-content">
       <div class="slot-heading">
@@ -94,6 +92,8 @@ async function spin() {
         <p class="muted">Válassz tétet, és pörgesd meg a tárcsákat.</p>
       </div>
 
+      <div class="slots-layout">
+      <div class="slots-play-area">
       <div class="slot-cabinet" :class="{ 'is-spinning': busy, 'is-winning': result.startsWith('JACKPOT') }">
         <div class="slot-top-lights"><i v-for="n in 13" :key="n"></i></div>
         <div class="slot-marquee">
@@ -136,11 +136,13 @@ async function spin() {
       <p v-else class="slot-current-bet">Current bet: <strong>{{ selectedBet }} CR</strong> · Balance: <strong>{{ tokenBalance }} CR</strong><span v-if="freeSpins"> · Free spin available (no stake deducted)</span></p>
       <p v-if="error" class="error">{{ error }}</p>
       <p v-if="!canPlay" class="muted small slot-login-hint">A játékhoz először lépj be a főoldalon.</p>
+      </div>
       <section class="slot-paytable" aria-labelledby="slot-paytable-title">
         <h2 id="slot-paytable-title">Nyereménytábla</h2>
         <div class="slot-paytable-rows"><div v-for="item in paytable" :key="item.combination"><span>{{ item.combination }}</span><strong>{{ item.multiplier }}×</strong></div></div>
         <small>⭐ A csillag helyettesíti a normál szimbólumokat. 🪙 A bónusz 5 ingyenpörgetést ad.</small>
       </section>
+      </div>
     </section>
   </main>
 </template>

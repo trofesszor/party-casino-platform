@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router';
 import { api } from '../services/api';
 
 type Transaction = { id: number; amount: number; balanceAfter: number; type: string; description: string; createdAt: string };
+defineProps<{ inline?: boolean }>();
+
 const route = useRoute();
 const playerId = ref(Number(localStorage.getItem('party-player-id')) || 0);
 const balance = ref(0);
@@ -62,11 +64,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <aside v-if="visible" class="player-wallet" :class="{ expanded }">
+  <aside v-if="visible" class="player-wallet" :class="{ expanded, 'player-wallet-inline': inline }">
     <button class="wallet-summary" @click="toggleHistory" :aria-expanded="expanded">
-      <span class="wallet-coin">C</span>
-      <span class="wallet-copy"><small>EGYENLEGED</small><strong>{{ formattedBalance }} <em>CR</em></strong></span>
-      <span class="wallet-chevron">{{ expanded ? '−' : '+' }}</span>
+      <span v-if="!inline" class="wallet-coin" aria-hidden="true">C</span>
+      <span v-if="!inline" class="wallet-copy"><small>EGYENLEGED</small><strong>{{ formattedBalance }} <em>CR</em></strong></span>
+      <span v-else>Tranzakciók</span>
+      <span class="wallet-chevron" aria-hidden="true">{{ expanded ? '−' : '+' }}</span>
     </button>
     <section v-if="expanded" class="wallet-history">
       <header><div><small>SAJÁT FIÓK</small><h3>Tranzakciók</h3></div><button class="wallet-close" @click="expanded=false" aria-label="Bezárás">×</button></header>

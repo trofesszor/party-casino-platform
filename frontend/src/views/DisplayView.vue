@@ -108,31 +108,7 @@ onUnmounted(()=>{
     </header>
 
     <div class="tv-layout">
-      <aside class="tv-sidebar">
-        <section class="tv-panel tv-notification-panel">
-          <header class="tv-panel-heading"><div><small>LIVE FEED</small><h2>Értesítések</h2></div><span class="tv-live-pill"><i></i> LIVE</span></header>
-          <div class="tv-notification-list">
-            <article v-for="item in notifications" :key="item.id" class="tv-notification-item" :class="'tv-notice-'+item.type">
-              <span class="tv-notice-icon">{{item.type==='wheel'?'◎':item.type==='event'?'✦':item.type==='duel'?'⚔':item.type==='slots'?'🎰':item.type==='roulette'?'🎯':item.type==='leaderboard'?'♛':'◆'}}</span>
-              <div><small>{{item.title||'PARTY CASINO'}} <time>{{formatTime(item.createdAt)}}</time></small><strong>{{item.message}}</strong></div>
-            </article>
-            <p v-if="!notifications.length" class="tv-panel-empty">{{loading?'Értesítések betöltése…':'Még nincs új értesítés.'}}</p>
-          </div>
-        </section>
 
-        <section class="tv-panel tv-events-panel">
-          <header class="tv-panel-heading"><div><small>WORK TOGETHER</small><h2>Közösségi események</h2></div><span class="tv-event-count">{{events.length}}</span></header>
-          <div class="tv-event-list">
-            <article v-for="event in events" :key="event.id" class="tv-event-item">
-              <div class="tv-event-title"><div><span v-if="event.isSecret" class="tv-secret-tag">✦ TITKOS</span><small v-else>{{event.repeatMode==='ONCE'?'EGYSZERI':event.repeatMode==='COOLDOWN'?'COOLDOWN':'ISMÉTELHETŐ'}}</small><h3>{{event.isSecret?'Rejtett esemény':event.title}}</h3></div><b>{{eventPercent(event)}}%</b></div>
-              <p>{{event.isSecret?'A részletek egyelőre titkosak.':event.description}}</p>
-              <div class="tv-progress"><span :style="{width:eventPercent(event)+'%'}"></span></div>
-              <div class="tv-event-meta"><strong>{{fmt(event.currentAmount)}} <small>/ {{fmt(event.targetAmount)}} CR</small></strong><span>{{event.contributorCount}} támogató</span></div>
-            </article>
-            <p v-if="!events.length" class="tv-panel-empty">{{loading?'Események betöltése…':'Jelenleg nincs aktív közösségi esemény.'}}</p>
-          </div>
-        </section>
-      </aside>
 
       <section class="tv-main-screen">
         <div class="tv-screen-toolbar">
@@ -177,6 +153,31 @@ onUnmounted(()=>{
         </section>
         <footer class="tv-footer"><span>PARTY CASINO</span><strong>VÁLASSZ JÁTÉKOT. CSATLAKOZZ. JÁTSSZ.</strong></footer>
       </section>
+      <aside class="tv-sidebar">
+        <section class="tv-panel tv-notification-panel">
+          <header class="tv-panel-heading"><div><small>LIVE FEED</small><h2>Értesítések</h2></div><span class="tv-live-pill"><i></i> LIVE</span></header>
+          <div class="tv-notification-list">
+            <article v-for="item in notifications" :key="item.id" class="tv-notification-item" :class="'tv-notice-'+item.type">
+              <span class="tv-notice-icon">{{item.type==='wheel'?'◎':item.type==='event'?'✦':item.type==='duel'?'⚔':item.type==='slots'?'🎰':item.type==='roulette'?'🎯':item.type==='leaderboard'?'♛':'◆'}}</span>
+              <div><small>{{item.title||'PARTY CASINO'}} <time>{{formatTime(item.createdAt)}}</time></small><strong>{{item.message}}</strong></div>
+            </article>
+            <p v-if="!notifications.length" class="tv-panel-empty">{{loading?'Értesítések betöltése…':'Még nincs új értesítés.'}}</p>
+          </div>
+        </section>
+
+        <section class="tv-panel tv-events-panel">
+          <header class="tv-panel-heading"><div><small>WORK TOGETHER</small><h2>Közösségi események</h2></div><span class="tv-event-count">{{events.length}}</span></header>
+          <div class="tv-event-list">
+            <article v-for="event in events" :key="event.id" class="tv-event-item">
+              <div class="tv-event-title"><div><span v-if="event.isSecret" class="tv-secret-tag">✦ TITKOS</span><small v-else>{{event.repeatMode==='ONCE'?'EGYSZERI':event.repeatMode==='COOLDOWN'?'COOLDOWN':'ISMÉTELHETŐ'}}</small><h3>{{event.isSecret?'Rejtett esemény':event.title}}</h3></div><b>{{eventPercent(event)}}%</b></div>
+              <p>{{event.isSecret?'A részletek egyelőre titkosak.':event.description}}</p>
+              <div class="tv-progress"><span :style="{width:eventPercent(event)+'%'}"></span></div>
+              <div class="tv-event-meta"><strong>{{fmt(event.currentAmount)}} <small>/ {{fmt(event.targetAmount)}} CR</small></strong><span>{{event.contributorCount}} támogató</span></div>
+            </article>
+            <p v-if="!events.length" class="tv-panel-empty">{{loading?'Események betöltése…':'Jelenleg nincs aktív közösségi esemény.'}}</p>
+          </div>
+        </section>
+      </aside>
     </div>
   </main>
 </template>

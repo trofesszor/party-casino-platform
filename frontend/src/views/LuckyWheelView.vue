@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CasinoHeader from '../components/CasinoHeader.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { api } from '../services/api';
@@ -99,11 +98,10 @@ onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInter
 
 <template>
  <main class="lucky-wheel-page">
-  <CasinoHeader />
   <section class="lucky-wheel-content">
-   <h1>Szerencse<span>kerék</span></h1>
-   <p class="muted wheel-subtitle">Egy kerék, egy pörgetés, mindenki ugyanazt látja.</p>
-   <section class="wheel-stage panel">
+   <header class="wheel-room-heading"><h1>Szerencsekerék</h1><p class="muted wheel-subtitle">Egy pörgetés, közös eredmény.</p></header>
+   <div class="wheel-room-grid">
+   <section class="wheel-stage panel" aria-label="Szerencsekerék">
     <div class="wheel-pointer"></div>
     <div class="wheel-frame">
      <svg class="lucky-wheel-svg" viewBox="0 0 400 400" :style="{transform:`rotate(${rotation}deg)`,transitionDuration:transitionMs+'ms'}">
@@ -116,7 +114,9 @@ onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInter
       <circle cx="200" cy="200" r="10" fill="#30251a"/>
      </svg>
     </div>
-    <div class="wheel-status">
+   </section>
+   <aside class="wheel-room-controls panel">
+    <div class="wheel-status" role="status">
      <span v-if="isSpinning" class="wheel-spinning-label">FOROG A KERÉK · {{ Math.ceil(remaining/1000) }} mp</span>
      <span v-else-if="state?.winner" class="wheel-winner-label">AZ EREDMÉNY</span>
      <span v-else class="wheel-spinning-label">KÉSZEN ÁLL</span>
@@ -127,9 +127,12 @@ onUnmounted(()=>{socket.off('lucky-wheel:changed',onChanged);if(clock)clearInter
     <button v-if="!isDisplay" class="primary wheel-spin-button"  :disabled="busy||isSpinning||!state?.segments?.length||!playerId" @click="spin">{{ isSpinning?'Pörgetés folyamatban…':busy?'Indítás…':!playerId?'LÉPJ BE A PÖRGETÉSHEZ':`MEGPÖRGETÉS · ${state?.spinCost ?? 5} CR` }}</button>
     <p v-else class="wheel-tv-hint">{{ isSpinning?'A pörgetés folyamatban van':'A játékosok telefonjukról indíthatják a pörgetést' }}</p>
     <p v-if="error" class="error">{{ error }}</p>
-   </section>
-   <div class="wheel-segment-list"><span v-for="segment in state?.segments??[]" :key="segment.id">{{ segment.label }}</span></div>
-   <footer>PARTY CASINO · A KERÉK MINDEN ESZKÖZÖN SZINKRONBAN FOROG</footer>
+    <details v-if="state?.segments?.length" class="wheel-room-prizes">
+      <summary>Kerékmezők <span>{{ state.segments.length }}</span></summary>
+      <div class="wheel-segment-list"><span v-for="segment in state.segments" :key="segment.id">{{ segment.label }}</span></div>
+    </details>
+   </aside>
+   </div>
   </section>
  </main>
 </template>
