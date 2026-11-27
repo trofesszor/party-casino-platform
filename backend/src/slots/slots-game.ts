@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 
-export const denominations = [1, 2, 5, 10, 25];
-export const betUnits = [1, 2, 3, 5];
+export const denominations = [1, 2, 5, 10];
+export const betUnits = [1, 2, 3, 5, 10];
 export const jackpotStarts = { grand: 2500, major: 600 };
 export const jackpotMultipliers = { minor: 80, mini: 20 };
 export const symbols = [

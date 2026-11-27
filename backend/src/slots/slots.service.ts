@@ -147,8 +147,10 @@ export class SlotsService {
     if (denomination === undefined && units === undefined) {
       if ([1, 5, 10, 25].includes(legacyAmount)) return { denomination: legacyAmount, units: 1 };
       if (legacyAmount === 50) return { denomination: 25, units: 2 };
-    } else if (denomination !== undefined && units !== undefined && denominations.includes(denomination) && betUnits.includes(units)) {
-      return { denomination, units };
+    } else if (denomination !== undefined && units !== undefined) {
+      const supported = denominations.includes(denomination) && betUnits.includes(units);
+      const legacy = denomination === 25 && [1, 2, 3, 5].includes(units);
+      if (supported || legacy) return { denomination, units };
     }
     throw new BadRequestException('Érvénytelen tétegység vagy tét.');
   }

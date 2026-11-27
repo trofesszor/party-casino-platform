@@ -11,6 +11,7 @@ const jackpots = ref<SlotProgressives>();
 const available = ref<number | null>(null);
 const denomination = ref(1);
 const units = ref(1);
+const stakeDialog = ref<HTMLDialogElement>();
 const bonus = ref<SlotBonus | null>(null);
 const freeSpins = ref(0);
 const freeStake = ref<SlotStake | null>(null);
@@ -72,6 +73,16 @@ async function load() {
     if (mounted) error.value = cause instanceof Error ? cause.message : 'A slot betöltése sikertelen.';
   }
 }
+function openStakePicker() {
+  if (!stakesLocked.value) stakeDialog.value?.showModal();
+}
+function chooseStake(nextDenomination: number, nextUnits: number) {
+  if (stakesLocked.value) return;
+  denomination.value = nextDenomination;
+  units.value = nextUnits;
+  stakeDialog.value?.close();
+}
+
 function displayTile(tile: SlotTile) {
   if (!tile.coin) return labels[tile.symbol];
   return tile.coin.tier ? `${tile.coin.tier.toUpperCase()} · ${format(tile.coin.value)} CR` : `${format(tile.coin.value)} CR`;
@@ -155,7 +166,7 @@ onUnmounted(() => {
     <div class="mint-shell">
       <header class="mint-top">
         <div><h1>Midnight <em>Mint</em></h1><p>5 tárcsa · {{ rules?.lines.length ?? 9 }} nyerővonal · CR</p></div>
-        <div v-if="available !== null" class="mint-balance"><span>Egyenleg</span><strong>{{ format(available) }} CR</strong></div>
+        
       </header>
 
       <p v-if="!rules && !error" class="mint-loading" role="status">Játék betöltése…</p>
@@ -192,24 +203,48 @@ onUnmounted(() => {
               <span v-if="last.payoutAmount">+{{ format(last.payoutAmount) }} CR</span>
               <span v-if="last.jackpotWins.length">{{ last.jackpotWins.map(win => tierTitle(win.tier) + ' ' + format(win.amount) + ' CR').join(' · ') }}</span>
             </template>
-            <span v-else>{{ busy ? 'A tárcsák forognak…' : bonus ? 'A gyűjtött érmék a helyükön maradnak.' : 'Válassz tétegységet a pörgetéshez.' }}</span>
+            <span v-else>{{ busy ? 'A tárcsák forognak…' : bonus ? 'A gyűjtött érmék a helyükön maradnak.' : 'Pörgetésre kész' }}</span>
           </div>
 
           <form class="mint-controls" @submit.prevent="spin">
-            <label>Tétegység (CR)
-              <select :value="effectiveStake.denomination" @change="denomination = Number(($event.target as HTMLSelectElement).value)" :disabled="stakesLocked">
-                <option v-for="value in rules.denominations" :key="value" :value="value">{{ value }} CR</option>
-              </select>
-            </label>
-            <label>Tétszorzó
-              <select :value="effectiveStake.units" @change="units = Number(($event.target as HTMLSelectElement).value)" :disabled="stakesLocked">
-                <option v-for="value in rules.betUnits" :key="value" :value="value">{{ value }}×</option>
-              </select>
-            </label>
-            <div class="mint-cost"><span>Fizetendő tét</span><strong>{{ bonus || freeSpins ? '0' : format(bet) }} CR</strong></div>
+            <div v-if="available !== null" class="mint-balance"><span>Egyenleg</span><strong>{{ format(available) }} CR</strong></div>
+            <button class="mint-stake-trigger" type="button" aria-haspopup="dialog" :disabled="stakesLocked" @click="openStakePicker">
+              <span>Tét <span aria-hidden="true">▾</span></span>
+              <strong>{{ format(bet) }} CR</strong>
+              <small>{{ effectiveStake.denomination }} CR × {{ effectiveStake.units }}</small>
+            </button>
+            <div v-if="bonus || freeSpins" class="mint-cost"><span>Fizetendő</span><strong>0 CR</strong></div>
             <RouterLink v-if="!playerId" class="mint-spin" to="/">Csatlakozás</RouterLink>
-            <button v-else class="mint-spin" type="submit" :disabled="!canSpin">{{ spinLabel }}</button>
+            <button v-else class="mint-spin" type="submit" :disabled="!canSpin"><span aria-hidden="true">⟳</span>{{ spinLabel }}</button>
           </form>
+
+          <dialog ref="stakeDialog" class="mint-stake-dialog" aria-labelledby="mint-stake-title">
+            <header class="mint-stake-heading">
+              <h2 id="mint-stake-title">Tétválasztás</h2>
+              <button class="mint-stake-close" type="button" aria-label="Bezárás" autofocus @click="stakeDialog?.close()">×</button>
+            </header>
+            <table class="mint-stake-table">
+              <thead><tr>
+                <th scope="col">Egység</th>
+                <th v-for="factor in rules.betUnits" :key="factor" scope="col">{{ factor }}×</th>
+              </tr></thead>
+              <tbody>
+                <tr v-for="unit in rules.denominations" :key="unit" :class="{ 'mint-stake-current-row': effectiveStake.denomination === unit }">
+                  <th scope="row">{{ unit }} <small>CR</small></th>
+                  <td v-for="factor in rules.betUnits" :key="factor">
+                    <button class="mint-stake-option" type="button" :aria-label="unit + ' CR × ' + factor + ' = ' + unit * factor + ' CR'"
+                      :aria-pressed="effectiveStake.denomination === unit && effectiveStake.units === factor" @click="chooseStake(unit, factor)">
+                      {{ format(unit * factor) }}<small>CR</small>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <footer class="mint-stake-footer">
+              <span v-if="available !== null">Egyenleg <strong>{{ format(available) }} CR</strong></span>
+              <span>Kiválasztott tét <strong>{{ format(bet) }} CR</strong></span>
+            </footer>
+          </dialog>
           <p v-if="error" class="error mint-message" role="alert">{{ error }}</p>
           <p v-else-if="playerId && !bonus && !freeSpins && available !== null && available < bet" class="mint-message">Ehhez a téthez nincs elég CR-ed.</p>
         </section>
