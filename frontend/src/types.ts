@@ -15,6 +15,7 @@ export type SlotState = {
   denominations: number[];
   betUnits: number[];
   jackpotStarts: SlotProgressives;
+  bellBonus: { trigger: number; respins: number };
   jackpotMultipliers: Record<'minor' | 'mini', number>;
   lines: number[][];
   paytable: Array<{ symbol: SlotTile['symbol']; label: string; payouts: number[] }>;

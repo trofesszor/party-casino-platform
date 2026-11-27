@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 
 export const denominations = [1, 2, 5, 10];
 export const betUnits = [1, 2, 3, 5, 10];
+export const bellBonus = { trigger: 6, respins: 3 };
 export const jackpotStarts = { grand: 2500, major: 600 };
 export const jackpotMultipliers = { minor: 80, mini: 20 };
 export const symbols = [
@@ -13,7 +14,7 @@ export const symbols = [
   { id: 'crescent', weight: 8, label: 'Rubinhold', payouts: [4, 12, 40] },
   { id: 'wild', weight: 4, label: 'Wild' },
   { id: 'scatter', weight: 4, label: 'Scatter' },
-  { id: 'coin', weight: 10, label: 'Érme' },
+  { id: 'coin', weight: 10, label: 'Harang' },
 ] as const;
 
 export type SymbolId = typeof symbols[number]['id'];
@@ -41,6 +42,7 @@ export const slotRules = {
   denominations,
   betUnits,
   jackpotStarts,
+  bellBonus,
   jackpotMultipliers,
   lines,
   paytable: symbols.filter(symbol => 'payouts' in symbol).map(symbol => ({
@@ -99,5 +101,5 @@ export function respin(bonus: Bonus): Bonus {
     added = true;
     return drawCoin(bonus.stake);
   });
-  return { ...bonus, coins, remaining: added ? 3 : bonus.remaining - 1 };
+  return { ...bonus, coins, remaining: added ? bellBonus.respins : bonus.remaining - 1 };
 }

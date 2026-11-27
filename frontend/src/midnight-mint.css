@@ -102,7 +102,13 @@
 .symbol-orange { background-position: 50% 50%; }
 .symbol-wild { background-position: 100% 50%; }
 .symbol-scatter { background-position: 0 100%; }
-.symbol-coin { background-position: 50% 100%; }
+.symbol-coin {
+  background-image: url('./assets/mint-bell.webp');
+  background-position: center;
+  background-size: contain;
+}
+.mint-cell.minor .symbol-coin { filter: hue-rotate(133deg); }
+.mint-cell.mini .symbol-coin { filter: hue-rotate(224deg); }
 .symbol-crescent { background-position: 100% 100%; }
 .symbol-empty { background: transparent; }
 .mint-reel.rolling .mint-cell:not(.mint-held) .mint-symbol { animation: mint-drag 115ms linear infinite; }
@@ -271,4 +277,53 @@
 @media (prefers-reduced-motion: reduce) {
   .mint-reel.rolling .mint-cell .mint-symbol { animation: none; }
   .mint-cell { transition: none; }
+}
+
+.mint-machine.mint-bonus {
+  border-color: oklch(83% .15 165 / .75);
+  background: radial-gradient(ellipse at 50% 0% in oklch, oklch(34% .079 170), oklch(22% .042 244) 72%);
+}
+.mint-bonus .mint-reels {
+  border-color: oklch(84% .12 165 / .45);
+  background: oklch(14% .025 198);
+}
+.mint-bonus .mint-cell { background: linear-gradient(157deg, #142c2d, #0b1a20); }
+.mint-bonus .mint-cell.mint-held { border-color: var(--mint-gold); }
+.mint-bonus .mint-cell.mint-held.minor { border-color: #94dcf6; }
+.mint-bonus .mint-cell.mint-held.mini { border-color: #d8acf9; }
+.mint-bonus .mint-machine-head h2 { color: var(--mint-gold); font: 700 clamp(1.2rem, 3vw, 1.85rem)/1.1 Georgia, serif; }
+.mint-respin-meter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 3px 7px;
+  padding: 6px 9px;
+  border: 1px solid oklch(86% .125 166 / .23);
+  border-radius: 8px;
+  background: oklch(16% .035 188);
+  color: var(--mint-muted);
+  font-size: .8rem;
+}
+.mint-respin-meter ol { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.mint-respin-meter li {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid oklch(85% .095 164 / .24);
+  border-radius: 50%;
+  color: var(--mint-muted);
+  font-variant-numeric: tabular-nums;
+}
+.mint-respin-meter .mint-respin-lit { background: oklch(81% .126 164); color: #10221d; font-weight: 800; }
+.mint-respin-refill .mint-respin-lit { animation: mint-bell-arrival 420ms cubic-bezier(.18,.78,.25,1); }
+.mint-bonus .mint-cell.mint-new-bell .mint-symbol { animation: mint-bell-arrival 420ms cubic-bezier(.18,.78,.25,1); }
+@keyframes mint-bell-arrival {
+  from { transform: translateY(-12%) scale(.83); opacity: .5; }
+  65% { transform: translateY(0) scale(1.06); opacity: 1; }
+  to { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mint-respin-refill .mint-respin-lit, .mint-bonus .mint-cell.mint-new-bell .mint-symbol { animation: none; }
 }

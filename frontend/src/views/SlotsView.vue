@@ -23,7 +23,7 @@ const columns = [0, 1, 2, 3, 4];
 const rows = [0, 1, 2];
 const labels: Record<SlotTile['symbol'], string> = {
   cherry: 'Cseresznye', lemon: 'Citrom', lime: 'Lime', grapes: 'Szőlő', orange: 'Narancs',
-  crescent: 'Rubinhold', wild: 'Wild', scatter: 'Scatter', coin: 'Érme', empty: 'Üres mező',
+  crescent: 'Rubinhold', wild: 'Wild', scatter: 'Scatter', coin: 'Harang', empty: 'Üres mező',
 };
 const reelSymbols: SlotTile['symbol'][] = ['cherry', 'lemon', 'lime', 'grapes', 'orange', 'crescent', 'wild', 'scatter', 'coin'];
 const reel = ref<SlotTile[]>(Array.from({ length: 15 }, (_, index) => ({ symbol: reelSymbols[(index * 2) % reelSymbols.length] })));
@@ -37,7 +37,10 @@ const bet = computed(() => effectiveStake.value.denomination * effectiveStake.va
 const stakesLocked = computed(() => busy.value || Boolean(bonus.value || freeStake.value));
 const canSpin = computed(() => !busy.value && Boolean(rules.value && playerId && (bonus.value || freeSpins.value > 0 || (available.value ?? 0) >= bet.value)));
 const winningPositions = computed(() => new Set(last.value?.wins.flatMap(win => win.positions) ?? []));
-const lockedCoins = computed(() => bonus.value?.coins.filter(Boolean).length ?? 0);
+const displayedBonus = computed(() => bonus.value ?? last.value?.finishedBonus ?? null);
+const lockedBells = computed(() => displayedBonus.value?.coins.filter(Boolean).length ?? 0);
+const newBells = ref<number[]>([]);
+const newBellCount = computed(() => newBells.value.length);
 const jackpotCards = computed<Array<{ tier: SlotTier; amount: number; progressive: boolean }>>(() => {
   if (!rules.value || !jackpots.value) return [];
   return [
@@ -47,7 +50,7 @@ const jackpotCards = computed<Array<{ tier: SlotTier; amount: number; progressiv
     { tier: 'mini', amount: effectiveStake.value.denomination * rules.value.jackpotMultipliers.mini, progressive: false },
   ];
 });
-const spinLabel = computed(() => busy.value ? 'Pörgetés…' : bonus.value ? 'Újrapörgetés' : freeSpins.value ? 'Ingyenpörgetés' : 'Pörgetés');
+const spinLabel = computed(() => busy.value ? 'Pörgetés…' : bonus.value ? 'Ingyenes újrapörgetés' : freeSpins.value ? 'Ingyenpörgetés' : 'Pörgetés');
 
 function bonusGrid(state: SlotBonus): SlotTile[] {
   return state.coins.map(coin => coin ? { symbol: 'coin', coin } : { symbol: 'empty' });
@@ -85,7 +88,7 @@ function chooseStake(nextDenomination: number, nextUnits: number) {
 
 function displayTile(tile: SlotTile) {
   if (!tile.coin) return labels[tile.symbol];
-  return tile.coin.tier ? `${tile.coin.tier.toUpperCase()} · ${format(tile.coin.value)} CR` : `${format(tile.coin.value)} CR`;
+  return tile.coin.tier ? `Harang · ${tile.coin.tier.toUpperCase()} · ${format(tile.coin.value)} CR` : `Harang · ${format(tile.coin.value)} CR`;
 }
 function tierTitle(tier: SlotTier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
@@ -107,16 +110,19 @@ async function animate(grid: SlotTile[], held: readonly boolean[]) {
 }
 async function spin() {
   if (!canSpin.value) return;
+  const wasBonus = Boolean(bonus.value);
   const held = bonus.value?.coins.map(Boolean) ?? [];
   const before = reel.value.slice();
   busy.value = true;
   error.value = '';
   last.value = null;
+  newBells.value = [];
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
     rolling.value = columns.map(() => true);
     ticker = setInterval(() => {
       reel.value = reel.value.map((tile, index) => {
         if (!rolling.value[index % 5] || held[index]) return tile;
+        if (wasBonus) return { symbol: Math.random() < .35 ? 'coin' : 'empty' };
         return { symbol: reelSymbols[Math.floor(Math.random() * reelSymbols.length)] };
       });
     }, 84);
@@ -126,7 +132,9 @@ async function spin() {
     if (!mounted) return;
     await animate(reply.grid, held);
     if (!mounted) return;
-    reel.value = reply.grid;
+    const feature = reply.bonus ?? reply.finishedBonus;
+    reel.value = feature ? bonusGrid(feature) : reply.grid;
+    if (feature) newBells.value = feature.coins.flatMap((coin, index) => coin && !held[index] ? [index] : []);
     bonus.value = reply.bonus;
     freeSpins.value = reply.freeSpins;
     freeStake.value = reply.freeStake;
@@ -181,15 +189,21 @@ onUnmounted(() => {
           </article>
         </section>
 
-        <section class="mint-machine" :class="{ 'mint-bonus': bonus }" aria-label="Midnight Mint játékgép">
+        <section class="mint-machine" :class="{ 'mint-bonus': displayedBonus }" aria-label="Midnight Mint játékgép">
           <header class="mint-machine-head">
-            <h2>{{ bonus ? 'Érmegyűjtés' : 'Tárcsák' }}</h2>
-            <span v-if="bonus">{{ lockedCoins }} / 15 érme · {{ bonus.remaining }} újrapörgetés</span>
+            <h2>{{ displayedBonus ? 'Harangeső' : 'Tárcsák' }}</h2>
+            <span v-if="displayedBonus" class="mint-bell-count">{{ lockedBells }} / 15 harang</span>
             <span v-else-if="freeSpins">{{ freeSpins }} ingyenpörgetés</span>
           </header>
+          <div v-if="displayedBonus" class="mint-respin-meter" :class="{ 'mint-respin-refill': newBellCount && bonus }" aria-live="polite">
+            <span>{{ bonus ? 'Hátralévő ingyenes körök' : 'Bónusz vége' }}</span>
+            <ol :aria-label="(bonus?.remaining ?? 0) + ' ingyenes kör maradt'">
+              <li v-for="index in rules.bellBonus.respins" :key="index" :class="{ 'mint-respin-lit': index <= (bonus?.remaining ?? 0) }" aria-hidden="true">{{ index }}</li>
+            </ol>
+          </div>
           <div class="mint-reels" :aria-busy="busy">
             <div v-for="column in columns" :key="column" class="mint-reel" :class="{ rolling: rolling[column] }">
-              <div v-for="row in rows" :key="row" :class="['mint-cell', reel[row * 5 + column].coin?.tier, { 'mint-winning': winningPositions.has(row * 5 + column), 'mint-held': bonus?.coins[row * 5 + column] }]" role="img" :aria-label="displayTile(reel[row * 5 + column])">
+              <div v-for="row in rows" :key="row" :class="['mint-cell', reel[row * 5 + column].coin?.tier, { 'mint-winning': !displayedBonus && winningPositions.has(row * 5 + column), 'mint-held': displayedBonus?.coins[row * 5 + column], 'mint-new-bell': newBells.includes(row * 5 + column) }]" role="img" :aria-label="displayTile(reel[row * 5 + column])">
                 <span :class="['mint-symbol', 'symbol-' + reel[row * 5 + column].symbol]" aria-hidden="true"></span>
                 <strong v-if="reel[row * 5 + column].coin" class="mint-coin-value">
                   <small v-if="reel[row * 5 + column].coin?.tier">{{ reel[row * 5 + column].coin?.tier }}</small>{{ format(reel[row * 5 + column].coin!.value) }} CR
@@ -200,10 +214,12 @@ onUnmounted(() => {
           <div class="mint-result" role="status" aria-live="polite">
             <template v-if="last">
               <strong>{{ last.winLabel }}</strong>
+              <span v-if="bonus && newBellCount">+{{ newBellCount }} harang · {{ rules.bellBonus.respins }} kör</span>
+              <span v-else-if="bonus">Nem érkezett új harang.</span>
               <span v-if="last.payoutAmount">+{{ format(last.payoutAmount) }} CR</span>
               <span v-if="last.jackpotWins.length">{{ last.jackpotWins.map(win => tierTitle(win.tier) + ' ' + format(win.amount) + ' CR').join(' · ') }}</span>
             </template>
-            <span v-else>{{ busy ? 'A tárcsák forognak…' : bonus ? 'A gyűjtött érmék a helyükön maradnak.' : 'Pörgetésre kész' }}</span>
+            <span v-else>{{ busy ? 'A tárcsák forognak…' : bonus ? 'A gyűjtött harangok a helyükön maradnak.' : 'Pörgetésre kész' }}</span>
           </div>
 
           <form class="mint-controls" @submit.prevent="spin">
@@ -253,7 +269,7 @@ onUnmounted(() => {
         <details class="mint-rules">
           <summary>Játékszabályok és nyereménytábla</summary>
           <p>A tét a tétegység és a tétszorzó szorzata. A 9 nyerővonal balról jobbra fizet, legalább három egyező jelnél. A Wild a vonalszimbólumokat helyettesíti.</p>
-          <p>Legalább 3 Scatter 5 ingyenpörgetést ad. Legalább 6 érme 3 újrapörgetéssel indítja az érmegyűjtést. Minden új érme ismét 3-ra állítja a számlálót. A lezáráskor 12–14 érme a Major, 15 érme a Grand jackpotot adja.</p>
+          <p>Legalább 3 Scatter 5 ingyenpörgetést ad. Legalább {{ rules.bellBonus.trigger }} harang indítja a Harangesőt {{ rules.bellBonus.respins }} díjmentes újrapörgetéssel ugyanazon a mezőn. Minden új harang visszaállítja a számlálót {{ rules.bellBonus.respins }}-ra. Ha három körön át nem érkezik új harang, a bónusz lezárul és jóváírja az összegyűlt értékeket. A lezáráskor 12–14 harang a Major, a teljes 15 mező a Grand jackpotot adja.</p>
           <div class="mint-paytable">
             <table><thead><tr><th>Szimbólum</th><th>3 egyező</th><th>4 egyező</th><th>5 egyező</th></tr></thead>
               <tbody><tr v-for="entry in rules.paytable" :key="entry.symbol"><th scope="row">{{ entry.label }}</th><td v-for="(payout, index) in entry.payouts" :key="index">{{ payout }}×</td></tr></tbody>

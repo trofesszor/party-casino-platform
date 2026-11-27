@@ -2,12 +2,12 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import type { DatabaseSync } from 'node:sqlite';
 import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
-import { amount, betUnits, denominations, jackpotStarts, respin, scoreGrid, slotRules, spinGrid } from './slots-game';
+import { amount, bellBonus, betUnits, denominations, jackpotStarts, respin, scoreGrid, slotRules, spinGrid } from './slots-game';
 import type { Bonus, JackpotWin, Stake, Tile } from './slots-game';
 
 const legacyReels: Record<Tile['symbol'], string> = {
   cherry: '🍒', lemon: '🍋', lime: '🍉', grapes: '🍇', orange: '🔔', crescent: '7️⃣',
-  wild: '⭐', scatter: '💎', coin: '🪙', empty: '·',
+  wild: '⭐', scatter: '💎', coin: '🔔', empty: '·',
 };
 type Progressives = typeof jackpotStarts;
 type Player = { id: number; name: string; tokenBalance: number };
@@ -94,9 +94,9 @@ export class SlotsService {
         }
         finishedBonus = bonus;
         bonus = null;
-        winLabel = 'Érmegyűjtés lezárva';
+        winLabel = 'Harangeső lezárva';
       } else {
-        winLabel = 'Érmegyűjtés folyamatban';
+        winLabel = 'Harangeső folyamatban';
       }
     } else {
       if (usedFreeSpin) {
@@ -118,9 +118,9 @@ export class SlotsService {
         freeSpins += freeSpinsAwarded;
         freeStake = stake;
       }
-      if (coins.filter(Boolean).length >= 6) {
-        bonus = { coins, remaining: 3, stake };
-        winLabel = 'Érmegyűjtés indul';
+      if (coins.filter(Boolean).length >= bellBonus.trigger) {
+        bonus = { coins, remaining: bellBonus.respins, stake };
+        winLabel = 'Harangeső indul';
       } else if (freeSpinsAwarded) {
         winLabel = `+${freeSpinsAwarded} ingyenpörgetés`;
       } else if (payoutAmount > 0) {
