@@ -15,6 +15,7 @@ import AdminCommunityEventsView from './views/AdminCommunityEventsView.vue';
 import './style.css';
 import './casino-theme.css';
 import './casino-layout.css';
+import './roulette-studio.css';
 const router = createRouter({ history: createWebHistory(), scrollBehavior(to, from, saved) {
   if (saved) return saved;
   if (to.hash) return { el: to.hash };

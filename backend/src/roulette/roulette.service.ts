@@ -34,7 +34,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
 
   getState() {
     const currentRound = this.latestRound();
-    if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: this.bettingSeconds };
+    if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds };
     const bets = this.database.sqlite.prepare(`
       SELECT b.id AS id, b.player_id AS playerId, p.name AS playerName,
         b.bet_type AS betType, b.bet_value AS betValue, b.amount AS amount
@@ -48,7 +48,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
       FROM casino_roulette_rounds WHERE status = 'COMPLETED' AND id < ?
       ORDER BY id DESC LIMIT 10
     `).all(currentRound.id);
-    return { currentRound, bets, winners, history, bettingSeconds: this.bettingSeconds };
+    return { currentRound, bets, winners, history, bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds };
   }
 
   placeBet(playerId: number, input: { betType: string; betValue: string | number; amount?: number }) {
@@ -136,7 +136,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
     const sqlite = this.database.sqlite;
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      const updated = sqlite.prepare("UPDATE casino_roulette_rounds SET status = 'COMPLETED', result_number = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'BETTING'").run(result, round.id);
+      const updated = sqlite.prepare("UPDATE casino_roulette_rounds SET status = 'COMPLETED', result_number = ?, completed_at = ? WHERE id = ? AND status = 'BETTING'").run(result, new Date().toISOString(), round.id);
       if (Number(updated.changes) === 1) {
         const bets = sqlite.prepare('SELECT id, player_id AS playerId, bet_type AS betType, bet_value AS betValue, amount FROM casino_roulette_bets WHERE round_id = ?').all(round.id) as any[];
         const savePayout = sqlite.prepare('UPDATE casino_roulette_bets SET payout_amount = ? WHERE id = ?');

@@ -8,6 +8,7 @@ import RouletteWheel from '../components/RouletteWheel.vue';
 type PublicNotification = {id:number;type:string;title:string|null;message:string;createdAt:string};
 type ScreenMode = 'roulette'|'wheel'|'slots';
 const state = ref<RouletteState|null>(null);
+const visibleRouletteRound = ref<number | null>(null);
 const players = ref<{id:number;name:string}[]>([]);
 const notifications = ref<PublicNotification[]>([]);
 const events = ref<CommunityEvent[]>([]);
@@ -123,10 +124,10 @@ onUnmounted(()=>{
         <section v-if="activeScreen==='roulette'" class="tv-game-content tv-roulette-screen">
           <template v-if="state?.currentRound">
             <p class="tv-game-eyebrow">KÖZÖS RULETTASZTAL · {{state.currentRound.status==='BETTING'?'FOGADÁS':'EREDMÉNY'}}</p>
-            <h2>{{state.currentRound.status==='BETTING'?'Tétek leadása folyamatban':'A kör eredménye'}}</h2>
-            <RouletteWheel :result-number="state.currentRound.resultNumber" :previous-result-number="state.history[0]?.resultNumber??null" :spinning="state.currentRound.status==='COMPLETED'" :round-number="state.currentRound.roundNumber"/>
+            <h2>{{state.currentRound.status==='BETTING'?'Tétek leadása folyamatban':visibleRouletteRound === state.currentRound.roundNumber ? 'A kör eredménye' : 'A golyó pályán van'}}</h2>
+            <RouletteWheel :result-number="state.currentRound.resultNumber" :previous-result-number="state.history[0]?.resultNumber??null" :spinning="state.currentRound.status==='COMPLETED'" :round-number="state.currentRound.roundNumber" :completed-at="state.currentRound.completedAt" :result-seconds="state.resultSeconds" @landed="visibleRouletteRound = $event"/>
             <div class="tv-game-stats"><span><b>{{players.length}}</b> online játékos</span><span><b>{{state.bets.length}}</b> leadott tét</span></div>
-            <div class="tv-bet-list"><div v-for="bet in state.bets" :key="bet.playerId" class="tv-bet-row"><strong>{{bet.playerName}}</strong><span>{{bet.betType==='NUMBER'?bet.betValue:bet.betValue==='red'?'Piros':'Fekete'}}</span><b v-if="state.currentRound.status==='COMPLETED'" :class="{winner:state.winners.some(w=>w.playerId===bet.playerId)}">{{state.winners.some(w=>w.playerId===bet.playerId)?'NYERT':'—'}}</b></div></div>
+            <div class="tv-bet-list"><div v-for="bet in state.bets" :key="bet.id" class="tv-bet-row"><strong>{{bet.playerName}}</strong><span>{{bet.betType==='NUMBER'?bet.betValue:bet.betValue==='red'?'Piros':'Fekete'}}</span><b v-if="state.currentRound.status==='COMPLETED' && visibleRouletteRound === state.currentRound.roundNumber" :class="{winner:state.winners.some(w=>w.id===bet.id)}">{{state.winners.some(w=>w.id===bet.id)?'NYERT':'—'}}</b></div></div>
           </template>
           <div v-else class="tv-empty-game"><span>◉</span><h2>Hamarosan indul az első rulettkör</h2><p>A játékosok a telefonjukról csatlakozhatnak az asztalhoz.</p></div>
         </section>
