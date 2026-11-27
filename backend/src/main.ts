@@ -15,7 +15,7 @@ async function bootstrap() {
       response.status(status).json({ statusCode: status, message: exception?.message ?? 'Internal server error' });
     },
   } as any);
-  await app.listen(3000, '0.0.0.0');
-  console.log('Party Casino API listening on http://localhost:3000');
+  await app.listen(3002, '0.0.0.0');
+  console.log('Party Casino API listening on http://localhost:3002');
 }
 bootstrap();

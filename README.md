@@ -24,9 +24,9 @@ Open:
 - Player app: http://localhost:5173
 - Admin: http://localhost:5173/admin
 - TV display: http://localhost:5173/display
-- API: http://localhost:3000/api/events
+- API: http://localhost:3002/api/events
 
-For phones on the same Wi-Fi, open `http://<HOST-LAN-IP>:5173`. The Vite dev server is configured to listen on `0.0.0.0`; make sure the host firewall allows ports 5173 and 3000. For the eventual party build, serve the compiled frontend from NestJS or a small local reverse proxy so one LAN URL is enough.
+For phones on the same Wi-Fi, open `http://<HOST-LAN-IP>:5173`. The Vite dev server is configured to listen on `0.0.0.0`; make sure the host firewall allows ports 5173 and 3002. For the eventual party build, serve the compiled frontend from NestJS or a small local reverse proxy so one LAN URL is enough.
 
 ## Current functionality
 - Players join by entering a name. Names are case-insensitive and unique for this party database; returning with the same name reuses the same player record.
