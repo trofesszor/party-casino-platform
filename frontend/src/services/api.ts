@@ -1,6 +1,6 @@
 import type { CreditEconomy, ShopItem, ShopRedemption, Player, RouletteBetType, RouletteState, SlotSpin, SlotStake, SlotState } from '../types';
 
-export type CommunityEvent = {id:number;title:string;description:string;targetAmount:number;currentAmount:number;repeatMode:'ONCE'|'REPEATABLE'|'COOLDOWN';isSecret:number;unlocked?:number;nextAvailableAt:string|null;contributorCount:number};
+export type CommunityEvent = {id:number;title:string;description:string;targetAmount:number;currentAmount:number;minContribution:number;repeatMode:'ONCE'|'REPEATABLE'|'COOLDOWN';isSecret:number;unlocked?:number;nextAvailableAt:string|null;contributorCount:number};
 export type CommunityEventAdmin = CommunityEvent & {cooldownMinutes:number;minContribution:number;maxContribution:number|null;active:number;completed:number;activationCount:number};
 export type CommunityActivation = {id:number;title:string;description:string;totalContributions:number;participantCount:number;activatedAt:string;triggerType:string};
 
@@ -40,7 +40,7 @@ export const api = {
   redeemShopCoupon: (playerId: number, itemKey: string) => request<ShopRedemption>(`/api/players/${playerId}/shop/redeem`, { method: 'POST', body: JSON.stringify({ itemKey }) }),
   getShop: (playerId:number) => request<ShopItem[]>(`/api/players/${playerId}/shop`),
   buyShopItem: (playerId:number,itemKey:string) => request<{success:boolean;itemKey:string;quantity?:number;ticketId?:number;tokenBalance:number}>(`/api/players/${playerId}/shop/buy`, {method:'POST',body:JSON.stringify({itemKey})}),
-  getScratchTickets: (playerId:number) => request<{id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;outcomeJson?:string|null;createdAt:string}[]>(`/api/players/${playerId}/scratch-tickets`),
+  getScratchTickets: (playerId:number) => request<{id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;outcomeJson?:string|null;legacyPrizes?:number;createdAt:string}[]>(`/api/players/${playerId}/scratch-tickets`),
   revealScratchTicket: (playerId:number,ticketId:number) => request<{success:boolean;ticketId:number;prizeAmount:number;outcome:string[][];alreadyRevealed:boolean}>(`/api/players/${playerId}/scratch-tickets/${ticketId}/reveal`,{method:'POST'}),
   useShopItem: (playerId:number,itemKey:string,questId:number) => request<{success:boolean;skippedQuestId:number;inventoryQuantity:number}>(`/api/players/${playerId}/shop/use`, {method:'POST',body:JSON.stringify({itemKey,questId})}),
   getTokenPhotoStatus: (playerId:number) => request<any>(`/api/players/${playerId}/token-photo/status`),

@@ -1,18 +1,26 @@
-export const startingCredits = 100;
-export const wheelSpinPrice = 5;
-export const rouletteRoundLimit = 25;
-export const slotStakeLimit = 25;
-export const blackjackBets = [2, 4, 10, 20];
-export const scratchTicketPrice = 10;
-export const questSkipPrice = 15;
+export const creditScale = 1000;
+export const startingCredits = 100_000;
+export const wheelSpinPrice = 2500;
+export const rouletteMinBet = 500;
+export const rouletteRoundLimit = 10_000;
+export const rouletteAdminLimit = 100_000;
+export const slotStakeLimit = 7500;
+export const blackjackBets = [1000, 2000, 3500, 5000];
+export const duelReward = 5000;
+export const scratchTicketPrice = 5000;
+export const questSkipPrice = 7500;
+export const scratchPrizes = [5000, 12_500, 25_000, 50_000];
+export const legacyScratchPrizes = [10_000, 25_000, 50_000, 100_000];
+export const scratchOdds = [62, 22, 11, 4, 1];
+export const photoRewardDefaults = { balanceThreshold: 15_000, rewardAmount: 7500, cooldownMinutes: 30, dailyLimit: 2 };
 
 export const partyCoupons: ReadonlyArray<readonly [string, string, string, number]> = [
-  ['PARTY_SONG', 'Egy dal a lejátszási listára', 'Kérj egy dalt a házigazdától a következő szabad helyre.', 10],
-  ['PARTY_PHOTO', 'Közös bulifotó', 'Válassz fotókelléket, és kérj egy közös képet a házigazdától.', 12],
-  ['PARTY_SNACK', 'Következő nasi választása', 'Válassz egy adagot a házigazdánál elérhető nasikból.', 15],
-  ['PARTY_MOCKTAIL', 'Alkoholmentes koktél', 'Válassz egy alkoholmentes italt a házigazda kínálatából.', 20],
-  ['PARTY_KARAOKE', 'Karaokehely', 'Kérj egy helyet a következő karaoke-körben.', 25],
-  ['PARTY_GAME', 'Te választasz partijátékot', 'Válaszd ki a következő közös játékot a társasággal egyeztetve.', 30],
+  ['PARTY_SONG', 'Egy dal a lejátszási listára', 'Kérj egy dalt a házigazdától a következő szabad helyre.', 5000],
+  ['PARTY_PHOTO', 'Közös bulifotó', 'Válassz fotókelléket, és kérj egy közös képet a házigazdától.', 6000],
+  ['PARTY_SNACK', 'Következő nasi választása', 'Válassz egy adagot a házigazdánál elérhető nasikból.', 7500],
+  ['PARTY_MOCKTAIL', 'Alkoholmentes koktél', 'Válassz egy alkoholmentes italt a házigazda kínálatából.', 10000],
+  ['PARTY_KARAOKE', 'Karaokehely', 'Kérj egy helyet a következő karaoke-körben.', 12500],
+  ['PARTY_GAME', 'Te választasz partijátékot', 'Válaszd ki a következő közös játékot a társasággal egyeztetve.', 15000],
 ];
 
 export function isPartyCoupon(key: string) {

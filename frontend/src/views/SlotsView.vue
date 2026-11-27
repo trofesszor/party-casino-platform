@@ -13,7 +13,7 @@ const playerId = Number(localStorage.getItem('party-player-id')) || 0;
 const rules = ref<SlotState>();
 const jackpots = ref<SlotProgressives>();
 const available = ref<number | null>(null);
-const denomination = ref(1);
+const denomination = ref(500);
 const units = ref(1);
 const stakeDialog = ref<HTMLDialogElement>();
 const bonus = ref<SlotBonus | null>(null);
@@ -105,7 +105,7 @@ function openStakePicker() {
   if (!stakesLocked.value) stakeDialog.value?.showModal();
 }
 function chooseStake(nextDenomination: number, nextUnits: number) {
-  if (stakesLocked.value || nextDenomination * nextUnits > (rules.value?.maxBet ?? 25)) return;
+  if (stakesLocked.value || nextDenomination * nextUnits > (rules.value?.maxBet ?? 7500)) return;
   denomination.value = nextDenomination;
   units.value = nextUnits;
   stakeDialog.value?.close();
@@ -312,7 +312,7 @@ onUnmounted(() => {
             <button class="mint-stake-trigger" type="button" aria-haspopup="dialog" :disabled="stakesLocked" @click="openStakePicker">
               <span>Tét <span aria-hidden="true">▾</span></span>
               <strong>{{ format(bet) }} CR</strong>
-              <small>{{ effectiveStake.denomination }} CR × {{ effectiveStake.units }}</small>
+              <small>{{ format(effectiveStake.denomination) }} CR × {{ effectiveStake.units }}</small>
             </button>
             <div v-if="bonus || freeSpins" class="mint-cost"><span>Fizetendő</span><strong>0 CR</strong></div>
             <RouterLink v-if="!playerId" class="mint-spin" to="/">Csatlakozás</RouterLink>
@@ -331,7 +331,7 @@ onUnmounted(() => {
               </tr></thead>
               <tbody>
                 <tr v-for="unit in rules.denominations" :key="unit" :class="{ 'mint-stake-current-row': effectiveStake.denomination === unit }">
-                  <th scope="row">{{ unit }} <small>CR</small></th>
+                  <th scope="row">{{ format(unit) }} <small>CR</small></th>
                   <td v-for="factor in rules.betUnits" :key="factor">
                     <button class="mint-stake-option" type="button" :aria-label="unit + ' CR × ' + factor + ' = ' + unit * factor + ' CR'"
                       :disabled="unit * factor > rules.maxBet"
@@ -344,7 +344,7 @@ onUnmounted(() => {
             </table>
             <footer class="mint-stake-footer">
               <span v-if="available !== null">Egyenleg <strong>{{ format(available) }} CR</strong></span>
-              <span>Tét <strong>{{ format(bet) }} / {{ rules.maxBet }} CR</strong></span>
+              <span>Tét <strong>{{ format(bet) }} / {{ format(rules.maxBet) }} CR</strong></span>
             </footer>
           </dialog>
           <p v-if="error" class="error mint-message" role="alert">{{ error }}</p>

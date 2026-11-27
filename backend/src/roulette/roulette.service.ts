@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, OnModuleDestroy, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
-import { rouletteRoundLimit } from '../casino/economy';
+import { rouletteMinBet, rouletteRoundLimit } from '../casino/economy';
 import { DATABASE } from '../database/database.module';
 import { EventsGateway } from '../events/events.gateway';
 
@@ -35,7 +35,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
 
   getState() {
     const currentRound = this.latestRound();
-    if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds, maxBet: this.maxBet };
+    if (!currentRound) return { currentRound: null, bets: [], winners: [], history: [], bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds, maxBet: this.maxBet, minBet: rouletteMinBet };
     const bets = this.database.sqlite.prepare(`
       SELECT b.id AS id, b.player_id AS playerId, p.name AS playerName,
         b.bet_type AS betType, b.bet_value AS betValue, b.amount AS amount
@@ -49,7 +49,7 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
       FROM casino_roulette_rounds WHERE status = 'COMPLETED' AND id < ?
       ORDER BY id DESC LIMIT 10
     `).all(currentRound.id);
-    return { currentRound, bets, winners, history, bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds, maxBet: this.maxBet };
+    return { currentRound, bets, winners, history, bettingSeconds: this.bettingSeconds, resultSeconds: this.resultSeconds, maxBet: this.maxBet, minBet: rouletteMinBet };
   }
 
   placeBet(playerId: number, input: { betType: string; betValue: string | number; amount?: number; roundId?: number }) {
@@ -66,9 +66,9 @@ export class RouletteService implements OnModuleInit, OnModuleDestroy {
 
     const betType = String(input?.betType ?? '').toUpperCase();
     const betValue = String(input?.betValue ?? '').toLowerCase();
-    const amount = Number(input?.amount ?? 1);
+    const amount = Number(input?.amount ?? rouletteMinBet);
     if (!BET_TYPES.has(betType)) throw new BadRequestException('Érvénytelen fogadástípus.');
-    if (!Number.isInteger(amount) || amount < 1 || amount > this.maxBet) throw new BadRequestException('A tét értéke 1 és '+this.maxBet+' között lehet.');
+    if (!Number.isInteger(amount) || amount < rouletteMinBet || amount > this.maxBet) throw new BadRequestException('A tét értéke ' + rouletteMinBet + ' és ' + this.maxBet + ' CR között lehet.');
     this.validateBet(betType, betValue);
 
     const sqlite = this.database.sqlite;

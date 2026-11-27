@@ -60,7 +60,7 @@ async function checkTokenPhotoUpload(){
     if(result.completed){
       if(tokenPhotoPollTimer)clearInterval(tokenPhotoPollTimer);tokenPhotoPollTimer=undefined;tokenPhotoSession.value=null;
       if(tokenCameraWindow&&!tokenCameraWindow.closed){tokenCameraWindow.close();window.focus();}tokenCameraWindow=null;
-      tokenPhotoMessage.value=`Sikeres feltöltés! +${result.rewardAmount} CR jóváírva.`;
+      tokenPhotoMessage.value=`Sikeres feltöltés! +${result.rewardAmount.toLocaleString('hu-HU')} CR jóváírva.`;
       const balance=await api.getPlayerBalance(player.value.id);tokenBalance.value=balance.tokenBalance;
       await loadTokenPhotoStatus();
     }else if(result.status==='EXPIRED'){
@@ -327,8 +327,8 @@ onUnmounted(() => { if (duelRefreshTimer) clearInterval(duelRefreshTimer); if (s
 
         <section v-if="tokenPhotoStatus?.enabled && (tokenPhotoStatus.eligible || tokenPhotoStatus.pending || tokenPhotoSession || tokenPhotoMessage)" class="token-photo-reward panel lobby-reward-card">
           <div class="reward-icon">✦</div>
-          <div><h3>Fotóért tokeneket?</h3><p>Ha az egyenleged {{tokenPhotoStatus.balanceThreshold}} CR alatt van, egy fotófeltöltéssel <strong>+{{tokenPhotoStatus.rewardAmount}} CR</strong>-t szerezhetsz.</p><small>Napi lehetőség: {{tokenPhotoStatus.dailyRemaining}} / {{tokenPhotoStatus.dailyLimit}} · Várakozás: {{tokenPhotoStatus.cooldownMinutes}} perc</small></div>
-          <div class="reward-action"><button class="primary" :disabled="tokenPhotoBusy || !tokenPhotoStatus.eligible || !!tokenPhotoSession" @click="startTokenPhotoUpload">{{tokenPhotoBusy?'Indítás…':tokenPhotoSession?'Feltöltés folyamatban…':tokenPhotoStatus.eligible?'Fotó feltöltése · +'+tokenPhotoStatus.rewardAmount+' CR':tokenPhotoStatus.pending?'Feltöltés folyamatban…':tokenPhotoStatus.reason==='COOLDOWN'?'Várakozás…':tokenPhotoStatus.reason==='DAILY_LIMIT'?'Napi limit elérve':'Nem elérhető'}}</button><small v-if="tokenPhotoStatus.pending">Már van aktív feltöltésed.</small></div>
+          <div><h3>Fotóért tokeneket?</h3><p>Ha az egyenleged {{tokenPhotoStatus.balanceThreshold.toLocaleString('hu-HU')}} CR alatt van, egy fotófeltöltéssel <strong>+{{tokenPhotoStatus.rewardAmount.toLocaleString('hu-HU')}} CR</strong>-t szerezhetsz.</p><small>Napi lehetőség: {{tokenPhotoStatus.dailyRemaining}} / {{tokenPhotoStatus.dailyLimit}} · Várakozás: {{tokenPhotoStatus.cooldownMinutes}} perc</small></div>
+          <div class="reward-action"><button class="primary" :disabled="tokenPhotoBusy || !tokenPhotoStatus.eligible || !!tokenPhotoSession" @click="startTokenPhotoUpload">{{tokenPhotoBusy?'Indítás…':tokenPhotoSession?'Feltöltés folyamatban…':tokenPhotoStatus.eligible?'Fotó feltöltése · +'+tokenPhotoStatus.rewardAmount.toLocaleString('hu-HU')+' CR':tokenPhotoStatus.pending?'Feltöltés folyamatban…':tokenPhotoStatus.reason==='COOLDOWN'?'Várakozás…':tokenPhotoStatus.reason==='DAILY_LIMIT'?'Napi limit elérve':'Nem elérhető'}}</button><small v-if="tokenPhotoStatus.pending">Már van aktív feltöltésed.</small></div>
           <p v-if="tokenPhotoMessage" class="token-photo-message">{{tokenPhotoMessage}}</p>
         </section>
 

@@ -23,7 +23,8 @@ let sending = false;
 const balance = ref<number | null>(null);
 let balanceRevision = 0;
 let refreshAfterBets = false;
-const chip = ref(1);
+const chip = ref(500);
+const formatCredits = (amount: number) => amount.toLocaleString('hu-HU');
 const landedRound = ref<number | null>(null);
 let clock: ReturnType<typeof setInterval> | undefined;
 
@@ -47,7 +48,7 @@ const dozens: Choice[] = [1, 2, 3].map(n => ({
 }));
 const columns: Choice[] = [3, 2, 1].map(n => ({ type: 'COLUMN', value: String(n), label: `${n}. oszlop` }));
 const standardChoices = [...outside, ...dozens, ...columns];
-const chipValues = [1, 5, 10, 25, 50, 100];
+const chipValues = [500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
 const red = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
 const numberList = Array.from({ length: 36 }, (_, index) => {
   const number = index + 1;
@@ -77,9 +78,10 @@ const visibleBalance = computed(() => balance.value === null ? null : Math.max(0
   balance.value - queued.value.reduce((sum, bet) => sum + bet.amount, 0)));
 watch(visibleBalance, value => { rouletteDisplayBalance.value = value; }, { immediate: true });
 
-const maxBet = computed(() => state.value?.maxBet ?? 25);
-const chips = computed(() => chipValues.filter(value => value <= maxBet.value));
-watch(maxBet, limit => { if (chip.value > limit) chip.value = 1; });
+const maxBet = computed(() => state.value?.maxBet ?? 10_000);
+const minBet = computed(() => state.value?.minBet ?? 500);
+const chips = computed(() => chipValues.filter(value => value >= minBet.value && value <= maxBet.value));
+watch(chips, values => { if (!values.includes(chip.value)) chip.value = values[0] ?? minBet.value; });
 const totalStake = computed(() => myBets.value.reduce((sum, bet) => sum + bet.amount, 0));
 const secondsLeft = computed(() => Math.max(0, Math.ceil((Date.parse(round.value?.bettingEndsAt ?? '') - now.value) / 1000)));
 const accepting = computed(() => round.value?.status === 'BETTING' && secondsLeft.value > 0);
@@ -156,7 +158,7 @@ function onLanded(number: number) {
 function placeBet(choice: Choice) {
   if (!accepting.value || !playerId || !round.value) return;
   if (totalStake.value + chip.value > maxBet.value) {
-    error.value = 'A teljes tét egy körben legfeljebb ' + maxBet.value + ' CR lehet.';
+    error.value = 'A teljes tét egy körben legfeljebb ' + formatCredits(maxBet.value) + ' CR lehet.';
     return;
   }
   error.value = '';
@@ -237,11 +239,11 @@ onUnmounted(() => {
         </section>
 
         <section v-if="!isDisplay" class="studio-console" aria-label="Fogadóasztal">
-          <div class="studio-console-heading"><h2>Fogadóasztal</h2><span>{{ myBets.length }} tét · {{ totalStake }} / {{ maxBet }} CR</span></div>
+          <div class="studio-console-heading"><h2>Fogadóasztal</h2><span>{{ myBets.length }} tét · {{ formatCredits(totalStake) }} / {{ formatCredits(maxBet) }} CR</span></div>
           <div class="studio-chipline" role="group" aria-label="Zsetonérték">
             <span>Zseton</span>
             <button v-for="value in chips" :key="value" type="button" :aria-pressed="value === chip" :aria-label="value + ' CR'"
-              @click="chip = value">{{ value }}</button>
+              @click="chip = value">{{ value < 1000 ? value : (value / 1000).toLocaleString('hu-HU') + 'k' }}</button>
             <RouterLink v-if="!playerId" class="studio-cta" to="/">Csatlakozás</RouterLink>
           </div>
           <p v-if="error" class="error studio-error" role="alert">{{ error }}</p>
@@ -296,14 +298,14 @@ onUnmounted(() => {
           <summary>Asztalon lévő tétek <b>{{ state?.bets.length || 0 }}</b></summary>
           <p v-if="!state?.bets.length">Még nincs tét ebben a körben.</p>
           <div v-for="bet in state?.bets" :key="bet.id" class="studio-bet-row">
-            <strong>{{ bet.playerName }}</strong><span>{{ describe(bet) }}</span><b>{{ bet.amount }} CR</b>
+            <strong>{{ bet.playerName }}</strong><span>{{ describe(bet) }}</span><b>{{ formatCredits(bet.amount) }} CR</b>
             <span v-if="resultVisible && state?.winners.some(win => win.id === bet.id)" class="studio-winner">Nyert</span>
           </div>
         </details>
         <details v-if="!isDisplay" class="studio-log">
           <summary>Saját téteim <b>{{ myBets.length }}</b></summary>
           <p v-if="!myBets.length">Még nem adtál le tétet ebben a körben.</p>
-          <div v-for="bet in myBets" :key="bet.id" class="studio-bet-row"><span>{{ describe(bet) }}</span><b>{{ bet.amount }} CR</b></div>
+          <div v-for="bet in myBets" :key="bet.id" class="studio-bet-row"><span>{{ describe(bet) }}</span><b>{{ formatCredits(bet.amount) }} CR</b></div>
         </details>
       </div>
     </div>

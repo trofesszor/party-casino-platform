@@ -28,7 +28,7 @@ const connected = ref(false);
 const table = ref<Table>();
 const error = ref('');
 const waiting = ref(false);
-const stake = ref(2);
+const stake = ref(1000);
 const labels: Record<Outcome, string> = { blackjack: 'Blackjack', won: 'Nyertél', push: 'Döntetlen', lost: 'Az osztó nyert', bust: 'Besokalltál' };
 const dealerCards = computed(() => {
   const state = table.value;
@@ -40,6 +40,7 @@ const format = (amount: number) => amount.toLocaleString('hu-HU') + ' CR';
 function setTable(next: Table) {
   const previous = table.value;
   table.value = next;
+  if (!next.allowedBets.includes(stake.value)) stake.value = next.allowedBets[0];
   if (previous?.balance !== next.balance && next.balance !== null) window.dispatchEvent(new Event('party-player-changed'));
   if (!previous || !next.hand) return;
   const newRound = previous.round !== next.round;

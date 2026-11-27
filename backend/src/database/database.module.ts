@@ -1,3 +1,4 @@
+import { migratePartyCredits } from '../casino/credit-migration';
 import { partyCoupons, questSkipPrice, rouletteRoundLimit, scratchTicketPrice, startingCredits, wheelSpinPrice } from '../casino/economy';
 import { jackpotStarts } from '../slots/slots-game';
 import { Global, Module } from '@nestjs/common';
@@ -211,8 +212,8 @@ export const DATABASE = Symbol('DATABASE');
 
       const seedShop = sqlite.prepare('INSERT OR IGNORE INTO shop_items (item_key,name,description,price,enabled) VALUES (?,?,?,?,1)');
       seedShop.run('QUEST_SKIP', 'Küldetés kihagyás', 'Egy aktív side quest kihagyása. Később újra megkaphatod.', questSkipPrice);
-      seedShop.run('SCRATCH_TICKET', 'Kapard és nyerj!', 'Kapard le a mezőt, és derítsd ki, nyertél-e akár 100 CR-t!', scratchTicketPrice);
-      for (const coupon of partyCoupons) seedShop.run(...coupon);
+      seedShop.run('SCRATCH_TICKET', 'Kapard és nyerj!', 'Kapard le a mezőt, és derítsd ki, nyertél-e akár 50 000 CR-t!', scratchTicketPrice);
+      for (const coupon of partyCoupons) seedShop.run(coupon[0], coupon[1], coupon[2], coupon[3]);
       sqlite.exec(`
         CREATE TABLE IF NOT EXISTS shop_redemptions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -338,6 +339,7 @@ export const DATABASE = Symbol('DATABASE');
       const jackpotColumns = sqlite.prepare('PRAGMA table_info(slot_jackpots)').all() as Array<{ name: string }>;
       if (!jackpotColumns.some(column => column.name === 'grand_carry')) sqlite.exec('ALTER TABLE slot_jackpots ADD COLUMN grand_carry INTEGER NOT NULL DEFAULT 0');
       if (!jackpotColumns.some(column => column.name === 'major_carry')) sqlite.exec('ALTER TABLE slot_jackpots ADD COLUMN major_carry INTEGER NOT NULL DEFAULT 0');
+      migratePartyCredits(sqlite);
       sqlite.prepare('INSERT OR IGNORE INTO slot_jackpots (id, grand, major) VALUES (1, ?, ?)').run(jackpotStarts.grand, jackpotStarts.major);
       return { sqlite, db: drizzle({ client: sqlite }) };
     },

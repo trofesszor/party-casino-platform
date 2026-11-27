@@ -25,7 +25,7 @@ async function load(){
 }
 async function contribute(event:CommunityEvent){
   const amount=Number(amounts.value[event.id]);
-  if(!Number.isSafeInteger(amount)||amount<=0){error.value='Adj meg érvényes tokenmennyiséget.';return;}
+  if(!Number.isSafeInteger(amount)||amount<event.minContribution){error.value='A minimum hozzájárulás ' + fmt(event.minContribution) + ' CR.';return;}
   busyId.value=event.id;error.value='';message.value='';
   try{
     const result=await api.contributeCommunityEvent(event.id,playerId,amount);
@@ -57,7 +57,7 @@ onUnmounted(()=>{if(timer)clearInterval(timer);});
         </template>
         <div class="community-progress"><span :style="{width:percent(event)+'%'}"></span></div>
         <div class="community-progress-meta"><strong>{{fmt(event.currentAmount)}} <small>/ {{fmt(event.targetAmount)}} CR</small></strong><span>{{event.contributorCount}} támogató</span></div>
-        <div class="community-contribute" v-if="canJoin"><input v-model.number="amounts[event.id]" type="number" min="1" :max="balance" placeholder="Tokenmennyiség" aria-label="Hozzájárulás tokenben"><button class="primary" :disabled="busyId===event.id||balance<1" @click="contribute(event)">{{busyId===event.id?'Küldés…':'Hozzájárulás →'}}</button></div>
+        <div class="community-contribute" v-if="canJoin"><input v-model.number="amounts[event.id]" type="number" :min="event.minContribution" :max="balance" :placeholder="'Min. ' + fmt(event.minContribution) + ' CR'" aria-label="Hozzájárulás tokenben"><button class="primary" :disabled="busyId===event.id||balance<event.minContribution" @click="contribute(event)">{{busyId===event.id?'Küldés…':'Hozzájárulás →'}}</button></div>
         <p v-else class="muted">A hozzájáruláshoz lépj be játékosként.</p>
         <button v-if="!event.isSecret" class="community-history-link" @click="showHistory(event)">Hozzájárulások és előzmények →</button>
       </article>

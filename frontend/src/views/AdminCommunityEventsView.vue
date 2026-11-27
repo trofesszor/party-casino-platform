@@ -4,10 +4,10 @@ import { api, type CommunityEventAdmin } from '../services/api';
 const token=ref(localStorage.getItem('party-admin-token')||'');
 const events=ref<CommunityEventAdmin[]>([]);
 const error=ref('');const busy=ref(false);const editingId=ref<number|null>(null);
-const form=ref({title:'',description:'',targetAmount:500,repeatMode:'ONCE' as 'ONCE'|'REPEATABLE'|'COOLDOWN',cooldownMinutes:60,minContribution:1,maxContribution:null as number|null,isSecret:false,active:true});
+const form=ref({title:'',description:'',targetAmount:60000,repeatMode:'ONCE' as 'ONCE'|'REPEATABLE'|'COOLDOWN',cooldownMinutes:60,minContribution:1000,maxContribution:null as number|null,isSecret:false,active:true});
 const fmt=(n:number)=>n.toLocaleString('hu-HU');
 async function load(){if(!token.value){error.value='Admin bejelentkezés szükséges. Lépj be az admin felületen.';return;}try{events.value=await api.adminCommunityEvents(token.value);}catch(e:any){error.value=e.message;}}
-function reset(){editingId.value=null;form.value={title:'',description:'',targetAmount:500,repeatMode:'ONCE',cooldownMinutes:60,minContribution:1,maxContribution:null,isSecret:false,active:true};}
+function reset(){editingId.value=null;form.value={title:'',description:'',targetAmount:60000,repeatMode:'ONCE',cooldownMinutes:60,minContribution:1000,maxContribution:null,isSecret:false,active:true};}
 function edit(e:CommunityEventAdmin){editingId.value=e.id;form.value={title:e.title,description:e.description,targetAmount:e.targetAmount,repeatMode:e.repeatMode,cooldownMinutes:e.cooldownMinutes,minContribution:e.minContribution,maxContribution:e.maxContribution,isSecret:!!e.isSecret,active:!!e.active};window.scrollTo({top:0,behavior:'smooth'});}
 async function save(){busy.value=true;error.value='';try{if(editingId.value)await api.adminUpdateCommunityEvent(token.value,editingId.value,form.value);else await api.adminCreateCommunityEvent(token.value,form.value);reset();await load();}catch(e:any){error.value=e.message;}finally{busy.value=false;}}
 async function toggle(e:CommunityEventAdmin){try{await api.adminToggleCommunityEvent(token.value,e.id,!e.active);await load();}catch(x:any){error.value=x.message;}}

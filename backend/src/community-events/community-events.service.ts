@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { creditScale } from '../casino/economy';
 import { DATABASE } from '../database/database.module';
 import { PlayerPresenceGateway } from '../players/player-presence.gateway';
 import { EventsGateway } from '../events/events.gateway';
@@ -50,16 +51,6 @@ export class CommunityEventsService {
       CREATE INDEX IF NOT EXISTS idx_community_contributions_event ON community_event_contributions(event_id,id DESC);
       CREATE INDEX IF NOT EXISTS idx_community_activations_event ON community_event_activations(event_id,id DESC);
     `);
-    const existing = sqlite.prepare('SELECT COUNT(*) AS count FROM community_events').get() as {count:number};
-    if (Number(existing.count) === 0) {
-      const insert = sqlite.prepare(`INSERT INTO community_events
-        (title,description,target_amount,repeat_mode,cooldown_minutes,min_contribution,is_secret,is_active)
-        VALUES (?,?,?,?,?,?,?,?)`);
-      insert.run('Everybody Drinks','Közös koccintás: mindenki választhat egy italt, alkoholmenteset is.',60,'REPEATABLE',0,1,0,1);
-      insert.run('Random Victim','A közösség felold egy véletlenszerű, önkéntes party kihívást.',90,'COOLDOWN',30,1,0,1);
-      insert.run('Forbidden Word','Válasszatok egy tiltott szót, amit 10 percig senki nem mondhat ki.',120,'ONCE',0,1,0,1);
-      insert.run('??? Secret Afterparty','Egy rejtett meglepetés esemény. Az admin bármikor aktiválhatja.',180,'ONCE',0,1,1,0);
-    }
     sqlite.exec('BEGIN IMMEDIATE');
     try {
       const migration = sqlite.prepare("INSERT OR IGNORE INTO casino_settings VALUES ('party_community_costs_v1','1')").run();
@@ -79,6 +70,31 @@ export class CommunityEventsService {
     } catch (error) {
       sqlite.exec('ROLLBACK');
       throw error;
+    }
+
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const migrated = sqlite.prepare("INSERT OR IGNORE INTO casino_settings VALUES ('party_community_100k','1')").run();
+      if (migrated.changes) sqlite.exec(`
+        UPDATE community_events SET target_amount=target_amount*${creditScale}, current_amount=current_amount*${creditScale},
+          min_contribution=min_contribution*${creditScale}, max_contribution=max_contribution*${creditScale};
+        UPDATE community_event_contributions SET amount=amount*${creditScale};
+        UPDATE community_event_activations SET total_contributions=total_contributions*${creditScale};
+      `);
+      sqlite.exec('COMMIT');
+    } catch (error) {
+      sqlite.exec('ROLLBACK');
+      throw error;
+    }
+    const existing = sqlite.prepare('SELECT COUNT(*) AS count FROM community_events').get() as {count:number};
+    if (Number(existing.count) === 0) {
+      const insert = sqlite.prepare(`INSERT INTO community_events
+        (title,description,target_amount,repeat_mode,cooldown_minutes,min_contribution,is_secret,is_active)
+        VALUES (?,?,?,?,?,?,?,?)`);
+      insert.run('Everybody Drinks','Közös koccintás: mindenki választhat egy italt, alkoholmenteset is.',60_000,'REPEATABLE',0,1000,0,1);
+      insert.run('Random Victim','A közösség felold egy véletlenszerű, önkéntes party kihívást.',90_000,'COOLDOWN',30,1000,0,1);
+      insert.run('Forbidden Word','Válasszatok egy tiltott szót, amit 10 percig senki nem mondhat ki.',120_000,'ONCE',0,1000,0,1);
+      insert.run('??? Secret Afterparty','Egy rejtett meglepetés esemény. Az admin bármikor aktiválhatja.',180_000,'ONCE',0,1000,1,0);
     }
 
   }
@@ -109,7 +125,7 @@ export class CommunityEventsService {
     const title = input.title === undefined && partial ? undefined : String(input.title ?? '').trim();
     const description = input.description === undefined && partial ? undefined : String(input.description ?? '').trim();
     const target = input.targetAmount === undefined && partial ? undefined : Number(input.targetAmount);
-    const min = input.minContribution === undefined && partial ? undefined : Number(input.minContribution ?? 1);
+    const min = input.minContribution === undefined && partial ? undefined : Number(input.minContribution ?? 1000);
     const max = input.maxContribution === undefined && partial ? undefined : input.maxContribution === null || input.maxContribution === undefined ? null : Number(input.maxContribution);
     const mode = input.repeatMode;
     const cooldown = input.cooldownMinutes === undefined && partial ? undefined : Number(input.cooldownMinutes ?? 0);
@@ -124,7 +140,7 @@ export class CommunityEventsService {
   }
 
   listPublic() {
-    const rows = this.sqlite.prepare(`SELECT e.id,e.title,e.description,e.target_amount AS targetAmount,
+    const rows = this.sqlite.prepare(`SELECT e.id,e.title,e.description,e.min_contribution AS minContribution,e.target_amount AS targetAmount,
       e.current_amount AS currentAmount,e.repeat_mode AS repeatMode,e.is_secret AS isSecret,
       e.next_available_at AS nextAvailableAt,e.created_at AS createdAt,
       (SELECT COUNT(DISTINCT player_id) FROM community_event_contributions c WHERE c.event_id=e.id) AS contributorCount

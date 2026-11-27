@@ -27,9 +27,11 @@ const error = ref('');
 const notice = ref('');
 const questSkipItem = computed(() => items.value.find(item => item.itemKey === 'QUEST_SKIP'));
 const activeQuests = computed(() => quests.value.filter(quest => quest.status === 'ACTIVE'));
-type ScratchTicket = {id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;outcomeJson?:string|null;createdAt:string};
+type ScratchTicket = {id:number;status:'UNSCRATCHED'|'REVEALED';prizeAmount?:number;outcomeJson?:string|null;legacyPrizes?:number;createdAt:string};
 const scratchTickets = ref<ScratchTicket[]>([]);
+const prizeSymbols = ['🔔', '⭐', '💎', '7️⃣'];
 const activeTicket = ref<ScratchTicket|null>(null);
+const ticketPrizes = computed(() => activeTicket.value?.legacyPrizes ? economy.value?.legacyScratchPrizes : economy.value?.scratchPrizes);
 const scratchCanvas = ref<HTMLCanvasElement|null>(null);
 const scratching = ref(false);
 const revealing = ref(false);
@@ -134,12 +136,12 @@ onMounted(refresh);
       <summary><strong>Kreditek és tétlimitek</strong><span>Egyenleg {{ number(balance) }} CR</span></summary>
       <dl>
         <div><dt>Kezdőegyenleg</dt><dd>{{ number(economy.startingCredits) }} CR</dd></div>
-        <div><dt>Rulett</dt><dd>1–{{ economy.rouletteRoundLimit }} CR körönként</dd></div>
-        <div><dt>Slot</dt><dd>1–{{ economy.slotStakeLimit }} CR pörgetésenként</dd></div>
-        <div><dt>Blackjack</dt><dd>{{ economy.blackjackBets.join(', ') }} CR alaptét</dd></div>
-        <div><dt>Szerencsekerék</dt><dd>{{ economy.wheelSpinCost }} CR pörgetésenként</dd></div>
-        <div><dt>Párbaj győztese</dt><dd>+{{ economy.duelReward }} CR</dd></div>
-        <div v-if="economy.photoReward.enabled"><dt>Fotóküldetés {{ economy.photoReward.balanceThreshold }} CR alatt</dt><dd>+{{ economy.photoReward.rewardAmount }} CR · napi {{ economy.photoReward.dailyLimit }}×</dd></div>
+        <div><dt>Rulett</dt><dd>{{ number(economy.rouletteMinBet) }}–{{ number(economy.rouletteRoundLimit) }} CR körönként</dd></div>
+        <div><dt>Slot</dt><dd>500–{{ number(economy.slotStakeLimit) }} CR pörgetésenként</dd></div>
+        <div><dt>Blackjack</dt><dd>{{ economy.blackjackBets.map(number).join(', ') }} CR alaptét</dd></div>
+        <div><dt>Szerencsekerék</dt><dd>{{ number(economy.wheelSpinCost) }} CR pörgetésenként</dd></div>
+        <div><dt>Párbaj győztese</dt><dd>+{{ number(economy.duelReward) }} CR</dd></div>
+        <div v-if="economy.photoReward.enabled"><dt>Fotóküldetés {{ number(economy.photoReward.balanceThreshold) }} CR alatt</dt><dd>+{{ number(economy.photoReward.rewardAmount) }} CR · napi {{ economy.photoReward.dailyLimit }}×</dd></div>
       </dl>
     </details>
 
@@ -225,11 +227,11 @@ onMounted(refresh);
           <div class="paper-rules">
             <div><strong>HOGYAN NYERHETSZ?</strong><span>Keress 3 egyforma szimbólumot egy vízszintes sorban.</span></div>
             <div class="paper-prize-table">
-              <span>🔔 <b>10 CR</b></span><span>⭐ <b>25 CR</b></span><span>💎 <b>50 CR</b></span><span>7️⃣ <b>100 CR</b></span>
+              <span v-for="(prize, index) in ticketPrizes" :key="prize">{{ prizeSymbols[index] }} <b>{{ number(prize) }} CR</b></span>
             </div>
           </div>
           <div v-if="activeTicket.status==='REVEALED'" class="paper-result" :class="{'paper-result-win':(activeTicket.prizeAmount??0)>0}">
-            <strong>{{ activeTicket.prizeAmount ? 'NYERTÉL '+activeTicket.prizeAmount+' CR-T!' : 'EZ MOST NEM NYERT' }}</strong>
+            <strong>{{ activeTicket.prizeAmount ? 'NYERTÉL '+number(activeTicket.prizeAmount)+' CR-T!' : 'EZ MOST NEM NYERT' }}</strong>
             <span>{{ activeTicket.prizeAmount ? 'A nyereményedet jóváírtuk az egyenlegeden.' : 'Legközelebb talán a szerencse melléd áll.' }}</span>
           </div>
           <div class="paper-bottomline"><span>PARTY CASINO · JÁTÉKOS KIADÁS</span><span>★ SOK SZERENCSÉT ★</span></div>

@@ -20,13 +20,13 @@ const sideQuestSaving = ref(false);
 type AdminShopItem = { itemKey:string; name:string; description:string; price:number; enabled:number };
 const shopItems = ref<AdminShopItem[]>([]);
 const shopSavingKey = ref('');
-const gameSettings=ref({wheelSpinCost:5,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:25,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1});
+const gameSettings=ref({wheelSpinCost:2500,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:10000,duelReward:5000,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:62,scratch10Percent:22,scratch25Percent:11,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1});
 const gameSettingsSaving=ref(false);
-const tokenPhotoSettings=ref({enabled:true,balanceThreshold:50,rewardAmount:10,cooldownMinutes:60,dailyLimit:2});
+const tokenPhotoSettings=ref({enabled:true,balanceThreshold:15000,rewardAmount:7500,cooldownMinutes:30,dailyLimit:2});
 const tokenPhotoSaving=ref(false);
 const notificationSettings=ref<Record<string,boolean>>({wheel:true,event:true,duel:true,roulette:true,slots:true,leaderboard:true,system:true});
 const notificationSaving=ref(false);
-const defaultPlayerTokens=ref(100);
+const defaultPlayerTokens=ref(100000);
 const defaultTokensSaving=ref(false);
 const resetBusy=ref(false);
 const resetMessage=ref('');
@@ -486,7 +486,7 @@ onMounted(async () => {
           <label>Szerencsekerék animáció (ms)<input v-model.number="gameSettings.wheelSpinDurationMs" type="number" min="1000" max="60000" step="500"></label>
           <label>Rulett fogadási idő (mp)<input v-model.number="gameSettings.rouletteBettingSeconds" type="number" min="5" max="120"></label>
           <label>Rulett eredményidő (mp)<input v-model.number="gameSettings.rouletteResultSeconds" type="number" min="1" max="30"></label>
-          <label>Rulett tétlimit játékosonként és körönként (CR)<input v-model.number="gameSettings.rouletteMaxBet" type="number" min="1" max="100"></label>
+          <label>Rulett tétlimit játékosonként és körönként (CR)<input v-model.number="gameSettings.rouletteMaxBet" type="number" min="500" max="100000"></label>
           <label>Párbaj győzelmi jutalom (CR)<input v-model.number="gameSettings.duelReward" type="number" min="0" max="1000000"></label>
           <label>Max. aktív side quest / játékos<input v-model.number="gameSettings.maxActiveSideQuests" type="number" min="1" max="10"></label>
           <label>PIN érvényesség (mp)<input v-model.number="gameSettings.questPinExpirySeconds" type="number" min="15" max="600"></label>
@@ -495,10 +495,10 @@ onMounted(async () => {
         <div class="admin-subheading"><span class="muted">Az összegnek pontosan 100%-nak kell lennie.</span></div>
         <div class="game-settings-grid scratch-odds-grid">
           <label>Nem nyer (%)<input v-model.number="gameSettings.scratchLossPercent" type="number" min="0" max="100"></label>
-          <label>10 CR (%)<input v-model.number="gameSettings.scratch10Percent" type="number" min="0" max="100"></label>
-          <label>25 CR (%)<input v-model.number="gameSettings.scratch25Percent" type="number" min="0" max="100"></label>
-          <label>50 CR (%)<input v-model.number="gameSettings.scratch50Percent" type="number" min="0" max="100"></label>
-          <label>100 CR (%)<input v-model.number="gameSettings.scratch100Percent" type="number" min="0" max="100"></label>
+          <label>5 000 CR (%)<input v-model.number="gameSettings.scratch10Percent" type="number" min="0" max="100"></label>
+          <label>12 500 CR (%)<input v-model.number="gameSettings.scratch25Percent" type="number" min="0" max="100"></label>
+          <label>25 000 CR (%)<input v-model.number="gameSettings.scratch50Percent" type="number" min="0" max="100"></label>
+          <label>50 000 CR (%)<input v-model.number="gameSettings.scratch100Percent" type="number" min="0" max="100"></label>
         </div>
         <p class="muted">Jelenlegi összesített esély: {{gameSettings.scratchLossPercent+gameSettings.scratch10Percent+gameSettings.scratch25Percent+gameSettings.scratch50Percent+gameSettings.scratch100Percent}}%</p>
         </details>

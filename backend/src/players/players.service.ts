@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { EventsGateway } from '../events/events.gateway';
 import { createHash, createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
-import { blackjackBets, isPartyCoupon, rouletteRoundLimit, slotStakeLimit, startingCredits, wheelSpinPrice } from '../casino/economy';
+import { blackjackBets, duelReward, isPartyCoupon, legacyScratchPrizes, photoRewardDefaults, rouletteAdminLimit, rouletteMinBet, rouletteRoundLimit, scratchOdds, scratchPrizes, slotStakeLimit, startingCredits, wheelSpinPrice } from '../casino/economy';
 import { DATABASE } from '../database/database.module';
 
 @Injectable()
@@ -78,22 +78,22 @@ export class PlayersService {
     }
   }
 
-  private readonly gameSettingDefaults={wheelSpinCost:wheelSpinPrice,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:rouletteRoundLimit,duelReward:10,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:60,scratch10Percent:25,scratch25Percent:10,scratch50Percent:4,scratch100Percent:1,roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1};
+  private readonly gameSettingDefaults={wheelSpinCost:wheelSpinPrice,wheelSpinDurationMs:7000,rouletteBettingSeconds:20,rouletteResultSeconds:5,rouletteMaxBet:rouletteRoundLimit,duelReward,maxActiveSideQuests:2,questPinExpirySeconds:90,scratchLossPercent:scratchOdds[0],scratch10Percent:scratchOdds[1],scratch25Percent:scratchOdds[2],scratch50Percent:scratchOdds[3],scratch100Percent:scratchOdds[4],roulettePayoutNumber:35,roulettePayoutSplit:17,roulettePayoutStreet:11,roulettePayoutCorner:8,roulettePayoutSixLine:5,roulettePayoutDozen:2,roulettePayoutColumn:2,roulettePayoutColor:1,roulettePayoutOddEven:1,roulettePayoutLowHigh:1};
   getCasinoGameSettings(){
     const rows=this.database.sqlite.prepare("SELECT setting_key AS key,setting_value AS value FROM casino_settings").all() as Array<{key:string;value:string}>;
     const values=Object.fromEntries(rows.map(r=>[r.key,Number(r.value)]));
     return {
       wheelSpinCost:values.wheel_spin_cost??wheelSpinPrice,wheelSpinDurationMs:values.wheel_spin_duration_ms??7000,
       rouletteBettingSeconds:values.roulette_betting_seconds??20,rouletteResultSeconds:values.roulette_result_seconds??5,rouletteMaxBet:values.roulette_max_bet??rouletteRoundLimit,
-      duelReward:values.duel_reward??10,maxActiveSideQuests:values.max_active_side_quests??2,questPinExpirySeconds:values.quest_pin_expiry_seconds??90,
-      scratchLossPercent:values.scratch_loss_percent??60,scratch10Percent:values.scratch_10_percent??25,scratch25Percent:values.scratch_25_percent??10,scratch50Percent:values.scratch_50_percent??4,scratch100Percent:values.scratch_100_percent??1,
+      duelReward:values.duel_reward??duelReward,maxActiveSideQuests:values.max_active_side_quests??2,questPinExpirySeconds:values.quest_pin_expiry_seconds??90,
+      scratchLossPercent:values.scratch_loss_percent??scratchOdds[0],scratch10Percent:values.scratch_10_percent??scratchOdds[1],scratch25Percent:values.scratch_25_percent??scratchOdds[2],scratch50Percent:values.scratch_50_percent??scratchOdds[3],scratch100Percent:values.scratch_100_percent??scratchOdds[4],
       roulettePayoutNumber:values.roulette_payout_number??35,roulettePayoutSplit:values.roulette_payout_split??17,roulettePayoutStreet:values.roulette_payout_street??11,roulettePayoutCorner:values.roulette_payout_corner??8,roulettePayoutSixLine:values.roulette_payout_six_line??5,roulettePayoutDozen:values.roulette_payout_dozen??2,roulettePayoutColumn:values.roulette_payout_column??2,roulettePayoutColor:values.roulette_payout_color??1,roulettePayoutOddEven:values.roulette_payout_odd_even??1,roulettePayoutLowHigh:values.roulette_payout_low_high??1
     };
   }
   setCasinoGameSettings(input:any){
     const keys=Object.keys(this.gameSettingDefaults) as Array<keyof typeof this.gameSettingDefaults>;
     for(const key of keys){const value=input?.[key];if(!Number.isSafeInteger(value))throw new BadRequestException('Minden játékszabályhoz egész számot adj meg.');}
-    const limits:Record<string,[number,number]>={wheelSpinCost:[0,100000],wheelSpinDurationMs:[1000,60000],rouletteBettingSeconds:[5,120],rouletteResultSeconds:[1,30],rouletteMaxBet:[1,100],duelReward:[0,1000000],maxActiveSideQuests:[1,10],questPinExpirySeconds:[15,600],scratchLossPercent:[0,100],scratch10Percent:[0,100],scratch25Percent:[0,100],scratch50Percent:[0,100],scratch100Percent:[0,100],roulettePayoutNumber:[1,1000],roulettePayoutSplit:[1,1000],roulettePayoutStreet:[1,1000],roulettePayoutCorner:[1,1000],roulettePayoutSixLine:[1,1000],roulettePayoutDozen:[1,1000],roulettePayoutColumn:[1,1000],roulettePayoutColor:[1,1000],roulettePayoutOddEven:[1,1000],roulettePayoutLowHigh:[1,1000]};
+    const limits:Record<string,[number,number]>={wheelSpinCost:[0,100000],wheelSpinDurationMs:[1000,60000],rouletteBettingSeconds:[5,120],rouletteResultSeconds:[1,30],rouletteMaxBet:[rouletteMinBet,rouletteAdminLimit],duelReward:[0,1000000],maxActiveSideQuests:[1,10],questPinExpirySeconds:[15,600],scratchLossPercent:[0,100],scratch10Percent:[0,100],scratch25Percent:[0,100],scratch50Percent:[0,100],scratch100Percent:[0,100],roulettePayoutNumber:[1,1000],roulettePayoutSplit:[1,1000],roulettePayoutStreet:[1,1000],roulettePayoutCorner:[1,1000],roulettePayoutSixLine:[1,1000],roulettePayoutDozen:[1,1000],roulettePayoutColumn:[1,1000],roulettePayoutColor:[1,1000],roulettePayoutOddEven:[1,1000],roulettePayoutLowHigh:[1,1000]};
     for(const key of keys){const [min,max]=limits[key];if(input[key]<min||input[key]>max)throw new BadRequestException('Egy vagy több beállítás kívül esik a megengedett tartományon.');}
     const total=input.scratchLossPercent+input.scratch10Percent+input.scratch25Percent+input.scratch50Percent+input.scratch100Percent;
     if(total!==100)throw new BadRequestException('A kaparós sorsjegy esélyeinek összege pontosan 100% legyen.');
@@ -396,10 +396,10 @@ export class PlayersService {
     const values=Object.fromEntries(rows.map(row=>[row.key,row.value]));
     return {
       enabled:values.enabled!=='0',
-      balanceThreshold:Math.max(0,Number(values.balance_threshold??50)),
-      rewardAmount:Math.max(1,Number(values.reward_amount??10)),
-      cooldownMinutes:Math.max(0,Number(values.cooldown_minutes??60)),
-      dailyLimit:Math.max(1,Number(values.daily_limit??2)),
+      balanceThreshold:Math.max(0,Number(values.balance_threshold??photoRewardDefaults.balanceThreshold)),
+      rewardAmount:Math.max(1,Number(values.reward_amount??photoRewardDefaults.rewardAmount)),
+      cooldownMinutes:Math.max(0,Number(values.cooldown_minutes??photoRewardDefaults.cooldownMinutes)),
+      dailyLimit:Math.max(1,Number(values.daily_limit??photoRewardDefaults.dailyLimit)),
     };
   }
 
@@ -666,6 +666,9 @@ export class PlayersService {
       startingCredits: this.getDefaultPlayerTokens().defaultTokens,
       wheelSpinCost: settings.wheelSpinCost,
       rouletteRoundLimit: settings.rouletteMaxBet,
+      rouletteMinBet,
+      scratchPrizes,
+      legacyScratchPrizes,
       slotStakeLimit,
       blackjackBets,
       duelReward: settings.duelReward,
@@ -731,19 +734,26 @@ export class PlayersService {
       if(itemKey==='SCRATCH_TICKET'){
         const settings=this.getCasinoGameSettings();
         const roll=randomInt(0,10000);let threshold=settings.scratchLossPercent*100,prize=0;
-        for(const [chance,value] of [[settings.scratch10Percent,10],[settings.scratch25Percent,25],[settings.scratch50Percent,50],[settings.scratch100Percent,100]] as Array<[number,number]>){threshold+=chance*100;if(roll>=settings.scratchLossPercent*100 && roll<threshold){prize=value;break;}}
+        const odds = [settings.scratch10Percent, settings.scratch25Percent, settings.scratch50Percent, settings.scratch100Percent];
+        for (const [index, chance] of odds.entries()) {
+          threshold += chance * 100;
+          if (roll >= settings.scratchLossPercent * 100 && roll < threshold) {
+            prize = scratchPrizes[index];
+            break;
+          }
+        }
         const symbols=['🍒','🍋','🔔','🍀','💎','⭐','7️⃣'];
         const makeNonWinningRow=():string[]=>{
           for(let attempt=0;attempt<100;attempt++){
-            const row=Array.from({length:3},()=>symbols[randomInt(0,symbols.length-1)]);
+            const row=Array.from({length:3},()=>symbols[randomInt(symbols.length)]);
             if(!(row[0]===row[1]&&row[1]===row[2]))return row;
           }
           return ['🍒','🍋','🍒'];
         };
         const grid:string[][]=Array.from({length:3},()=>makeNonWinningRow());
         if(prize>0){
-          const prizeSymbol=prize===100?'7️⃣':prize===50?'💎':prize===25?'⭐':'🔔';
-          const winningRow=randomInt(0,2);
+          const prizeSymbol=['🔔', '⭐', '💎', '7️⃣'][scratchPrizes.indexOf(prize)];
+          const winningRow=randomInt(grid.length);
           grid[winningRow]=[prizeSymbol,prizeSymbol,prizeSymbol];
         }
         const result=sqlite.prepare('INSERT INTO scratch_tickets (player_id,prize_amount,outcome_json) VALUES (?,?,?)').run(playerId,prize,JSON.stringify(grid));
@@ -757,7 +767,7 @@ export class PlayersService {
 
   getScratchTickets(playerId:number) {
     if(!this.database.sqlite.prepare('SELECT id FROM players WHERE id=?').get(playerId)) throw new BadRequestException('A játékos nem található.');
-    return this.database.sqlite.prepare("SELECT id,status,CASE WHEN status='REVEALED' THEN prize_amount ELSE NULL END AS prizeAmount,CASE WHEN status='REVEALED' THEN outcome_json ELSE NULL END AS outcomeJson,created_at AS createdAt,revealed_at AS revealedAt FROM scratch_tickets WHERE player_id=? ORDER BY id DESC LIMIT 20").all(playerId);
+    return this.database.sqlite.prepare("SELECT id,status,CASE WHEN status='REVEALED' THEN prize_amount ELSE NULL END AS prizeAmount,CASE WHEN status='REVEALED' THEN outcome_json ELSE NULL END AS outcomeJson,legacy_prizes AS legacyPrizes,created_at AS createdAt,revealed_at AS revealedAt FROM scratch_tickets WHERE player_id=? ORDER BY id DESC LIMIT 20").all(playerId);
   }
 
   revealScratchTicket(playerId:number,ticketId:number) {

@@ -32,14 +32,13 @@ export class SlotsService {
   }
 
   spin(playerId: number, legacyAmount: number, denomination?: number, units?: number) {
-    const requestedStake = this.stake(legacyAmount, denomination, units);
     const sqlite = this.database.sqlite;
     sqlite.exec('BEGIN IMMEDIATE');
     const result = (() => {
       try {
         const player = this.player(playerId);
         if (!player) throw new NotFoundException('A játékos nem található. Lépj be újra.');
-        const spin = this.play(player, requestedStake);
+        const spin = this.play(player, () => this.stake(legacyAmount, denomination, units));
         sqlite.exec('COMMIT');
         return spin;
       } catch (error) {
@@ -59,14 +58,14 @@ export class SlotsService {
     return result;
   }
 
-  private play(player: Player, requestedStake: Stake) {
+  private play(player: Player, requestedStake: () => Stake) {
     const sqlite = this.database.sqlite;
     const existing = this.playerSlot(player.id);
     let bonus = this.decode<Bonus>(existing?.bonusState);
     let freeSpins = existing?.freeSpins ?? 0;
     let freeStake = this.decode<Stake>(existing?.freeStake);
     const usedFreeSpin = !bonus && freeSpins > 0;
-    const stake = bonus?.stake ?? (usedFreeSpin ? freeStake ?? requestedStake : requestedStake);
+    const stake = bonus?.stake ?? (usedFreeSpin ? freeStake ?? requestedStake() : requestedStake());
     const betAmount = amount(stake);
     const jackpots = this.jackpots();
     let jackpotWins: JackpotWin[] = [];
@@ -151,12 +150,13 @@ export class SlotsService {
 
   private stake(legacyAmount: number, denomination?: number, units?: number): Stake {
     if (denomination === undefined && units === undefined) {
-      if ([1, 5, 10, 25].includes(legacyAmount)) return { denomination: legacyAmount, units: 1 };
-      if (legacyAmount === 50) return { denomination: 25, units: 2 };
+      for (const denomination of denominations) {
+        const units = legacyAmount / denomination;
+        if (betUnits.includes(units)) return { denomination, units };
+      }
     } else if (denomination !== undefined && units !== undefined) {
       const supported = denominations.includes(denomination) && betUnits.includes(units);
-      const legacy = denomination === 25 && [1, 2, 3, 5].includes(units);
-      if (supported || legacy) return { denomination, units };
+      if (supported) return { denomination, units };
     }
     throw new BadRequestException('Érvénytelen tétegység vagy tét.');
   }

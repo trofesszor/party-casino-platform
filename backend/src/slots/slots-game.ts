@@ -1,19 +1,19 @@
 import { randomInt } from 'node:crypto';
 import { slotStakeLimit } from '../casino/economy';
 
-export const denominations = [1, 2, 5, 10];
+export const denominations = [500, 1000, 2500];
 export const betUnits = [1, 2, 3, 5, 10];
 export const bellBonus = { trigger: 5, respins: 3, grandBells: 3, fullBoardMultiplier: 2 };
-export const jackpotStarts = { grand: 1500, major: 300 };
+export const jackpotStarts = { grand: 600_000, major: 100_000 };
 export const jackpotMultipliers = { minor: 80, mini: 20 };
 export const symbols = [
   { id: 'cherry', weight: 23, label: 'Cseresznye', payouts: [1, 2, 5] },
   { id: 'lemon', weight: 20, label: 'Citrom', payouts: [1, 2, 7] },
   { id: 'lime', weight: 17, label: 'Lime', payouts: [1, 3, 9] },
-  { id: 'grapes', weight: 14, label: 'Szőlő', payouts: [1, 4, 12] },
+  { id: 'grapes', weight: 13, label: 'Szőlő', payouts: [1, 4, 12] },
   { id: 'orange', weight: 12, label: 'Narancs', payouts: [2, 5, 15] },
   { id: 'crescent', weight: 8, label: 'Rubinhold', payouts: [2, 6, 20] },
-  { id: 'wild', weight: 3, label: 'Wild' },
+  { id: 'wild', weight: 4, label: 'Wild' },
   { id: 'scatter', weight: 4, label: 'Scatter' },
   { id: 'coin', weight: 10, label: 'Harang' },
 ] as const;
@@ -68,11 +68,11 @@ function coinDraw(stake: Stake, existing: Array<Coin | null> = []) {
     const special = randomInt(1000);
     if (special < 9) return { value: stake.denomination * jackpotMultipliers.minor, tier: 'minor' };
     if (special < 45) return { value: stake.denomination * jackpotMultipliers.mini, tier: 'mini' };
-    if (special >= 45 && special < 48 && !major) {
+    if (special >= 45 && special < 47 && !major) {
       major = true;
       return { value: 0, tier: 'major' };
     }
-    if (special >= 48 && special < 60 && grand < bellBonus.grandBells) {
+    if (special >= 47 && special < 61 && grand < bellBonus.grandBells) {
       grand++;
       return { value: 0, tier: 'grand' };
     }
