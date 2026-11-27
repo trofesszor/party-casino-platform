@@ -16,49 +16,52 @@ const error = ref('');
 const busy = ref(false);
 const balance = ref(0);
 const chip = ref(1);
-const mode = ref<'numbers' | 'combination' | 'outside'>('numbers');
-const combinationType = ref<Combination>('SPLIT');
-const anchor = ref<number | null>(null);
 const selection = ref<Choice | null>(null);
 const landedRound = ref<number | null>(null);
 let clock: ReturnType<typeof setInterval> | undefined;
 
 type Choice = { type: RouletteBetType; value: string; label: string; color?: string };
-type Combination = 'SPLIT' | 'STREET' | 'CORNER' | 'SIX_LINE';
-const combinations: Array<{ type: Combination; label: string }> = [
-  { type: 'SPLIT', label: '2 szám' },
-  { type: 'STREET', label: '3 szám' },
-  { type: 'CORNER', label: '4 szám' },
-  { type: 'SIX_LINE', label: '6 szám' },
-];
-const sections: Array<{ id: typeof mode.value; label: string }> = [
-  { id: 'numbers', label: 'Számok' },
-  { id: 'combination', label: 'Kombinációk' },
-  { id: 'outside', label: 'Külső tétek' },
-];
+type Combination = Choice & { type: 'SPLIT' | 'STREET' | 'CORNER' | 'SIX_LINE'; x: number; y: number };
 const names: Record<RouletteBetType, string> = {
   NUMBER: 'Szám', SPLIT: 'Két szám', STREET: 'Három szám', CORNER: 'Négy szám', SIX_LINE: 'Hat szám',
   DOZEN: 'Tucat', COLUMN: 'Oszlop', COLOR: 'Szín', ODD_EVEN: 'Páros/páratlan', LOW_HIGH: 'Számtartomány',
 };
-const outsideGroups: Array<{ label: string; choices: Choice[] }> = [
-  { label: 'Színek és tartományok', choices: [
-    { type: 'COLOR', value: 'red', label: 'Piros', color: 'red' },
-    { type: 'COLOR', value: 'black', label: 'Fekete', color: 'black' },
-    { type: 'ODD_EVEN', value: 'even', label: 'Páros' },
-    { type: 'ODD_EVEN', value: 'odd', label: 'Páratlan' },
-    { type: 'LOW_HIGH', value: 'low', label: '1–18' },
-    { type: 'LOW_HIGH', value: 'high', label: '19–36' },
-  ] },
-  { label: 'Tucat', choices: [
-    { type: 'DOZEN', value: '1', label: '1–12' },
-    { type: 'DOZEN', value: '2', label: '13–24' },
-    { type: 'DOZEN', value: '3', label: '25–36' },
-  ] },
-  { label: 'Oszlop', choices: [1, 2, 3].map(n => ({ type: 'COLUMN', value: String(n), label: `${n}. oszlop` })) },
+const outside: Choice[] = [
+  { type: 'LOW_HIGH', value: 'low', label: '1–18' },
+  { type: 'ODD_EVEN', value: 'even', label: 'Páros' },
+  { type: 'COLOR', value: 'red', label: 'Piros', color: 'red' },
+  { type: 'COLOR', value: 'black', label: 'Fekete', color: 'black' },
+  { type: 'ODD_EVEN', value: 'odd', label: 'Páratlan' },
+  { type: 'LOW_HIGH', value: 'high', label: '19–36' },
 ];
+const dozens: Choice[] = [1, 2, 3].map(n => ({
+  type: 'DOZEN', value: String(n), label: `${(n - 1) * 12 + 1}–${n * 12}`,
+}));
+const columns: Choice[] = [3, 2, 1].map(n => ({ type: 'COLUMN', value: String(n), label: `${n}. oszlop` }));
+const standardChoices = [...outside, ...dozens, ...columns];
 const chips = [1, 5, 10, 25, 100];
 const red = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
-const numberList = Array.from({ length: 36 }, (_, index) => index + 1);
+const numberList = Array.from({ length: 36 }, (_, index) => {
+  const number = index + 1;
+  return {
+    type: 'NUMBER', value: String(number), label: String(number), color: color(number),
+    column: Math.floor(index / 3) + 1, row: 3 - index % 3,
+  } as const;
+});
+const zero: Choice = { type: 'NUMBER', value: '0', label: '0', color: 'green' };
+const combinations: Combination[] = [];
+const edge: Combination[] = [];
+for (let column = 0; column < 12; column++) {
+  const first = column * 3 + 1;
+  edge.push(combination('STREET', [first, first + 1, first + 2], column + .5, 0));
+  if (column < 11) edge.push(combination('SIX_LINE', [first, first + 1, first + 2, first + 3, first + 4, first + 5], column + 1, 0));
+  for (let index = 0; index < 3; index++) {
+    const number = first + index;
+    if (index < 2) combinations.push(combination('SPLIT', [number, number + 1], column + .5, 2 - index));
+    if (column < 11) combinations.push(combination('SPLIT', [number, number + 3], column + 1, 2.5 - index));
+    if (column < 11 && index < 2) combinations.push(combination('CORNER', [number, number + 1, number + 3, number + 4], column + 1, 2 - index));
+  }
+}
 
 const round = computed(() => state.value?.currentRound);
 const myBets = computed(() => state.value?.bets.filter(bet => bet.playerId === playerId) ?? []);
@@ -67,62 +70,25 @@ const secondsLeft = computed(() => Math.max(0, Math.ceil((Date.parse(round.value
 const accepting = computed(() => round.value?.status === 'BETTING' && secondsLeft.value > 0);
 const resultVisible = computed(() => round.value?.status === 'COMPLETED' && round.value.roundNumber === landedRound.value);
 const remaining = computed(() => Math.max(0, Math.min(100, secondsLeft.value * 100 / (state.value?.bettingSeconds || 20))));
-const matchingGroups = computed(() => {
-  const selected = anchor.value;
-  return selected === null ? [] : groupsFor(combinationType.value).filter(numbers => numbers.includes(selected));
+const selectedNumbers = computed(() => {
+  const choice = selection.value;
+  if (!choice || standardChoices.some(item => item.type === choice.type)) return [];
+  return choice.value.split(',').map(Number);
 });
-const selectedNumbers = computed(() => selection.value && mode.value !== 'outside'
-  ? selection.value.value.split(',').map(Number)
-  : []);
 
-function groupsFor(type: Combination) {
-  const groups: number[][] = [];
-  for (let row = 0; row < 12; row++) {
-    const first = row * 3 + 1;
-    if (type === 'STREET') groups.push([first, first + 1, first + 2]);
-    if (type === 'SIX_LINE' && row < 11) groups.push([first, first + 1, first + 2, first + 3, first + 4, first + 5]);
-    for (let column = 0; column < 3; column++) {
-      const n = first + column;
-      if (type === 'SPLIT') {
-        if (column < 2) groups.push([n, n + 1]);
-        if (row < 11) groups.push([n, n + 3]);
-      }
-      if (type === 'CORNER' && column < 2 && row < 11) groups.push([n, n + 1, n + 3, n + 4]);
-    }
-  }
-  return groups;
+function combination(type: Combination['type'], numbers: number[], column: number, row: number): Combination {
+  return { type, value: numbers.join(','), label: numbers.join(' + '), x: column * 100 / 12, y: row * 100 / 3 };
 }
 
 function color(number: number) {
   return number === 0 ? 'green' : red.has(number) ? 'red' : 'black';
 }
 function describe(bet: RouletteBet) {
-  const standard = outsideGroups.flatMap(group => group.choices).find(choice => choice.type === bet.betType && choice.value === bet.betValue);
+  const standard = standardChoices.find(choice => choice.type === bet.betType && choice.value === bet.betValue);
   return `${names[bet.betType]} · ${standard?.label ?? bet.betValue.split(',').join(' + ')}`;
 }
 function clearSelection() {
   selection.value = null;
-  anchor.value = null;
-}
-function changeMode(next: typeof mode.value) {
-  if (mode.value === next) return;
-  mode.value = next;
-  clearSelection();
-}
-function chooseCombination(type: Combination) {
-  combinationType.value = type;
-  clearSelection();
-}
-function chooseNumber(number: number) {
-  if (mode.value === 'numbers') {
-    selection.value = { type: 'NUMBER', value: String(number), label: String(number) };
-  } else {
-    selection.value = null;
-    anchor.value = number;
-  }
-}
-function chooseGroup(numbers: number[]) {
-  selection.value = { type: combinationType.value, value: numbers.join(','), label: numbers.join(' + ') };
 }
 function selected(choice: Choice) {
   return selection.value?.type === choice.type && selection.value.value === choice.value;
@@ -192,34 +158,46 @@ onUnmounted(() => {
 
         <section v-if="!isDisplay" class="studio-console" aria-label="Fogadóasztal">
           <div class="studio-console-heading"><h2>Fogadóasztal</h2><span>{{ myBets.length }} tét · {{ totalStake }} CR</span></div>
-          <div class="studio-modes" role="group" aria-label="Fogadás típusa">
-            <button v-for="section in sections" :key="section.id" type="button" :aria-pressed="mode === section.id"
-              :disabled="busy" @click="changeMode(section.id)">{{ section.label }}</button>
-          </div>
           <fieldset class="studio-fields" :disabled="busy || !accepting">
             <legend class="layout-visually-hidden">Fogadás kiválasztása</legend>
-            <template v-if="mode !== 'outside'">
-              <div v-if="mode === 'combination'" class="studio-combinations">
-                <button v-for="item in combinations" :key="item.type" type="button" :aria-pressed="combinationType === item.type"
-                  @click="chooseCombination(item.type)">{{ item.label }}</button>
+            <p class="studio-instruction" id="roulette-board-help">
+              A mező közepe egy szám, a határ két szám, a sarok négy szám. Az alsó jelölők három- és hatszámos tétek.
+            </p>
+            <p class="studio-board-pan">A teljes asztal oldalra húzható.</p>
+            <div class="studio-board-scroll" role="region" tabindex="0" aria-label="Európai rulettasztal" aria-describedby="roulette-board-help">
+              <div class="studio-table">
+                <button class="studio-board-cell studio-zero green" type="button" :aria-pressed="selected(zero)" @click="selection = zero">0</button>
+                <div class="studio-inner-bets">
+                  <div class="studio-number-board" aria-label="Számmezők">
+                    <button v-for="number in numberList" :key="number.value" type="button" class="studio-board-cell"
+                      :class="[number.color, { 'studio-covered-number': selectedNumbers.includes(Number(number.value)) }]"
+                      :style="{ gridColumn: number.column, gridRow: number.row }"
+                      :aria-pressed="selected(number)" @click="selection = number">{{ number.label }}</button>
+                  </div>
+                  <button v-for="mark in combinations" :key="mark.type + mark.value" type="button" class="studio-bet-marker"
+                    :class="mark.type.toLowerCase()" :style="{ left: mark.x + '%', top: mark.y + '%' }"
+                    :aria-label="names[mark.type] + ' · ' + mark.label" :title="names[mark.type] + ' · ' + mark.label"
+                    :aria-pressed="selected(mark)" @click="selection = mark"><span aria-hidden="true"></span></button>
+                </div>
+                <div class="studio-column-bets" role="group" aria-label="Oszlopfogadások">
+                  <button v-for="choice in columns" :key="choice.value" type="button" class="studio-board-cell"
+                    :aria-pressed="selected(choice)" @click="selection = choice">{{ choice.label }}</button>
+                </div>
+                <div class="studio-edge-bets" role="group" aria-label="Három és hat szám">
+                  <button v-for="mark in edge" :key="mark.type + mark.value" type="button" class="studio-bet-marker"
+                    :class="mark.type.toLowerCase()" :style="{ left: mark.x + '%' }"
+                    :aria-label="names[mark.type] + ' · ' + mark.label" :title="names[mark.type] + ' · ' + mark.label"
+                    :aria-pressed="selected(mark)" @click="selection = mark"><span aria-hidden="true">{{ mark.type === 'STREET' ? '3' : '6' }}</span></button>
+                </div>
+                <div class="studio-dozen-bets" role="group" aria-label="Tucatfogadások">
+                  <button v-for="choice in dozens" :key="choice.value" type="button" class="studio-board-cell"
+                    :aria-pressed="selected(choice)" @click="selection = choice">{{ choice.label }}</button>
+                </div>
+                <div class="studio-outside-bets" role="group" aria-label="Külső fogadások">
+                  <button v-for="choice in outside" :key="choice.value" type="button" class="studio-board-cell" :class="choice.color"
+                    :aria-pressed="selected(choice)" @click="selection = choice">{{ choice.label }}</button>
+                </div>
               </div>
-              <p v-if="mode === 'combination'" class="studio-instruction">Válassz egy számot, majd egy hozzá tartozó kombinációt.</p>
-              <div class="studio-number-board" aria-label="Számmezők">
-                <button v-if="mode === 'numbers'" type="button" class="green studio-zero" :aria-pressed="selectedNumbers.includes(0)" @click="chooseNumber(0)">0</button>
-                <button v-for="number in numberList" :key="number" type="button" :class="color(number)"
-                  :aria-pressed="selectedNumbers.includes(number) || anchor === number" @click="chooseNumber(number)">{{ number }}</button>
-              </div>
-              <div v-if="matchingGroups.length && mode === 'combination'" class="studio-group-options">
-                <button v-for="numbers in matchingGroups" :key="numbers.join(',')" type="button"
-                  :aria-pressed="selection?.value === numbers.join(',')" @click="chooseGroup(numbers)">{{ numbers.join(' + ') }}</button>
-              </div>
-            </template>
-            <div v-else class="studio-outside">
-              <section v-for="group in outsideGroups" :key="group.label">
-                <h3>{{ group.label }}</h3>
-                <div><button v-for="choice in group.choices" :key="choice.value" type="button" :class="choice.color"
-                  :aria-pressed="selected(choice)" @click="selection = choice">{{ choice.label }}</button></div>
-              </section>
             </div>
           </fieldset>
 
