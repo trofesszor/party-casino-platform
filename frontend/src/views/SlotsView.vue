@@ -103,7 +103,6 @@ function openStakePicker() {
 }
 function chooseStake(nextDenomination: number, nextUnits: number) {
   if (stakesLocked.value) return;
-  audio.effect('bet');
   denomination.value = nextDenomination;
   units.value = nextUnits;
   stakeDialog.value?.close();
@@ -139,7 +138,6 @@ async function animate(grid: SlotTile[], held: readonly boolean[], wasBonus: boo
     await wait(column === 0 ? 290 : 115);
     if (!mounted) return;
     rolling.value[column] = false;
-    audio.effect('click');
     let bells = 0;
     for (const row of rows) {
       const index = row * 5 + column;
@@ -160,9 +158,10 @@ async function spin() {
   error.value = '';
   last.value = null;
   newBells.value = [];
-  audio.effect('start');
-  audio.announce(wasBonus ? 'Harangeső. Újrapörgetés.' : freeSpins.value ? 'Indul az ingyenpörgetés.' : 'Indul a pörgetés.');
-  audio.roll('slot');
+  if (!wasBonus) {
+    audio.effect('reel');
+    audio.announce(freeSpins.value ? 'Indul az ingyenpörgetés.' : 'Indul a pörgetés.');
+  }
   if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
     rolling.value = columns.map(() => true);
     ticker = setInterval(() => {
@@ -180,14 +179,15 @@ async function spin() {
     const incoming = feature?.coins.flatMap((coin, index) => coin && !held[index] ? [index] : []) ?? [];
     const stagingGrid: SlotTile[] = reply.grid.map((tile, index) => incoming.includes(index) ? { symbol: 'empty' } : tile);
     await animate(stagingGrid, held, wasBonus);
-    audio.stopRoll();
     if (!mounted) return;
     reel.value = feature ? bonusGrid(feature) : reply.grid;
     newBells.value = incoming;
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    for (const [index] of incoming.entries()) {
-      audio.after((reducedMotion ? 55 : bellFallMs - 110) + index * (reducedMotion ? 85 : bellStaggerMs),
-        () => audio.effect(wasBonus ? 'bell' : 'bark'));
+    if (!wasBonus) {
+      if (reducedMotion) barkForBells(incoming.length);
+      else for (const [index] of incoming.entries()) {
+        audio.after(Math.round(bellFallMs * .69) + index * bellStaggerMs, () => audio.effect('bark'));
+      }
     }
     bonus.value = reply.bonus;
     freeSpins.value = reply.freeSpins;
@@ -200,15 +200,12 @@ async function spin() {
     if (!mounted) return;
     const payout = reply.payoutAmount;
     if (!wasBonus && reply.bonus) {
-      audio.effect('bonus');
+      audio.effect('win');
       audio.announce('Harangeső indul. Újrapörgetések száma: ' + reply.bonus.remaining + '.', true);
     } else if (reply.finishedBonus) {
       audio.effect(payout ? 'win' : 'end');
       audio.announce('A harangeső véget ért. Nyeremény: ' + payout + ' kredit.', true);
-    } else if (reply.bonus) {
-      audio.effect('end');
-      audio.announce('Pörgetés vége. Hátralévő újrapörgetések: ' + reply.bonus.remaining + '.', true);
-    } else {
+    } else if (!reply.bonus) {
       audio.effect(payout || reply.freeSpinsAwarded ? 'win' : 'end');
       const result = payout ? ' Nyertél ' + payout + ' kreditet.' : '';
       const free = reply.freeSpinsAwarded ? ' Kaptál ' + reply.freeSpinsAwarded + ' ingyenpörgetést.' : '';
@@ -219,7 +216,6 @@ async function spin() {
     reel.value = before;
     error.value = cause instanceof Error ? cause.message : 'A pörgetés sikertelen.';
   } finally {
-    audio.stopRoll();
     clearInterval(ticker);
     rolling.value = columns.map(() => false);
     if (pendingJackpots) jackpots.value = pendingJackpots;

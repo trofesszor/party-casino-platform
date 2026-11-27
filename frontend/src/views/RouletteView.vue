@@ -154,7 +154,6 @@ function placeBet(choice: Choice) {
   if (!accepting.value || !playerId || !round.value) return;
   error.value = '';
   balanceRevision++;
-  audio.effect('bet');
   queued.value.push({ choice, amount: chip.value, roundId: round.value.id });
   void sendBets();
 }

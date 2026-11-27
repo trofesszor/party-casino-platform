@@ -44,13 +44,12 @@ function setTable(next: Table) {
   if (!previous || !next.hand) return;
   const newRound = previous.round !== next.round;
   if (newRound) audio.effect('start');
-  if (newRound || (previous.hand?.cards.length ?? 0) < next.hand.cards.length) audio.effect('card');
   if (next.hand.result && (newRound || previous.phase !== 'results')) {
     const payout = next.hand.payout ?? 0;
     audio.effect(payout > next.hand.stake ? 'win' : 'end');
     audio.announce((newRound ? 'Új osztás. ' : '') + 'Kör vége. ' + labels[next.hand.result] + (payout ? '. Jóváírás: ' + payout + ' kredit.' : '.'));
-  } else if (next.phase === 'playing' && (newRound || previous.revision !== next.revision)) {
-    audio.announce((newRound ? 'Új osztás. ' : '') + 'A kezed értéke ' + next.hand.total + '.');
+  } else if (newRound && next.phase === 'playing') {
+    audio.announce('Új osztás.');
   }
 }
 
@@ -131,7 +130,7 @@ onUnmounted(() => {
           </template>
           <template v-else>
             <label class="bj-stake">Tét
-              <select v-model="stake" :disabled="disabled" @change="audio.effect('bet')">
+              <select v-model="stake" :disabled="disabled">
                 <option v-for="amount in table.allowedBets" :key="amount" :value="amount">{{ format(amount) }}</option>
               </select>
             </label>
